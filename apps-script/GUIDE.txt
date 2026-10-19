@@ -30,7 +30,10 @@
  1. ⚙️ Project Settings (منوی چپ) ← تیک «Show "appsscript.json" manifest file in editor» را بزنید.
  2. برگردید به Editor (آیکن <> در منوی چپ).
  3. Code.gs: روی فایل Code.gs کلیک کنید ← Ctrl+A ← Delete ← کل محتوای Code.gs این بسته را بچسبانید.
- 4. appsscript.json: روی آن کلیک کنید ← Ctrl+A ← Delete ← کل محتوای appsscript.json را بچسبانید.
+ 4. appsscript.json: این فایل را خودتان نسازید (با + نسازید). بعد از تیک بند ۱، خود گوگل آن را
+    در فهرست Files نشان می‌دهد. روی همان کلیک کنید ← Ctrl+A ← Delete ← محتوای appsscript.json را بچسبانید.
+    ⚠ اگر متن آن را در یک فایل .gs (مثل Untitled.gs) بچسبانید، خطای
+    «SyntaxError: Unexpected token ':'» می‌گیرید؛ آن فایل را پاک کنید (⋮ ← Delete).
  5. Index.html: کنار «Files» روی + ← HTML ← نامش را دقیقاً Index بنویسید (بدون .html) ← Enter.
     داخلش Ctrl+A ← Delete ← کل محتوای Index.html را بچسبانید. (چسباندن چند ثانیه طول می‌کشد.)
  6. Ctrl+S. کنار هیچ فایلی نباید نقطه‌ی نارنجیِ «ذخیره‌نشده» بماند.
