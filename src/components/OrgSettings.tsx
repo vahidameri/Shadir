@@ -8,15 +8,15 @@ import { ORG_KEYS, orgList, type OrgItem, type OrgKind } from '../lib/org'
 import { teamCodes } from '../lib/labels'
 import { TERMS, TERMS_KEY, termOverrides } from '../lib/terms'
 
-const TITLE: Record<OrgKind, T2> = { plans: ['هدف‌های برنامه‌ریزی', 'Planning purposes'], links: ['نوع لینک‌های پروژه', 'Project link types'], access: ['سطح دسترسی (فقط نام)', 'Access levels (names only)'], series: ['جلسه‌ها (عنوان سری‌ها)', 'Meeting series'], titles: ['سمت‌ها', 'Job titles'], teams: ['تیم‌ها', 'Teams'], sides: ['واحدها (پروداکت، دیزاین، تک…)', 'Units (product, design, tech…)'] }
+const TITLE: Record<OrgKind, T2> = { plans: ['هدف‌های برنامه‌ریزی', 'Planning purposes'], links: ['نوع لینک‌های پروژه', 'Project link types'], access: ['سطح دسترسی (فقط نام)', 'Access levels (names only)'], series: ['جلسه‌ها (عنوان سری‌ها)', 'Meeting series'], titles: ['سمت‌ها', 'Job titles'], teams: ['تیم‌ها', 'Teams'], sides: ['واحدهای دپارتمان (لاین‌ها، مدیران محصول، CRM و عملیات، داده…)', 'Department units (lines, product managers, CRM & ops, data…)'] }
 const HINT: Record<OrgKind, T2> = {
   plans: ['برنامه‌ریزی برای چه؟ دمو، بستن رودمپ، اسپرینت، انتشار… هر هدف چک‌لیست آمادگی خودش را دارد.', 'What a planning session is for: a demo, the roadmap, a sprint, a release… each starts with its own checklist.'],
   links: ['لینک‌هایی که هر پروژه دارد: استیج، پروداکشن، فیگما، …', 'The links each project keeps: staging, production, Figma, …'],
-  access: ['چهار سطح ثابت‌اند (همه‌چیز + بک‌آفیس، مدیرعامل، هد، عضو)؛ فقط اسمشان را عوض کنید.', 'The four levels are fixed (everything + back office, CEO, head, member); only rename them.'],
-  series: ['نام سری‌های جلسه؛ همه به‌جز «برنامه‌ریزی»، «یک‌به‌یک» و «سایر» هفتگی تکرار می‌شوند.', 'Series names; all but planning, one-on-one and other repeat weekly.'],
-  titles: ['کد کوتاه انگلیسی (مثل CEO) روی کارت هر نفر دیده می‌شود.', 'The short code (e.g. CEO) shows on each person.'],
+  access: ['چهار سطح ثابت‌اند (مدیر برنامه: همه‌چیز + بک‌آفیس، CPTO، هد، عضو)؛ فقط اسمشان را عوض کنید.', 'The four levels are fixed (PgM: everything + back office, CPTO, head, member); only rename them.'],
+  series: ['انواع جلسه؛ ویکلی‌ها هر هفته تکرار می‌شوند، بقیه (وان‌آن‌وان، موردی، بیرونی، برنامه‌ریزی، سایر) نه.', 'Meeting types; the weeklies repeat, the rest (one-on-one, ad-hoc, external, planning, other) don’t.'],
+  titles: ['کد کوتاه انگلیسی (مثل CPTO) روی کارت هر نفر دیده می‌شود.', 'The short code (e.g. CPTO) shows on each person.'],
   teams: ['هر نفر می‌تواند عضو چند تیم باشد.', 'A person can be in several teams.'],
-  sides: ['واحدها کار را به هم تحویل می‌دهند (رفت و برگشت)؛ هر تسک و هر نفر یک واحد دارد.', 'Units hand work to each other (and back); every task and person belongs to one.'],
+  sides: ['هر تسک و هر نفر یک واحد دارد؛ تسک‌ها بر اساس واحد فیلتر و گروه‌بندی می‌شوند.', 'Every task and person belongs to a unit; tasks filter and group by it.'],
 }
 
 export function OrgList({ kind, admin: canEdit, bare }: { kind: OrgKind; admin: boolean; bare?: boolean }) {

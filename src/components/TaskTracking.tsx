@@ -189,6 +189,7 @@ function show(h: HistoryRow, v: string, projectName: (id: string) => string) {
 export function historyText(h: HistoryRow, projectName: (id: string) => string) {
   if (h.field === '_created') return L('این مورد را ایجاد کرد', 'created this')
   if (h.field === '_deleted') return L('این مورد را حذف کرد', 'deleted this')
+  if (h.field === '_event') return `${h.from}${h.to ? `: ${h.to}` : ''}`
   const f = FIELD[h.field] ? L(...FIELD[h.field]) : h.field
   if (h.field === 'description' || h.field === 'notes') return L(`${f} را ویرایش کرد`, `edited the ${f}`)
   if (!h.from) return L(`${f} را «${show(h, h.to, projectName)}» گذاشت`, `set the ${f} to “${show(h, h.to, projectName)}”`)

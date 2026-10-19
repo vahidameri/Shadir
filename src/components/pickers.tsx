@@ -76,7 +76,7 @@ export function PriorityPicker({ value, onChange, label = true }: { value: Prior
 export function PersonPicker({ value, onChange, label = true, placeholder }: { value: string; onChange: (v: string) => void; label?: boolean; placeholder?: string }) {
   const { db, canEdit, me } = useStore()
   const [q, setQ] = useState('')
-  const people = Array.from(new Set([me, ...db.Team.map((m) => m.name)].filter(Boolean)))
+  const people = Array.from(new Set([me, ...db.Team.map((m) => m.name), ...db.Contacts.filter((c) => String(c.active) !== 'false').map((c) => c.name)].filter(Boolean)))
   const list = people.filter((p) => !q || p.includes(q))
   return (
     <Popover

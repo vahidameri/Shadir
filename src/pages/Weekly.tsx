@@ -206,6 +206,11 @@ function MeetingRoom({ m }: { m: Meeting }) {
                 <AvatarStack names={names(m.attendees)} max={6} />
                 {L(`${fa(names(m.attendees).length)} حاضر`, `${names(m.attendees).length} attendees`)}
               </span>
+              {m.guests && (
+                <span className="inline-flex items-center gap-1.5" title={m.guests}>
+                  {L('مهمانان بیرونی', 'Guests')}: <b className="max-w-[18rem] truncate font-medium text-ink">{String(m.guests).split(/[,،\n]+/).map((x) => x.trim()).filter(Boolean).join('، ')}</b>
+                </span>
+              )}
             </div>
           </div>
           <div className="flex flex-wrap gap-2">

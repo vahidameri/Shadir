@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { DB, Role, Row, SheetName } from './types'
+import type { DB, Role, Row, SheetName, MizitoItem } from './types'
 import { readWeekCfg, setWeekCfg } from './weeks'
 import { readTaskCfg, setTaskCfg } from './taskcfg'
 import { COLUMNS_KEY, readColumns, setColumns } from './columns'
@@ -8,6 +8,7 @@ import { TERMS_KEY, applyTerms } from './terms'
 import { setDeliveryCfg } from './cadence'
 import { stampTask } from './taskstamp'
 import { diffRows } from './history'
+import { readMzCfg, setMzCfg, stampMizito } from './mizito'
 import { passFor } from './handoffs'
 import type { Task } from './types'
 import { NOTIFY_KEY, setNotifyOff } from './inbox'
@@ -72,7 +73,7 @@ const NUMERIC: Partial<Record<SheetName, string[]>> = {
 }
 
 function emptyDB(): DB {
-  return { Projects: [], Scope: [], Milestones: [], Sprints: [], Tasks: [], FollowUps: [], Risks: [], Team: [], Allocations: [], Updates: [], Comments: [], Deliverables: [], Meetings: [], Files: [], Config: [], Contracts: [], Handoffs: [], Deliveries: [], History: [] }
+  return { Projects: [], Scope: [], Milestones: [], Sprints: [], Tasks: [], FollowUps: [], Risks: [], Team: [], Allocations: [], Updates: [], Comments: [], Deliverables: [], Meetings: [], Files: [], Config: [], Contracts: [], Handoffs: [], Deliveries: [], History: [], Contacts: [], Mizito: [], MizitoMentions: [] }
 }
 
 // Sheets return numbers as numbers or strings, dates as ISO strings. Normalize once here.
@@ -136,7 +137,11 @@ interface Store {
   authed: boolean
   email: string
   upload: (entity: FileRef['entity'], entity_id: string, file: File) => Promise<FileRef>
-  action: (name: string, payload: Record<string, unknown>) => Promise<void>
+  action: (name: string, payload: Record<string, unknown>) => Promise<unknown>
+  /** many rows at once (import); rows with an existing id are replaced */
+  bulk: <S extends SheetName>(sheet: S, rows: Row<S>[]) => Promise<void>
+  /** removes every row of an import batch */
+  undoBatch: (batch: string) => Promise<number>
   /** shared setting from the Config tab */
   setting: (key: string, fallback?: string) => string
   setSetting: (key: string, value: string) => Promise<void>
@@ -214,6 +219,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setNotifyOff(db.Config.find((r) => r.id === NOTIFY_KEY)?.value)
     setTaskCfg(readTaskCfg((k) => db.Config.find((r) => r.id === k)?.value, db.Team))
     setColumns(readColumns(db.Config.find((r) => r.id === COLUMNS_KEY)?.value))
+    setMzCfg(readMzCfg((k) => db.Config.find((r) => r.id === k)?.value))
   }, [db.Config, db.Team])
   const shown = useMemo(() => {
     return mapDB(scopeDB(visibleDB(db, canonMe), canonMe, access), maps.toEn)
@@ -314,6 +320,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       let row = mapRow(sheet, input as unknown as Record<string, unknown>, toCanonRef.current) as unknown as Row<S>
       const prev = dbRef.current
       const list = prev[sheet] as Row<S>[]
+      if (sheet === 'Mizito') row = stampMizito(list.find((r) => r.id === row.id) as unknown as MizitoItem | undefined, row as unknown as MizitoItem) as unknown as Row<S>
       if (sheet === 'Tasks') row = stampTask(list.find((r) => r.id === row.id) as unknown as Task | undefined, row as unknown as Task) as unknown as Row<S>
       const old = list.find((r) => r.id === row.id)
       const exists = !!old
@@ -405,10 +412,60 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const action = useCallback(
     async (name: string, payload: Record<string, unknown>) => {
-      if (mode === 'demo') return
-      await remoteAction(config, name, payload)
+      if (mode === 'demo') return undefined
+      const res = (await remoteAction(config, name, payload)) as { row?: unknown }
+      return res?.row
     },
     [config, mode],
+  )
+
+  const BULK_SHEETS: SheetName[] = ['Tasks', 'FollowUps', 'Mizito', 'MizitoMentions', 'Contacts', 'Team', 'Projects', 'History', 'Comments']
+  const bulk = useCallback(
+    async <S extends SheetName>(sheet: S, rows: Row<S>[]) => {
+      if (!rows.length) return
+      const prev = dbRef.current
+      const byId = new Map(rows.map((r) => [r.id, r]))
+      const list = prev[sheet] as Row<S>[]
+      const kept = list.map((r) => byId.get(r.id) || r)
+      const added = rows.filter((r) => !list.some((x) => x.id === r.id))
+      const next = { ...prev, [sheet]: [...kept, ...added] } as DB
+      dbRef.current = next
+      setDb(next)
+      if (mode === 'demo') return persistDemo(next)
+      try {
+        // in chunks, so one request never runs into the Apps Script time limit
+        for (let i = 0; i < rows.length; i += 300) await remoteAction(config, 'bulk', { sheet, rows: rows.slice(i, i + 300) })
+        setLastSync(new Date())
+      } catch (e) {
+        dbRef.current = prev
+        setDb(prev)
+        toast(`${L('ایمپورت انجام نشد', 'Import failed')}: ${e instanceof Error ? e.message : e}`, 'err')
+        throw e
+      }
+    },
+    [config, mode, toast],
+  )
+  const undoBatch = useCallback(
+    async (batch: string) => {
+      const prev = dbRef.current
+      let n = 0
+      const next = { ...prev } as DB
+      for (const k of BULK_SHEETS) {
+        const rows = prev[k] as { id: string; batch?: string }[]
+        const left = rows.filter((r) => r.batch !== batch)
+        n += rows.length - left.length
+        ;(next as unknown as Record<string, unknown>)[k] = left
+      }
+      dbRef.current = next
+      setDb(next)
+      if (mode === 'demo') {
+        persistDemo(next)
+        return n
+      }
+      const res = (await remoteAction(config, 'undoBatch', { batch })) as { row?: { removed?: number } }
+      return res?.row?.removed ?? n
+    },
+    [config, mode], // eslint-disable-line react-hooks/exhaustive-deps
   )
 
   const setting = (key: string, fallback = '') => db.Config.find((r) => r.id === key)?.value ?? fallback
@@ -434,9 +491,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
 
   const value = useMemo<Store>(
-    () => ({ db: live, archived, serverVersion, mode, role, me, setMe, loading, error, lastSync, config, setConfig, refresh, upsert, remove, resetDemo, canEdit: role !== 'viewer', access, authed, email, upload, action, setting, setSetting, toasts, toast, dismissToast }),
+    () => ({ db: live, archived, serverVersion, mode, role, me, setMe, loading, error, lastSync, config, setConfig, refresh, upsert, remove, resetDemo, canEdit: role !== 'viewer', access, authed, email, upload, action, bulk, undoBatch, setting, setSetting, toasts, toast, dismissToast }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [live, archived, serverVersion, access, mode, role, me, authed, email, upload, action, loading, error, lastSync, config, refresh, upsert, remove, toasts, toast, dismissToast],
+    [live, archived, serverVersion, access, mode, role, me, authed, email, upload, action, bulk, undoBatch, loading, error, lastSync, config, refresh, upsert, remove, toasts, toast, dismissToast],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

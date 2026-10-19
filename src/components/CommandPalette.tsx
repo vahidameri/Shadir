@@ -2,14 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { JOB_TITLE } from '../lib/labels'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { Briefcase, ListChecks, BellRing, ShieldAlert, User, CornerDownLeft, ArrowRight, Plus, Languages, Search } from 'lucide-react'
+import { Briefcase, ListChecks, BellRing, ShieldAlert, User, CornerDownLeft, ArrowRight, Plus, Languages, Search, AtSign } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { useI18n, L, lbl } from '../lib/i18n'
 import { useEditor } from './Editor'
 import { useComposer } from './UpdateComposer'
 import { can } from '../lib/access'
 
-const LEADER_ONLY: string[] = ['/risks']
+const LEADER_ONLY: string[] = ['/risks', '/mizito']
 import { cx, HealthDot, StatusIcon } from './ui'
 import { projectMetrics } from '../lib/metrics'
 
@@ -62,6 +62,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         ['/my', L('میز کار', 'My desk')],
         ['/tasks', L('تسک‌ها و بورد', 'Tasks & board')],
         ['/followups', L('پیگیری‌ها', 'Follow-ups')],
+        ['/mizito', L('میزیتو', 'Mizito')],
         ['/meetings', L('جلسات و اکشن‌ها', 'Meetings & actions')],
         ['/calendar', L('تقویم', 'Calendar')],
         ['/projects', L('پروژه‌ها', 'Projects')],
@@ -75,6 +76,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     const data: Item[] = [
       ...db.Projects.map((p) => ({ key: p.id, group: G.proj, label: p.name, sub: p.code, icon: <HealthDot h={projectMetrics(p, db).health} />, run: () => navigate(`/projects/${p.id}`) })),
       ...db.Tasks.map((t) => ({ key: t.id, group: G.task, label: t.title, sub: [pname(t.project_id), t.assignee].filter(Boolean).join(' · '), icon: <StatusIcon s={t.status} size={15} />, run: () => editor.open('Tasks', t as never) })),
+      ...db.Mizito.map((m) => ({ key: m.id, group: G.fu, label: m.title, sub: `${L('میزیتو', 'Mizito')} · ${m.asked_by}`, icon: ico(AtSign), run: () => navigate(`/mizito?id=${m.id}`) })),
       ...db.FollowUps.map((f) => ({ key: f.id, group: G.fu, label: f.subject, sub: f.person, icon: ico(BellRing), run: () => editor.open('FollowUps', f as never) })),
       ...db.Risks.map((r) => ({ key: r.id, group: G.risk, label: r.title, sub: pname(r.project_id), icon: ico(ShieldAlert), run: () => editor.open('Risks', r as never) })),
       ...db.Team.map((m) => ({ key: m.id, group: G.ppl, label: m.name, sub: lbl(JOB_TITLE, m.role), icon: ico(User), run: () => navigate(`/people/${m.id}`) })),

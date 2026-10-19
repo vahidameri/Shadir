@@ -1,4 +1,7 @@
 import { assigneesOf, isAssignee } from '../lib/assignees'
+import { mzClosed, mzSignals } from '../lib/mizito'
+import { MzSignals, PBadge } from '../components/MizitoParts'
+import { AtSign } from 'lucide-react'
 import { signals, viewCounts } from '../lib/signals'
 import { closed, isBlocked } from '../lib/columns'
 import { useMemo, useState } from 'react'
@@ -135,6 +138,11 @@ export default function MyDesk() {
   const blockedAll = scope.filter((t) => isBlocked(t.status))
   const fuDueAll = db.FollowUps.filter((f) => f.status !== 'done' && f.due_date && f.due_date <= today)
   const vc = viewCounts(db.Tasks, me)
+  const mzAll = db.Mizito.filter((m) => !mzClosed(m)).map((m) => ({ m, s: mzSignals(db, m) }))
+  const mzTop = [...mzAll].sort((a, b) => a.s.p - b.s.p || (a.s.slaLeft ?? 1e9) - (b.s.slaLeft ?? 1e9)).slice(0, 5)
+  const mzOpen = mzAll.length
+  const mzP0 = mzAll.filter((x) => x.s.p === 0).length
+  const mzBreach = mzAll.filter((x) => x.s.breached).length
   const watch = { flagged: vc.flagged, stale: vc.stale, intake: vc.intake, blockedLong: db.Tasks.filter((t) => signals(t).blockedLong).length }
   const myActions = db.Tasks.filter((t) => t.meeting_id && isAssignee(t, me) && !closed(t))
 
@@ -270,6 +278,29 @@ export default function MyDesk() {
                 </Link>
               ))}
           </div>
+        )}
+
+        {can.mizito(access) && mzTop.length > 0 && (
+          <Card
+            eyebrow={<span className="flex items-center gap-1.5"><AtSign size={12} /> {L('میزیتو', 'Mizito')}</span>}
+            title={L(`${fa(mzOpen)} مورد باز${mzP0 ? ` · ${fa(mzP0)} P0` : ''}${mzBreach ? ` · ${fa(mzBreach)} عبور از SLA` : ''}`, `${mzOpen} open${mzP0 ? ` · ${mzP0} P0` : ''}${mzBreach ? ` · ${mzBreach} SLA breached` : ''}`)}
+            action={<Link to="/mizito" className="text-xs text-sub hover:text-ink">{L('همه ←', 'All →')}</Link>}
+          >
+            <ul className="-mx-2 divide-y divide-line">
+              {mzTop.map(({ m, s }) => (
+                <li key={m.id}>
+                  <Link to={`/mizito?id=${m.id}`} className="flex items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-muted/60">
+                    <PBadge p={s.p} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm">{m.title}</span>
+                      <span className="mt-0.5 block"><MzSignals m={m} compact /></span>
+                    </span>
+                    <span className="hidden shrink-0 text-[0.6875rem] text-sub sm:inline">{m.asked_by}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Card>
         )}
 
         <div className="grid gap-4 @lg:grid-cols-5">

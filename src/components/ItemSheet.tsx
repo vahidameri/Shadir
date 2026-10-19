@@ -1,5 +1,7 @@
 // Rich detail sheet for a task or follow-up: inline-editable properties, description, comments & activity.
 import { useMemo, useState } from 'react'
+import { copyFollowUp } from './shared'
+import { Copy } from 'lucide-react'
 import { catOf, closed, firstOf } from '../lib/columns'
 import { historyOf } from '../lib/history'
 import { BlockerPanel, FlagPicker, TaskSignals, historyText } from './TaskTracking'
@@ -204,9 +206,17 @@ export function ItemSheet({ sheet, id, onClose }: { sheet: 'Tasks' | 'FollowUps'
               <button className="btn-primary btn-sm" onClick={() => patch({ status: 'done' })}>
                 <Check size={14} /> {L('انجام شد', 'Mark done')}
               </button>
-              <button className="btn-outline btn-sm" onClick={() => patch({ status: 'waiting', due_date: addDays(todayISO(), 2) })}>
-                <Clock size={14} /> {L('منتظر پاسخ (۲ روز)', 'Waiting (2 days)')}
+              <button className="btn-outline btn-sm" onClick={() => patch({ status: 'waiting', last_ping: todayISO(), ping_count: (Number(item.ping_count) || 0) + 1, due_date: addDays(todayISO(), taskCfg().pingDays) })}>
+                <Send size={14} className="rtl:-scale-x-100" /> {L(`پینگ زدم (بعدی ${fa(taskCfg().pingDays)} روز دیگر)`, `Pinged (next in ${taskCfg().pingDays} days)`)}
               </button>
+              <button className="btn-outline btn-sm" onClick={() => copyFollowUp(item as unknown as FollowUp, toast)}>
+                <Copy size={14} /> {L('کپی متن یادآوری', 'Copy reminder text')}
+              </button>
+              {item.link && (
+                <a className="btn-ghost btn-sm" href={item.link} target="_blank" rel="noreferrer">
+                  <ExternalLink size={14} /> {/mizito/i.test(item.link) ? L('باز کردن در میزیتو', 'Open in Mizito') : L('باز کردن لینک', 'Open link')}
+                </a>
+              )}
               <button className="btn-outline btn-sm" onClick={() => patch({ due_date: addDays(todayISO(), 1) })}>
                 <AlarmClockOff size={14} /> {L('فردا', 'Tomorrow')}
               </button>
@@ -478,6 +488,17 @@ export function ItemSheet({ sheet, id, onClose }: { sheet: 'Tasks' | 'FollowUps'
               <Prop label={L('با', 'With')}>
                 <PersonPicker value={item.person} onChange={(v) => patch({ person: v })} placeholder={L('انتخاب', 'Choose')} />
               </Prop>
+              <Prop label={L('منتظر', 'Waiting for')}>
+                <input key={item.waiting_for} defaultValue={item.waiting_for || ''} disabled={!canEdit} onBlur={(e) => e.target.value !== (item.waiting_for || '') && patch({ waiting_for: e.target.value })} placeholder={L('چه چیزی؟', 'What?')} className="h-8 w-full rounded-full bg-transparent px-2.5 text-xs outline-none hover:bg-muted focus:bg-surface focus:ring-1 focus:ring-line-strong" />
+              </Prop>
+              <Prop label={L('لینک', 'Link')}>
+                <input key={item.link} dir="ltr" defaultValue={item.link || ''} disabled={!canEdit} onBlur={(e) => e.target.value.trim() !== (item.link || '') && patch({ link: e.target.value.trim() })} placeholder="https://mizito…" className="h-8 w-full rounded-full bg-transparent px-2.5 text-xs outline-none hover:bg-muted focus:bg-surface focus:ring-1 focus:ring-line-strong" />
+              </Prop>
+              {Number(item.ping_count) > 0 && (
+                <Prop label={L('پینگ‌ها', 'Pings')}>
+                  <span className="px-2.5 text-xs text-sub">{L(`${fa(Number(item.ping_count))} بار · آخرین ${fmtDate(item.last_ping || '')}`, `${item.ping_count}× · last ${fmtDate(item.last_ping || '')}`)}</span>
+                </Prop>
+              )}
               <Prop label={L('کانال', 'Channel')}>
                 <Popover
                   width={170}
@@ -506,7 +527,7 @@ export function ItemSheet({ sheet, id, onClose }: { sheet: 'Tasks' | 'FollowUps'
               <Prop label={L('اولویت', 'Priority')}>
                 <PriorityPicker value={item.priority} onChange={(v) => patch({ priority: v })} />
               </Prop>
-              <Prop label={L('پیگیری بعدی', 'Next touch')}>
+              <Prop label={L('پینگ بعدی', 'Next ping')}>
                 <DatePicker compact value={item.due_date} onChange={(v) => patch({ due_date: v })} />
               </Prop>
               <Prop label={L('پروژه', 'Project')}>

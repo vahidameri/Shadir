@@ -6,14 +6,18 @@ import { useEditor } from '../components/Editor'
 import { Band, Card, Overlap, Segmented, StatStrip, Avatar, cx } from '../components/ui'
 import { PauseButton } from '../components/PauseButton'
 import Settings from './Settings'
+import { PeopleRegistry } from '../components/PeopleRegistry'
+import { ImportPage } from '../components/Import'
 import { OrgPage } from '../components/OrgSettings'
 import { L, lbl } from '../lib/i18n'
 import { ACCESS, PROJECT_STATUS, JOB_TITLE, TEAM_NAMES, teamCodes, usernameOf } from '../lib/labels'
-import { capOf, memberWeek } from '../lib/capacity'
+import { closed } from '../lib/columns'
+import { isAssignee } from '../lib/assignees'
+import { isTaskOverdue } from '../lib/metrics'
 import { fa } from '../lib/jalali'
 import type { Access } from '../lib/types'
 
-type Tab = 'people' | 'org' | 'projects' | 'settings'
+type Tab = 'people' | 'contacts' | 'org' | 'projects' | 'import' | 'settings'
 
 /** Back office — the program manager's control room: people & access, organisation, projects, settings.
  *  Contracts have their own page (/contracts) for the program manager and the CEO. */
@@ -33,9 +37,11 @@ export default function Admin({ initial = 'people' }: { initial?: Tab }) {
               value={tab}
               onChange={setTab}
               options={[
-                { value: 'people', label: L('افراد و دسترسی', 'People & access') },
+                { value: 'people', label: L('دپارتمان و دسترسی', 'Department & access') },
+                { value: 'contacts', label: L('اشخاص و رده‌ها', 'People & tiers') },
                 { value: 'org', label: L('سمت‌ها و سازمان', 'Titles & organisation') },
                 { value: 'projects', label: L('پروژه‌ها', 'Projects') },
+                { value: 'import', label: L('ایمپورت', 'Import') },
                 { value: 'settings', label: L('تنظیمات', 'Settings') },
               ]}
             />
@@ -69,6 +75,8 @@ export default function Admin({ initial = 'people' }: { initial?: Tab }) {
       <Overlap>
         {tab === 'people' && <People />}
         {tab === 'projects' && <ProjectsAdmin />}
+        {tab === 'contacts' && <PeopleRegistry admin={access === 'super'} />}
+        {tab === 'import' && <ImportPage />}
         {tab === 'org' && <OrgPage admin={access === 'super'} />}
         {tab === 'settings' && <Settings embedded />}
       </Overlap>
@@ -95,14 +103,16 @@ function People() {
               <th className="th">{L('نام کاربری', 'Username')}</th>
               <th className="th">{L('ایمیل', 'Email')}</th>
               <th className="th">{L('تیم', 'Track')}</th>
-              <th className="th text-center">{L('بار / ظرفیت', 'Load / capacity')}</th>
+              <th className="th text-center">{L('تسک باز', 'Open tasks')}</th>
               <th className="th text-center">{L('ورود', 'Sign-in')}</th>
               <th className="th" />
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
             {db.Team.map((m) => {
-              const w = memberWeek(db, m)
+              const mine = db.Tasks.filter((t) => !closed(t) && isAssignee(t, m.name))
+              const openN = mine.length
+              const late = mine.filter(isTaskOverdue).length
               const off = String(m.active) === 'false'
               return (
                 <tr key={m.id} className={cx('transition hover:bg-muted/30', off && 'opacity-50')}>
@@ -132,8 +142,8 @@ function People() {
                   </td>
                   <td className="td text-xs">{teamCodes(m.team).map((t) => lbl(TEAM_NAMES, t)).join(L('، ', ', ')) || '—'}</td>
                   <td className="td text-center text-xs num">
-                    <span className={cx(w.load > 100 ? 'font-semibold text-bad' : 'text-sub')}>{fa(`${w.load}%`)}</span>
-                    {capOf(m) !== 100 && <span className="text-sub"> / {fa(`${capOf(m)}%`)}</span>}
+                    <span className={cx(late ? 'font-semibold text-bad' : 'text-sub')}>{fa(openN)}</span>
+                    {late > 0 && <span className="text-bad"> · {L(`${fa(late)} معوق`, `${late} late`)}</span>}
                   </td>
                   <td className="td text-center">
                     <button

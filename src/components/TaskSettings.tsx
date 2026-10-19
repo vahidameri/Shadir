@@ -285,6 +285,7 @@ export function FlagsCard({ admin }: { admin: boolean }) {
       )}
       <div className="mt-5 space-y-3 border-t border-line pt-4">
         {num(L('راکد بعد از (روز)', 'Stale after (days)'), L('تسک بازی که این مدت تغییری نکرده «راکد» حساب می‌شود', 'An open task untouched this long counts as stale'), TASK_KEYS.staleDays, c.staleDays)}
+        {num(L('پینگ بعدی پیگیری‌ها (روز بعد)', 'Next follow-up ping (days)'), L('بعد از زدن «پینگ زدم»، پینگ بعدی چند روز دیگر باشد', 'After “Pinged”, the next ping is due in'), TASK_KEYS.pingDays, c.pingDays)}
         {num(L('هشدار انسداد بعد از (روز)', 'Blocker alert after (days)'), L('تسکی که این مدت مسدود مانده، هشدار و پیشنهاد پیگیری می‌گیرد', 'A task blocked this long raises an alert and a follow-up suggestion'), TASK_KEYS.blockedDays, c.blockedDays)}
       </div>
     </Card>

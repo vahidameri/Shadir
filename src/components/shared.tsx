@@ -1,15 +1,18 @@
 import { DeliveredButton, DeliveryBadge, DeliveryHistory } from './DeliveryDay'
+import { reminderText } from '../lib/mizito'
+import { taskCfg } from '../lib/taskcfg'
+import { Copy, ExternalLink, Send } from 'lucide-react'
 import { closed, firstOf } from '../lib/columns'
 import { signals } from '../lib/signals'
 import { TaskSignals } from './TaskTracking'
 import { everyDay, hasDeliveryDay } from '../lib/cadence'
 import { Link } from 'react-router-dom'
-import { Check, Clock, AlarmClockOff, MessageSquare, Phone, Mail, Users2, MoreHorizontal, AlertTriangle, Star } from 'lucide-react'
+import { Check, AlarmClockOff, MessageSquare, Phone, Mail, Users2, MoreHorizontal, AlertTriangle, Star } from 'lucide-react'
 import type { FollowUp, Project, Task } from '../lib/types'
 import { useStore } from '../lib/store'
 import { useEditor } from './Editor'
 import { Avatar, Due, HealthDot, Progress, cx, healthText, Chip, StatusIcon } from './ui'
-import { addDays, fa, fmtDayMonth, todayISO, daysFromToday } from '../lib/jalali'
+import { addDays, daysBetween, fa, fmtDayMonth, todayISO, daysFromToday } from '../lib/jalali'
 import { L, lbl, locale } from '../lib/i18n'
 import { CHANNEL, FOLLOWUP_STATUS, HEALTH, PROJECT_STATUS } from '../lib/labels'
 import { projectMetrics } from '../lib/metrics'
@@ -102,6 +105,19 @@ function DueInline({ iso, done, onChange }: { iso: string; done: boolean; onChan
 
 const channelIcon = { meeting: Users2, call: Phone, email: Mail, chat: MessageSquare, other: MoreHorizontal }
 
+/** Reminder text for a follow-up (the template from the settings), copied for Mizito or a messenger. */
+export function followUpText(f: FollowUp) {
+  const since = f.last_ping || f.created_at
+  const days = since ? Math.max(0, daysBetween(since, todayISO())) : 0
+  return reminderText({ title: f.waiting_for ? `${f.subject} (${f.waiting_for})` : f.subject, link: f.link }, f.person, days)
+}
+export function copyFollowUp(f: FollowUp, toast: (t: string, k?: 'ok' | 'err') => void) {
+  navigator.clipboard?.writeText(followUpText(f)).then(
+    () => toast(L('متن یادآوری کپی شد — در میزیتو یا پیام‌رسان بچسبانید', 'Reminder copied — paste it in Mizito or a messenger')),
+    () => toast(L('کپی انجام نشد', 'Copy failed'), 'err'),
+  )
+}
+
 export function FollowUpRow({ f, compact }: { f: FollowUp; compact?: boolean }) {
   const { upsert, canEdit, toast } = useStore()
   const { open } = useEditor()
@@ -129,7 +145,14 @@ export function FollowUpRow({ f, compact }: { f: FollowUp; compact?: boolean }) 
           <span>· {lbl(CHANNEL, f.channel)}</span>
           {f.project_id && <span className="truncate">· {pname(f.project_id)}</span>}
           {f.status === 'waiting' && <Chip className="bg-purple-500/10 text-purple-600 dark:text-purple-300">{lbl(FOLLOWUP_STATUS, 'waiting')}</Chip>}
+          {Number(f.ping_count) > 0 && <span>· {L(`${fa(Number(f.ping_count))} بار پینگ`, `pinged ${f.ping_count}×`)}{f.last_ping ? L(` (آخرین ${fmtDayMonth(f.last_ping)})`, ` (last ${fmtDayMonth(f.last_ping)})`) : ''}</span>}
+          {f.link && (
+            <a href={f.link} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-0.5 hover:text-ink">
+              · <ExternalLink size={11} /> {/mizito/i.test(f.link) ? L('میزیتو', 'Mizito') : L('لینک', 'Link')}
+            </a>
+          )}
         </div>
+        {f.waiting_for && <div className="mt-1 text-xs"><span className="text-sub">{L('منتظر:', 'Waiting for:')}</span> {f.waiting_for}</div>}
         {!compact && f.notes && <div className="mt-1.5 line-clamp-2 text-xs leading-5 text-sub/90">{f.notes}</div>}
       </div>
       <div className="flex flex-col items-end gap-1.5">
@@ -139,8 +162,15 @@ export function FollowUpRow({ f, compact }: { f: FollowUp; compact?: boolean }) 
             <button className="icon-btn h-7 w-7" title={L('انجام شد', 'Done')} onClick={(e) => act(e, { status: 'done', done_at: todayISO() }, L('پیگیری بسته شد', 'Follow-up closed'))}>
               <Check size={14} />
             </button>
-            <button className="icon-btn h-7 w-7" title={L('منتظر پاسخ', 'Waiting')} onClick={(e) => act(e, { status: 'waiting', due_date: addDays(todayISO(), 2) }, L('منتظر پاسخ — ۲ روز دیگر یادآوری می‌شود', 'Waiting — reminder in 2 days'))}>
-              <Clock size={14} />
+            <button
+              className="icon-btn h-7 w-7"
+              title={L('پینگ زدم', 'Pinged')}
+              onClick={(e) => act(e, { status: 'waiting', last_ping: todayISO(), ping_count: (Number(f.ping_count) || 0) + 1, due_date: addDays(todayISO(), taskCfg().pingDays) }, L(`پینگ ثبت شد — پینگ بعدی ${fa(taskCfg().pingDays)} روز دیگر`, `Ping logged — next in ${taskCfg().pingDays} days`))}
+            >
+              <Send size={14} className="rtl:-scale-x-100" />
+            </button>
+            <button className="icon-btn h-7 w-7" title={L('کپی متن یادآوری', 'Copy reminder text')} onClick={(e) => (e.stopPropagation(), copyFollowUp(f, toast))}>
+              <Copy size={14} />
             </button>
             <button className="icon-btn h-7 w-7" title={L('فردا', 'Tomorrow')} onClick={(e) => act(e, { due_date: addDays(todayISO(), 1) }, L('به فردا موکول شد', 'Snoozed to tomorrow'))}>
               <AlarmClockOff size={14} />

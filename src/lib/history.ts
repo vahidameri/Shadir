@@ -7,7 +7,8 @@ import { nowStamp } from './taskstamp'
 
 export const HISTORY_FIELDS: Partial<Record<SheetName, string[]>> = {
   Tasks: TRACKED as string[],
-  FollowUps: ['subject', 'person', 'status', 'due_date', 'priority', 'channel', 'notes', 'project_id', 'owner'],
+  FollowUps: ['subject', 'person', 'status', 'due_date', 'priority', 'channel', 'notes', 'project_id', 'owner', 'waiting_for', 'link'],
+  Mizito: ['title', 'status', 'asked_by', 'mentioned', 'category', 'action', 'priority_override', 'urgent', 'assigned_to', 'due_date', 'outcome', 'link', 'description'],
 }
 const clip = (v: unknown) => String(v ?? '').slice(0, 300)
 

@@ -20,6 +20,7 @@ import { can } from '../lib/access'
 import { ACCESS, JOB_TITLE } from '../lib/labels'
 import { CommandPalette } from './CommandPalette'
 import { NoyanMark } from './Brand'
+import { mzClosed, mzSignals } from '../lib/mizito'
 import { lbl } from '../lib/i18n'
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -85,6 +86,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
   // Madar: my work → tracking → watching → back office
   const openTasks = db.Tasks.filter((t) => !closed(t)).length
+  const mzHot = can.mizito(access) ? db.Mizito.filter((m) => { const s = mzSignals(db, m); return !mzClosed(m) && (s.p === 0 || s.breached) }).length : 0
   const groups: { label: string; links: { to: string; label: string; icon: typeof ListChecks; badge?: number; count?: number; hub?: Hub }[] }[] = [
     {
       label: L('کار من', 'My work'),
@@ -97,8 +99,9 @@ export function Layout({ children }: { children: ReactNode }) {
     {
       label: L('پیگیری', 'Tracking'),
       links: [
-        { to: '/tasks', label: L('تسک‌ها', 'Tasks'), icon: ListChecks, count: openTasks, hub: 'work' as Hub },
+        { to: '/tasks', label: L('تسک‌ها', 'Tasks'), icon: ListChecks, count: openTasks },
         { to: '/followups', label: L('پیگیری‌ها', 'Follow-ups'), icon: BellRing },
+        ...(can.mizito(access) ? [{ to: '/mizito', label: L('میزیتو', 'Mizito'), icon: AtSign, badge: mzHot }] : []),
         { to: '/projects', label: L('پروژه‌ها', 'Projects'), icon: Briefcase, count: db.Projects.filter((p) => p.status === 'active').length },
       ],
     },

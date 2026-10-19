@@ -13,6 +13,7 @@ export const TASK_KEYS = {
   flags: 'task.flags', // JSON [{id, fa, en, color}] — tracking flags
   staleDays: 'task.stale_days', // an open task untouched this many days is "stale" (default 7)
   blockedDays: 'task.blocked_days', // blocked this many days → alert (default 3)
+  pingDays: 'fu.ping_days', // after a ping, the next one is due in this many days (default 2)
 } as const
 
 export interface Flag { id: string; fa: string; en: string; color: string }
@@ -31,9 +32,9 @@ const FIELD_DEFAULT: Record<TaskField, FieldMode> = { assigned_at: 'on', flag: '
 export const fieldKey = (f: TaskField) => `task.field.${f}`
 
 interface Person { id: string; access?: string }
-export interface TaskCfg { defaultDue: string; flexDefaultDue: string; dueRequired: boolean; projectRequired: boolean; noDue: string[]; personal: string[]; areas: string[]; fields: Record<TaskField, FieldMode>; flags: Flag[]; staleDays: number; blockedDays: number }
+export interface TaskCfg { defaultDue: string; flexDefaultDue: string; dueRequired: boolean; projectRequired: boolean; noDue: string[]; personal: string[]; areas: string[]; fields: Record<TaskField, FieldMode>; flags: Flag[]; staleDays: number; blockedDays: number; pingDays: number }
 
-let cfg: TaskCfg = { defaultDue: '0', flexDefaultDue: '', dueRequired: true, projectRequired: false, noDue: [], personal: [], areas: [], fields: { ...FIELD_DEFAULT }, flags: DEFAULT_FLAGS, staleDays: 7, blockedDays: 3 }
+let cfg: TaskCfg = { defaultDue: '0', flexDefaultDue: '', dueRequired: true, projectRequired: false, noDue: [], personal: [], areas: [], fields: { ...FIELD_DEFAULT }, flags: DEFAULT_FLAGS, staleDays: 7, blockedDays: 3, pingDays: 2 }
 export const taskCfg = () => cfg
 
 /** Reads the rules; the people lists default to the CEO (exec). */
@@ -58,6 +59,7 @@ export function readTaskCfg(get: (k: string) => string | undefined, team: Person
     flags: readFlags(get(TASK_KEYS.flags)),
     staleDays: Number(get(TASK_KEYS.staleDays)) || 7,
     blockedDays: Number(get(TASK_KEYS.blockedDays)) || 3,
+    pingDays: Number(get(TASK_KEYS.pingDays)) || 2,
   }
 }
 

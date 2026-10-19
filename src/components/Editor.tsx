@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react'
+import { mzCfg } from '../lib/mizito'
 import { Plus, Trash2 } from 'lucide-react'
 import { ORG_KEYS, orgList } from '../lib/org'
 import type { SheetName } from '../lib/types'
@@ -20,7 +21,7 @@ import { ItemSheet } from './ItemSheet'
 import { useAuto } from '../lib/automations'
 import { can } from '../lib/access'
 
-type FieldType = 'text' | 'textarea' | 'select' | 'multi' | 'date' | 'number' | 'project' | 'person' | 'people' | 'sprint' | 'member' | 'scale' | 'status' | 'area' | 'side' | 'title' | 'assignees' | 'flag'
+type FieldType = 'text' | 'textarea' | 'select' | 'multi' | 'date' | 'number' | 'project' | 'person' | 'people' | 'sprint' | 'member' | 'scale' | 'status' | 'area' | 'side' | 'title' | 'assignees' | 'flag' | 'tier' | 'mzstatus' | 'mzcat' | 'mzaction' | 'pprio'
 export interface Field {
   key: string
   label: T2
@@ -31,7 +32,7 @@ export interface Field {
   placeholder?: T2
 }
 
-export type EditableSheet = Exclude<SheetName, 'Comments' | 'Files' | 'Config' | 'Handoffs' | 'Deliveries' | 'History'>
+export type EditableSheet = Exclude<SheetName, 'Comments' | 'Files' | 'Config' | 'Handoffs' | 'Deliveries' | 'History' | 'MizitoMentions'>
 
 export const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields: Field[]; defaults: () => Record<string, unknown> }> = {
   Tasks: {
@@ -69,20 +70,60 @@ export const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields:
     ],
     defaults: () => ({ private: '', flag: '', link: '', requested_by: '', assigned_at: '', blocked_reason: '', blocked_by: '', blocked_since: '', updated_at: '', status: 'todo', priority: 'medium', points: 0, created_at: todayISO(), track: '', depends_on: '', meeting_id: '', deadline: '', handoff_date: '', test_date: '', follow_date: '', area: '', collaborators: '', watchers: '', notify: '', start_date: '', estimate: '', checklist: '' }),
   },
+  Contacts: {
+    title: ['شخص', 'Person'],
+    prefix: 'CT',
+    fields: [
+      { key: 'name', label: ['نام (فارسی)', 'Name (Persian)'], type: 'text', required: true, half: true },
+      { key: 'name_en', label: ['نام (انگلیسی)', 'Name (English)'], type: 'text', half: true },
+      { key: 'title', label: ['سمت', 'Title'], type: 'text', half: true },
+      { key: 'org', label: ['واحد یا سازمان', 'Unit or organisation'], type: 'text', half: true },
+      { key: 'tier', label: ['رده (تعیین SLA و اولویت)', 'Tier (sets SLA & priority)'], type: 'tier', half: true },
+      { key: 'active', label: ['وضعیت', 'Status'], type: 'select', options: { true: ['فعال', 'Active'], false: ['غیرفعال', 'Inactive'] }, half: true },
+      { key: 'email', label: ['ایمیل', 'Email'], type: 'text', half: true },
+      { key: 'phone', label: ['تلفن', 'Phone'], type: 'text', half: true },
+      { key: 'notes', label: ['یادداشت', 'Notes'], type: 'textarea' },
+    ],
+    defaults: () => ({ active: 'true', tier: '', name_en: '', title: '', org: '', email: '', phone: '', notes: '' }),
+  },
+  Mizito: {
+    title: ['مورد میزیتو', 'Mizito item'],
+    prefix: 'MZ',
+    fields: [
+      { key: 'link', label: ['لینک تسک در میزیتو', 'Mizito task link'], type: 'text', placeholder: ['https://mizito.noyanet.com/#/ws/tasks/…', 'https://mizito.noyanet.com/#/ws/tasks/…'] },
+      { key: 'title', label: ['عنوان', 'Title'], type: 'text', required: true },
+      { key: 'asked_by', label: ['چه کسی مطرح کرد / منشن کرد', 'Raised / mentioned by'], type: 'person', half: true },
+      { key: 'mentioned', label: ['چه کسی منشن شد', 'Who was mentioned'], type: 'people', half: true },
+      { key: 'category', label: ['دسته', 'Category'], type: 'mzcat', half: true },
+      { key: 'action', label: ['نوع اقدام', 'Action needed'], type: 'mzaction', half: true },
+      { key: 'status', label: ['وضعیت', 'Status'], type: 'mzstatus', half: true },
+      { key: 'due_date', label: ['ددلاین', 'Deadline'], type: 'date', half: true },
+      { key: 'urgent', label: ['فوری', 'Urgent'], type: 'select', options: { '': ['عادی', 'Normal'], '1': ['فوری', 'Urgent'] }, half: true },
+      { key: 'priority_override', label: ['اولویت دستی', 'Manual priority'], type: 'pprio', half: true },
+      { key: 'assigned_to', label: ['سپرده به (واحد یا فرد)', 'Handed to (unit or person)'], type: 'person', half: true },
+      { key: 'received_at', label: ['تاریخ منشن', 'Mentioned on'], type: 'date', half: true },
+      { key: 'description', label: ['شرح', 'Description'], type: 'textarea' },
+      { key: 'docs', label: ['مستندات (هر لینک در یک خط)', 'Documents (one link per line)'], type: 'textarea' },
+      { key: 'outcome', label: ['نتیجه', 'Outcome'], type: 'textarea' },
+    ],
+    defaults: () => ({ mz_key: '', link: '', description: '', docs: '', asked_by: '', mentioned: '', category: '', action: '', status: '', priority_override: '', override_reason: '', urgent: '', assigned_to: '', due_date: '', received_at: '', last_mention_at: '', last_mention_by: '', outcome: '', notes: '', created_at: '', updated_at: '', closed_at: '' }),
+  },
   FollowUps: {
     title: ['پیگیری', 'Follow-up'],
     prefix: 'F',
     fields: [
       { key: 'subject', label: ['موضوع پیگیری', 'Follow-up subject'], type: 'text', required: true },
       { key: 'person', label: ['از چه کسی؟', 'With whom?'], type: 'person', half: true },
+      { key: 'waiting_for', label: ['منتظر چه چیزی هستیم؟', 'What are we waiting for?'], type: 'text' },
       { key: 'channel', label: ['کانال', 'Channel'], type: 'select', options: CHANNEL, half: true },
       { key: 'project_id', label: ['پروژه', 'Project'], type: 'project', half: true },
-      { key: 'due_date', label: ['تاریخ پیگیری بعدی', 'Next follow-up'], type: 'date', half: true },
+      { key: 'due_date', label: ['پینگ بعدی', 'Next ping'], type: 'date', half: true },
       { key: 'status', label: ['وضعیت', 'Status'], type: 'select', options: FOLLOWUP_STATUS, half: true },
       { key: 'priority', label: ['اولویت', 'Priority'], type: 'select', options: PRIORITY, half: true },
+      { key: 'link', label: ['لینک (مثلاً تسک میزیتو)', 'Link (e.g. the Mizito task)'], type: 'text', placeholder: ['https://mizito.noyanet.com/…', 'https://mizito.noyanet.com/…'] },
       { key: 'notes', label: ['یادداشت / سابقه', 'Notes / history'], type: 'textarea' },
     ],
-    defaults: () => ({ status: 'open', priority: 'medium', channel: 'meeting', created_at: todayISO(), due_date: todayISO(), owner: '' }),
+    defaults: () => ({ waiting_for: '', link: '', last_ping: '', ping_count: 0, status: 'open', priority: 'medium', channel: 'meeting', created_at: todayISO(), due_date: todayISO(), owner: '' }),
   },
   Projects: {
     title: ['پروژه', 'Project'],
@@ -244,10 +285,11 @@ export const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields:
       { key: 'facilitator', label: ['برگزارکننده', 'Facilitator'], type: 'person', half: true },
       { key: 'status', label: ['وضعیت', 'Status'], type: 'select', options: MEETING_STATUS, half: true },
       { key: 'attendees', label: ['حاضران', 'Attendees'], type: 'people' },
+      { key: 'guests', label: ['مهمانان بیرونی (ایمیل یا نام از «اشخاص»؛ با کاما یا هر نفر در یک خط)', 'Outside guests (emails or names from People; comma or one per line)'], type: 'textarea', placeholder: ['ali@example.com، خانم رضایی', 'ali@example.com, Ms Rezaei'] },
       { key: 'notes', label: ['صورت‌جلسه', 'Minutes'], type: 'textarea' },
       { key: 'decisions', label: ['تصمیم‌ها', 'Decisions'], type: 'textarea' },
     ],
-    defaults: () => ({ series: 'portfolio', status: 'scheduled', date: todayISO(), time: weekCfg().weeklyTime, duration: 45, notes: '', decisions: '', project_id: '', gcal_id: '', meet_url: '', attendees: '', facilitator: '', items: '', checklist: '', sprint_id: '' }),
+    defaults: () => ({ guests: '', series: 'portfolio', status: 'scheduled', date: todayISO(), time: weekCfg().weeklyTime, duration: 45, notes: '', decisions: '', project_id: '', gcal_id: '', meet_url: '', attendees: '', facilitator: '', items: '', checklist: '', sprint_id: '' }),
   },
   Contracts: {
     title: ['قرارداد', 'Contract'],
@@ -299,7 +341,7 @@ export function FieldInput({ f, value, set, form, disabled, autoFocus, onSubmit 
   const { db } = useStore()
   const v = value ?? ''
   const common = { className: 'input', disabled }
-  const people = Array.from(new Set([...db.Team.map((m) => m.name), ...db.FollowUps.map((x) => x.person)].filter(Boolean)))
+  const people = Array.from(new Set([...db.Team.map((m) => m.name), ...db.Contacts.map((c) => c.name), ...db.FollowUps.map((x) => x.person)].filter(Boolean)))
   switch (f.type) {
     case 'textarea':
       return <textarea {...common} rows={3} value={String(v)} placeholder={f.placeholder && tr(f.placeholder)} onChange={(e) => set(e.target.value)} />
@@ -334,6 +376,35 @@ export function FieldInput({ f, value, set, form, disabled, autoFocus, onSubmit 
           {columns().map((c) => (
             <option key={c.id} value={c.id}>
               {statusLabel(c.id)}
+            </option>
+          ))}
+        </select>
+      )
+    case 'tier':
+    case 'mzstatus':
+    case 'mzcat':
+    case 'mzaction': {
+      const c = mzCfg()
+      const opts = f.type === 'tier' ? c.tiers : f.type === 'mzstatus' ? c.statuses : f.type === 'mzcat' ? c.categories : c.actions
+      return (
+        <select {...common} value={String(v)} onChange={(e) => set(e.target.value)}>
+          <option value="">{f.type === 'tier' ? L('پیش‌فرض (پایین‌ترین رده)', 'Default (lowest tier)') : '—'}</option>
+          {opts.map((o) => (
+            <option key={o.id} value={o.id}>
+              {L(o.fa, o.en)}
+              {'sla' in o ? ` · SLA ${o.sla}h` : ''}
+            </option>
+          ))}
+        </select>
+      )
+    }
+    case 'pprio':
+      return (
+        <select {...common} value={String(v)} onChange={(e) => set(e.target.value)}>
+          <option value="">{L('خودکار (محاسبه‌شده)', 'Automatic (computed)')}</option>
+          {['P0', 'P1', 'P2', 'P3'].map((p) => (
+            <option key={p} value={p}>
+              {p}
             </option>
           ))}
         </select>

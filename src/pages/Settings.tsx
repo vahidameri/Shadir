@@ -1,4 +1,5 @@
 import { DAYS as CADENCE_DAYS, DELIVERY_KEYS, deliveryCfg } from '../lib/cadence'
+import { MizitoSettings } from '../components/MizitoParts'
 import { useState } from 'react'
 import { CalendarClock, CheckCircle2, Link2, Loader2, RotateCcw, Unplug, XCircle, Zap } from 'lucide-react'
 import { useStore } from '../lib/store'
@@ -160,6 +161,10 @@ export default function Settings({ embedded }: { embedded?: boolean }) {
           </div>
         </Card>
       </Wrap>
+      <div className="mt-6">
+        <div className="eyebrow mb-3 px-1">{L('میزیتو', 'Mizito')}</div>
+        <MizitoSettings admin={admin} />
+      </div>
     </>
   )
 }

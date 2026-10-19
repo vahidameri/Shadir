@@ -15,6 +15,8 @@ export const can = {
   /** create projects, people and allocations */
   manage: isLeader,
   allFollowUps: (a: Access) => a === 'super' || a === 'exec',
+  /** the Mizito queue and the people registry: the CPTO and the PgM */
+  mizito: (a: Access) => a === 'super' || a === 'exec',
 }
 
 export function accessOf(db: DB, name: string, demo: boolean): Access {
@@ -46,6 +48,7 @@ export function scopeDB(db: DB, me: string, access: Access): DB {
     : db.FollowUps.filter((f) => f.owner === me || f.person === me)
   let out: DB = { ...db, FollowUps }
   if (!can.contracts(access)) out = { ...out, Contracts: [], Files: out.Files.filter((f) => f.entity !== 'Contracts') }
+  if (!can.mizito(access)) out = { ...out, Mizito: [], MizitoMentions: [], Contacts: [], History: out.History.filter((h) => h.entity !== 'Mizito') }
   if (isLeader(access)) return out
 
   const ok = relatedProjects(db, me)

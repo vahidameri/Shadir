@@ -18,32 +18,33 @@
  *   viewer — read only (leadership)
  */
 
-var MADAR_VERSION = '0.2.0'; // shown on the login page and by diagnose()
+var MADAR_VERSION = '1.0.0'; // shown on the login page and by diagnose()
 
 var SCHEMA = {
   Projects: ['id', 'code', 'name', 'description', 'category', 'owner', 'client', 'liaison', 'liaison_contact', 'status', 'priority', 'phase', 'start_date', 'end_date', 'progress', 'health_override', 'objective', 'paused_at', 'pause_reason', 'delivery_day', 'last_delivery', 'archived', 'archived_at', 'links'],
   Scope: ['id', 'project_id', 'item', 'type', 'status', 'change_note', 'date'],
   Milestones: ['id', 'project_id', 'title', 'planned_date', 'actual_date', 'status', 'owner', 'weight'],
   Sprints: ['id', 'project_id', 'name', 'start_date', 'end_date', 'goal', 'committed_points', 'completed_points', 'status'],
-  Tasks: ['id', 'project_id', 'sprint_id', 'title', 'description', 'assignee', 'reporter', 'status', 'priority', 'due_date', 'points', 'tags', 'created_at', 'completed_at', 'track', 'depends_on', 'meeting_id', 'private', 'deadline', 'handoff_date', 'test_date', 'follow_date', 'area', 'collaborators', 'watchers', 'notify', 'start_date', 'estimate', 'checklist', 'assigned_at', 'flag', 'blocked_reason', 'blocked_by', 'blocked_since', 'updated_at', 'link', 'requested_by'],
+  Tasks: ['id', 'project_id', 'sprint_id', 'title', 'description', 'assignee', 'reporter', 'status', 'priority', 'due_date', 'points', 'tags', 'created_at', 'completed_at', 'track', 'depends_on', 'meeting_id', 'private', 'deadline', 'handoff_date', 'test_date', 'follow_date', 'area', 'collaborators', 'watchers', 'notify', 'start_date', 'estimate', 'checklist', 'assigned_at', 'flag', 'blocked_reason', 'blocked_by', 'blocked_since', 'updated_at', 'link', 'requested_by', 'ext_id', 'batch'],
   // owner = who is chasing; follow-ups are personal
-  FollowUps: ['id', 'project_id', 'subject', 'person', 'channel', 'due_date', 'status', 'priority', 'notes', 'created_at', 'done_at', 'owner'],
+  FollowUps: ['id', 'project_id', 'subject', 'person', 'channel', 'due_date', 'status', 'priority', 'notes', 'created_at', 'done_at', 'owner', 'waiting_for', 'link', 'last_ping', 'ping_count', 'ext_id', 'batch'],
   Risks: ['id', 'project_id', 'title', 'type', 'probability', 'impact', 'owner', 'mitigation', 'status', 'due_date'],
   // capacity = % of one full-time person (100 = full-time, 600 = a team of six)
   // email = the Google account used to sign in; tasks_private = '1' hides this person's tasks (e.g. the CEO)
   // role = job title code: ceo | cpo | cto | pgm | pm | pd | gd (free text also works)
   // access: super | exec | head | member. key = optional personal key (sign-in without Google).
   // username = sign-in name (blank = made from name_en, e.g. vahid.ameri); one shared team password
-  Team: ['id', 'name', 'name_en', 'username', 'role', 'email', 'team', 'track', 'capacity', 'photo', 'tasks_private', 'phone', 'access', 'active', 'key'],
+  Team: ['id', 'name', 'name_en', 'username', 'role', 'email', 'team', 'track', 'capacity', 'photo', 'tasks_private', 'phone', 'access', 'active', 'key', 'batch'],
   // start_date / end_date are optional; blank = open-ended
   Allocations: ['id', 'member_id', 'project_id', 'percent', 'start_date', 'end_date'],
   Updates: ['id', 'project_id', 'week_date', 'author', 'health', 'summary', 'done', 'next', 'blockers'],
   // Comments on tasks / follow-ups / projects. created_at is "YYYY-MM-DD HH:mm".
-  Comments: ['id', 'entity', 'entity_id', 'author', 'body', 'created_at'],
+  Comments: ['id', 'entity', 'entity_id', 'author', 'body', 'created_at', 'batch'],
   // Delivery plan. baseline_date = first committed date (kept when target_date moves → slippage).
   Deliverables: ['id', 'project_id', 'title', 'track', 'owner', 'target_date', 'baseline_date', 'delivered_date', 'status', 'confidence', 'notes'],
   // Weekly meetings. series: portfolio | product | tech | project | other. attendees comma-separated; decisions one per line.
-  Meetings: ['id', 'series', 'title', 'project_id', 'date', 'time', 'facilitator', 'attendees', 'status', 'notes', 'decisions', 'gcal_id', 'meet_url', 'duration', 'purpose', 'items', 'checklist', 'sprint_id'],
+  // guests: people outside the department — emails or names from Contacts, comma or line separated
+  Meetings: ['id', 'series', 'title', 'project_id', 'date', 'time', 'facilitator', 'attendees', 'status', 'notes', 'decisions', 'gcal_id', 'meet_url', 'duration', 'purpose', 'items', 'checklist', 'sprint_id', 'guests'],
   // Uploaded files live in a Drive folder; this tab is the index.
   Files: ['id', 'entity', 'entity_id', 'name', 'mime', 'size', 'url', 'uploaded_by', 'created_at'],
   // Shared settings (automation switches: auto.<id> = on/off). id = key.
@@ -55,13 +56,18 @@ var SCHEMA = {
   // Weekly delivery log: one row per project per week (status delivered | partial | skipped).
   Deliveries: ['id', 'project_id', 'week', 'date', 'status', 'note', 'by'],
   // field-level change log for tasks and follow-ups (written by history_, never by the app directly)
-  History: ['id', 'entity', 'entity_id', 'field', 'from', 'to', 'by', 'at'],
+  History: ['id', 'entity', 'entity_id', 'field', 'from', 'to', 'by', 'at', 'batch'],
+  // people who ask, mention or are chased (inside or outside the department); tier sets SLA and priority
+  Contacts: ['id', 'name', 'name_en', 'title', 'org', 'tier', 'email', 'phone', 'notes', 'active', 'batch'],
+  // Mizito: one row per Mizito task the CPTO / PgM was mentioned on; re-mentions go to MizitoMentions
+  Mizito: ['id', 'mz_key', 'link', 'title', 'description', 'docs', 'asked_by', 'mentioned', 'category', 'action', 'status', 'priority_override', 'override_reason', 'urgent', 'assigned_to', 'due_date', 'received_at', 'last_mention_at', 'last_mention_by', 'outcome', 'notes', 'created_at', 'updated_at', 'closed_at', 'ext_id', 'batch'],
+  MizitoMentions: ['id', 'item_id', 'by', 'at', 'note', 'status', 'batch'],
 };
 
 var USERS_SHEET = 'Users';
 var USERS_HEADERS = ['key', 'name', 'email', 'role', 'active'];
 var LOG_SHEET = 'AuditLog';
-var DATE_COLS = ['start_date', 'end_date', 'planned_date', 'actual_date', 'due_date', 'created_at', 'completed_at', 'done_at', 'week_date', 'date', 'target_date', 'baseline_date', 'delivered_date', 'time', 'deadline', 'handoff_date', 'test_date', 'follow_date', 'last_delivery', 'archived_at', 'sent_at', 'responded_at', 'week', 'assigned_at', 'blocked_since', 'updated_at'];
+var DATE_COLS = ['start_date', 'end_date', 'planned_date', 'actual_date', 'due_date', 'created_at', 'completed_at', 'done_at', 'week_date', 'date', 'target_date', 'baseline_date', 'delivered_date', 'time', 'deadline', 'handoff_date', 'test_date', 'follow_date', 'last_delivery', 'archived_at', 'sent_at', 'responded_at', 'week', 'assigned_at', 'blocked_since', 'updated_at', 'received_at', 'last_mention_at', 'closed_at', 'at', 'last_ping'];
 
 // --------------------------------------------------------------------------
 // HTTP entry points
@@ -106,6 +112,9 @@ function doPost(e) {
     lock.waitLock(20000);
     var result;
     if (body.action === 'upload') result = upload_(body, user);
+    else if (body.action === 'bulk') result = bulk_(body.sheet, body.rows, user);
+    else if (body.action === 'undoBatch') result = undoBatch_(body.batch, user);
+    else if (body.action === 'readSheet') result = readOtherSheet_(body.url, body.tab, user);
     else if (body.action === 'mailTask') result = mailTask_(body.id, user);
     else if (body.action === 'mailMinutes') result = mailMinutes_(body.meeting_id, user);
     else if (body.action === 'syncMeeting') result = syncMeeting_(body.meeting_id, user);
@@ -332,9 +341,12 @@ function sessionInfo_(token) {
   return s;
 }
 
-/** Run once from the editor with the "Execute as: Me" deployment URL: setApiUrl('https://script.google.com/macros/s/…/exec') */
+/** Run once after the first deployment: save API_URL in Script Properties, then Run setApiUrl (or call setApiUrl('…/exec')). */
 function setApiUrl(url) {
   var props = PropertiesService.getScriptProperties();
+  // run from the editor's Run button (no argument): takes the API_URL already saved in Script Properties
+  url = String(url || props.getProperty('API_URL') || '').trim();
+  if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(url)) throw new Error('اول در Project Settings ← Script Properties مقدار API_URL را برابر لینک انتشار Madar Team (پایان /exec) بگذارید، بعد setApiUrl را Run کنید.');
   props.setProperty('API_URL', url);
   // Only accept Google tokens issued to this script project (learned from your own token).
   var info = JSON.parse(UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?access_token=' + ScriptApp.getOAuthToken()).getContentText());
@@ -459,9 +471,10 @@ function applyPrivacy_(data, user) {
   data.Files = (data.Files || []).filter(function (f) { return !(f.entity === 'Tasks' && hidden[f.entity_id]); });
   var out = applyScope_(data, user, owners);
   // the log of a task or follow-up travels only with the row itself
-  var seen = { Tasks: {}, FollowUps: {} };
+  var seen = { Tasks: {}, FollowUps: {}, Mizito: {} };
   (out.Tasks || []).forEach(function (t) { seen.Tasks[t.id] = 1; });
   (out.FollowUps || []).forEach(function (f) { seen.FollowUps[f.id] = 1; });
+  (out.Mizito || []).forEach(function (m) { seen.Mizito[m.id] = 1; });
   out.History = (out.History || []).filter(function (h) { return seen[h.entity] && seen[h.entity][h.entity_id]; });
   return out;
 }
@@ -476,6 +489,10 @@ function applyScope_(data, user, owners) {
     return f.owner === me || f.person === me;
   });
   if (a !== 'super' && a !== 'exec') {
+    // the Mizito queue and the people registry are for the CPTO and the PgM only
+    data.Mizito = [];
+    data.MizitoMentions = [];
+    data.Contacts = [];
     data.Contracts = [];
     data.Files = data.Files.filter(function (f) { return f.entity !== 'Contracts'; });
   }
@@ -526,6 +543,7 @@ function guardWrite_(sheet, row, user) {
   var a = user.access || 'member';
   if (sheet === 'Config' && a !== 'super') throw new Error('فقط مدیر برنامه می‌تواند تنظیمات را تغییر دهد');
   if (sheet === 'Contracts' && a !== 'super' && a !== 'exec') throw new Error('دسترسی به قراردادها ندارید');
+  if ((sheet === 'Mizito' || sheet === 'MizitoMentions' || sheet === 'Contacts') && a !== 'super' && a !== 'exec') throw new Error('این بخش فقط برای CPTO و مدیر برنامه است');
   if (sheet === 'Team' && a !== 'super') {
     // anyone may update their own photo / phone; only the program manager manages people
     var cur = rawAll_().Team.filter(function (m) { return String(m.id) === String(row.id); })[0];
@@ -764,7 +782,8 @@ function googleEmail_(token) {
 
 var HISTORY_FIELDS = {
   Tasks: ['title', 'description', 'status', 'priority', 'assignee', 'due_date', 'assigned_at', 'flag', 'track', 'project_id', 'blocked_reason', 'blocked_by', 'link', 'requested_by', 'collaborators', 'watchers', 'private', 'deadline'],
-  FollowUps: ['subject', 'person', 'status', 'due_date', 'priority', 'channel', 'notes', 'project_id', 'owner'],
+  FollowUps: ['subject', 'person', 'status', 'due_date', 'priority', 'channel', 'notes', 'project_id', 'owner', 'waiting_for', 'link'],
+  Mizito: ['title', 'status', 'asked_by', 'mentioned', 'category', 'action', 'priority_override', 'urgent', 'assigned_to', 'due_date', 'outcome', 'link', 'description'],
 };
 
 function clip_(v) { return String(v === undefined || v === null ? '' : v).slice(0, 300); }
@@ -793,6 +812,95 @@ function historyRows_(rows, user) {
   });
   sh.getRange(sh.getLastRow() + 1, 1, vals.length, SCHEMA.History.length).setValues(vals);
   bumpVersion_();
+}
+
+// --------------------------------------------------------------------------
+// Import — the back office brings rows from old sheets in one go (program manager only).
+// Every imported row carries a batch id, so a whole import can be taken back.
+// --------------------------------------------------------------------------
+
+var BULK_SHEETS = { Tasks: 1, FollowUps: 1, Mizito: 1, MizitoMentions: 1, Contacts: 1, Team: 1, Projects: 1, History: 1, Comments: 1 };
+
+function bulk_(name, rows, user) {
+  if (user.access !== 'super') throw new Error('فقط مدیر برنامه می‌تواند ایمپورت کند');
+  if (!BULK_SHEETS[name]) throw new Error('این تب قابل ایمپورت نیست: ' + name);
+  rows = (rows || []).filter(function (r) { return r && r.id; });
+  if (!rows.length) return { count: 0 };
+  var sh = ensureSheet_(name, SCHEMA[name]);
+  var headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+  rows.forEach(function (r) {
+    Object.keys(r).forEach(function (k) {
+      if (headers.indexOf(k) === -1) { sh.getRange(1, headers.length + 1).setValue(k); headers.push(k); }
+    });
+  });
+  // rows already in the sheet are updated in place (a re-import or a merge), the rest are appended
+  var ids = {};
+  var last = sh.getLastRow();
+  if (last > 1) sh.getRange(2, 1, last - 1, 1).getValues().forEach(function (v, i) { ids[String(v[0])] = i + 2; });
+  var text = function (h, v) {
+    if (v === undefined || v === null) return '';
+    if (v === '') return '';
+    if (DATE_COLS.indexOf(h) !== -1 || h === 'value') return "'" + v;
+    return v;
+  };
+  var fresh = [];
+  rows.forEach(function (r) {
+    var vals = headers.map(function (h) { return text(h, r[h]); });
+    var at = ids[String(r.id)];
+    if (at) sh.getRange(at, 1, 1, headers.length).setValues([vals]);
+    else fresh.push(vals);
+  });
+  if (fresh.length) sh.getRange(sh.getLastRow() + 1, 1, fresh.length, headers.length).setValues(fresh);
+  log_(user, 'import ' + rows.length, name, rows[0].batch || '');
+  bumpVersion_();
+  return { count: rows.length };
+}
+
+function undoBatch_(batch, user) {
+  if (user.access !== 'super') throw new Error('فقط مدیر برنامه می‌تواند ایمپورت را برگرداند');
+  if (!batch) throw new Error('batch لازم است');
+  var ss = SpreadsheetApp.getActive();
+  var removed = 0;
+  Object.keys(BULK_SHEETS).forEach(function (name) {
+    var sh = ss.getSheetByName(name);
+    if (!sh || sh.getLastRow() < 2) return;
+    var headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+    var col = headers.indexOf('batch');
+    if (col === -1) return;
+    var vals = sh.getRange(2, col + 1, sh.getLastRow() - 1, 1).getValues();
+    for (var i = vals.length - 1; i >= 0; i--) {
+      if (String(vals[i][0]) === String(batch)) { sh.deleteRow(i + 2); removed++; }
+    }
+  });
+  log_(user, 'undo import', 'batch', batch);
+  bumpVersion_();
+  return { removed: removed };
+}
+
+/** Reads a tab of another Google Sheet (the program manager must have access to it). Links in cells come back as URLs. */
+function readOtherSheet_(url, tab, user) {
+  if (user.access !== 'super') throw new Error('فقط مدیر برنامه می‌تواند از شیت دیگر بخواند');
+  var ss;
+  try { ss = SpreadsheetApp.openByUrl(String(url || '').trim()); } catch (e) { throw new Error('شیت باز نشد. لینک را بررسی کنید و مطمئن شوید حساب صاحب اسکریپت به آن دسترسی دارد.'); }
+  var tabs = ss.getSheets().map(function (x) { return x.getName(); });
+  var sh = tab ? ss.getSheetByName(tab) : null;
+  if (!sh) return { tabs: tabs, title: ss.getName(), rows: [] };
+  var range = sh.getDataRange();
+  var values = range.getDisplayValues();
+  var rich = range.getRichTextValues();
+  var formulas = range.getFormulas();
+  var rows = values.map(function (row, i) {
+    return row.map(function (v, j) {
+      var link = '';
+      try { link = rich[i][j] && rich[i][j].getLinkUrl(); } catch (e) {}
+      if (!link) {
+        var fm = (formulas[i][j] || '').match(/HYPERLINK\(\s*"([^"]+)"/i);
+        if (fm) link = fm[1];
+      }
+      return link && link !== v ? v + '\u0001' + link : v;
+    });
+  });
+  return { tabs: tabs, title: ss.getName(), rows: rows.slice(0, 3000) };
 }
 
 function log_(user, action, sheet, id) {
@@ -864,8 +972,10 @@ function setup() {
   if (team.getLastRow() < 2) {
     var key = newKey_();
     var me = Session.getEffectiveUser().getEmail();
-    upsert_('Team', { id: 'm1', name: 'وحید عامری', name_en: 'Vahid Ameri', role: 'pgm', email: me, team: 'PMO', capacity: 100, access: 'super', active: 'true', key: key }, { name: 'setup' });
-    safeAlert_('راه‌اندازی انجام شد. شما (' + me + ') سوپر ادمین هستید.\n\nکلید پشتیبان (برای ورود بدون گوگل):\n' + key);
+    upsert_('Team', { id: 'm1', name: 'وحید عامری', name_en: 'Vahid Ameri', role: 'pgm', email: me, team: 'pmo', capacity: 100, access: 'super', active: 'true', key: key }, { name: 'setup' });
+    // the CPTO: the email is entered in the back office (People → edit), then they can sign in
+    upsert_('Team', { id: 'm2', name: 'جلیل علیزاده', name_en: 'Jalil Alizadeh', role: 'cpto', email: '', team: 'leadership', capacity: 100, access: 'exec', active: 'true' }, { name: 'setup' });
+    safeAlert_('راه‌اندازی انجام شد. شما (' + me + ') مدیر برنامه با دسترسی کامل هستید.\nCPTO (جلیل علیزاده) هم تعریف شد؛ ایمیل گوگلش را از بک‌آفیس ← دپارتمان و دسترسی وارد کنید.\n\nکلید پشتیبان (برای ورود بدون گوگل):\n' + key);
     Logger.log('Admin key: ' + key);
   }
   fillUsernames_();
@@ -902,8 +1012,6 @@ function onOpen() {
     .addItem('ارسال خلاصه‌ی روزانه (همین حالا)', 'sendDailyDigest')
     .addItem('فعال‌سازی ایمیل روزانه', 'installDailyDigest')
     .addItem('نصب همه‌ی اتوماسیون‌ها', 'installAutomations')
-    .addItem('فعال‌سازی یادآوری گزارش هفتگی', 'installWeeklyReminder')
-    .addItem('ارسال یادآوری گزارش هفتگی (همین حالا)', 'remindWeeklyUpdatesNow')
     .addToUi();
 }
 
@@ -929,6 +1037,27 @@ function installDailyDigest() {
   safeAlert_('ایمیل خلاصه‌ی روزانه هر روز حدود ساعت ۷:۳۰ ارسال می‌شود.');
 }
 
+/** Open Mizito items that are urgent or past their SLA (mirrors src/lib/mizito.ts, simplified). */
+function mizitoHot_(data) {
+  var parse = function (k, d) { try { var v = JSON.parse(setting_(k, '')); return Array.isArray(v) && v.length ? v : d; } catch (e) { return d; } };
+  var statuses = parse('mz.statuses', [{ id: 'needs_action', cat: 'open' }, { id: 'in_progress', cat: 'open' }, { id: 'awaiting', cat: 'waiting' }, { id: 'blocked', cat: 'blocked' }, { id: 'done', cat: 'done' }, { id: 'cancelled', cat: 'cancelled' }]);
+  var tiers = parse('mz.tiers', [{ id: 'executive', sla: 4 }, { id: 'deputy', sla: 24 }, { id: 'manager', sla: 48 }, { id: 'standard', sla: 72 }]);
+  var cat = function (id) { var x = statuses.filter(function (s) { return s.id === id; })[0]; return x ? x.cat : 'open'; };
+  var tierOf = function (name) {
+    var c = (data.Contacts || []).filter(function (x) { return x.name === name; })[0];
+    return tiers.filter(function (t) { return c && t.id === c.tier; })[0] || tiers[tiers.length - 1];
+  };
+  var now = Date.now();
+  return (data.Mizito || []).filter(function (m) { return cat(m.status) !== 'done' && cat(m.status) !== 'cancelled'; }).map(function (m) {
+    var t = tierOf(m.asked_by);
+    var last = new Date(String(m.last_mention_at || m.received_at || m.created_at).replace(' ', 'T')).getTime();
+    var hours = last ? (now - last) / 3600000 : 0;
+    var breached = cat(m.status) === 'open' && t && hours > Number(t.sla || 72);
+    var why = [String(m.urgent) === '1' ? 'فوری' : '', breached ? Math.round(hours - t.sla) + ' ساعت عبور از SLA' : ''].filter(String).join(' · ');
+    return { title: m.title, asked_by: m.asked_by, link: m.link, why: why, hot: !!why };
+  }).filter(function (x) { return x.hot; });
+}
+
 function sendDailyDigest() {
   if (!automationOn_('daily_digest')) return;
   // the digest goes to the program manager: scoped as super, so the CEO's private items stay out
@@ -942,9 +1071,11 @@ function sendDailyDigest() {
   var pname = {};
   data.Projects.forEach(function (p) { pname[p.id] = p.name; });
 
-  var overdueTasks = data.Tasks.filter(function (t) { return t.status !== 'done' && t.due_date && t.due_date < today; });
-  var todayTasks = data.Tasks.filter(function (t) { return t.status !== 'done' && t.due_date === today; });
+  var shut = function (t) { return t.status === 'done' || t.status === 'cancelled'; };
+  var overdueTasks = data.Tasks.filter(function (t) { return !shut(t) && t.due_date && t.due_date < today; });
+  var todayTasks = data.Tasks.filter(function (t) { return !shut(t) && t.due_date === today; });
   var blocked = data.Tasks.filter(function (t) { return t.status === 'blocked'; });
+  var mz = mizitoHot_(data);
   var fus = data.FollowUps.filter(function (f) { return f.status !== 'done' && f.due_date && f.due_date <= today; });
   var ms = data.Milestones.filter(function (m) { return m.status !== 'done' && m.planned_date && m.planned_date < today; });
 
@@ -956,10 +1087,11 @@ function sendDailyDigest() {
 
   var html = '<div dir="rtl" style="font-family:Tahoma,Vazirmatn,sans-serif;font-size:14px;line-height:1.8;color:#111">' +
     '<h2 style="margin:0 0 8px">خلاصه‌ی امروز — مدار</h2>' +
+    sec('میزیتو: فوری یا عبور از SLA', '#c4314b', mz.map(function (m) { return li('<b>' + esc_(m.title) + '</b> — ' + esc_(m.asked_by || '') + (m.why ? ' · ' + m.why : '') + (m.link ? ' · <a href="' + m.link + '">میزیتو</a>' : '')); })) +
     sec('پیگیری‌های امروز و معوق', '#e13748', fus.map(function (f) { return li('<b>' + f.subject + '</b> — ' + f.person + (f.project_id ? ' · ' + (pname[f.project_id] || '') : '') + ' · ' + f.due_date); })) +
     sec('تسک‌های امروز', '#4f46e5', todayTasks.map(function (t) { return li(t.title + ' — ' + t.assignee + (t.project_id ? ' · ' + (pname[t.project_id] || '') : '')); })) +
-    sec('تسک‌های معوق', '#d98d06', overdueTasks.map(function (t) { return li(t.title + ' — ' + t.assignee + ' · سررسید ' + t.due_date); })) +
-    sec('تسک‌های مسدود', '#e13748', blocked.map(function (t) { return li(t.title + ' — ' + t.assignee + (t.description ? ' · ' + t.description : '')); })) +
+    sec('تسک‌های معوق', '#d98d06', overdueTasks.map(function (t) { return li(t.title + ' — ' + t.assignee + ' · ددلاین ' + t.due_date); })) +
+    sec('تسک‌های مسدود', '#e13748', blocked.map(function (t) { return li(t.title + ' — ' + t.assignee + (t.blocked_reason ? ' · ' + t.blocked_reason : '') + (t.blocked_by ? ' · منتظر ' + t.blocked_by : '')); })) +
     sec('مایلستون‌های عقب‌افتاده', '#e13748', ms.map(function (m) { return li(m.title + ' · ' + (pname[m.project_id] || '') + ' · ' + m.planned_date); })) +
     '<p style="color:#666;margin-top:24px;font-size:12px">این ایمیل به‌صورت خودکار از Google Sheet مدار ارسال شده است.</p></div>';
 
@@ -1103,6 +1235,22 @@ function alwaysInvited_(team) {
   return team.filter(function (t) { return (t.access === 'super' || t.access === 'exec') && String(t.active) !== '0'; }).map(function (t) { return t.name; });
 }
 
+/** Name → email for everyone: the department (Team) and the registry (Contacts). */
+function emailBook_(data) {
+  var email = {};
+  (data.Contacts || []).forEach(function (c) { if (c.email) email[c.name] = String(c.email).trim(); });
+  (data.Team || []).forEach(function (t) { if (t.email) email[t.name] = String(t.email).trim(); });
+  return email;
+}
+
+/** Guests from outside: raw emails, or names looked up in the email book. */
+function guestEmails_(m, email) {
+  return String(m.guests || '').split(/[,،\n]+/).map(function (x) { return x.trim(); }).filter(String).map(function (g) {
+    var hit = g.match(/[^\s<>]+@[^\s<>]+/);
+    return hit ? hit[0] : email[g] || '';
+  }).filter(String);
+}
+
 function syncMeeting_(meetingId, user) {
   if (setting_('auto.gcal_create', 'on') === 'off') return { skipped: true };
   var data = rawAll_();
@@ -1120,11 +1268,10 @@ function syncMeeting_(meetingId, user) {
     if (real) { try { Calendar.Events.remove('primary', m.gcal_id, { sendUpdates: 'all' }); } catch (eGone) {} }
     return save('', m.meet_url);
   }
-  var email = {};
-  data.Team.forEach(function (t) { if (t.email) email[t.name] = String(t.email).trim(); });
+  var email = emailBook_(data);
   var people = names_(m.attendees).concat([m.facilitator]).concat(alwaysInvited_(data.Team));
   var seen = {};
-  var attendees = people.map(function (n) { return email[n]; }).filter(function (e) {
+  var attendees = people.map(function (n) { return email[n]; }).concat(guestEmails_(m, email)).filter(function (e) {
     if (!e || seen[e.toLowerCase()]) return false;
     seen[e.toLowerCase()] = 1; return true;
   }).map(function (e) { return { email: e }; });
@@ -1178,9 +1325,8 @@ function mailMinutes_(meetingId, user) {
   var data = readAll_();
   var m = data.Meetings.filter(function (x) { return String(x.id) === String(meetingId); })[0];
   if (!m) throw new Error('جلسه پیدا نشد');
-  var email = {};
-  data.Team.forEach(function (t) { if (t.email) email[t.name] = t.email; });
-  var to = String(m.attendees || '').split(',').map(function (n) { return email[n.trim()]; }).filter(Boolean);
+  var email = emailBook_(data);
+  var to = String(m.attendees || '').split(',').map(function (n) { return email[n.trim()]; }).concat(guestEmails_(m, email)).filter(Boolean);
   if (!to.length) return { sent: 0 };
   var owners = privateOwners_(data.Team);
   var actions = data.Tasks.filter(function (t) { return String(t.meeting_id) === String(m.id) && String(t.private) !== '1' && !owners[lead_(t)]; });
@@ -1229,10 +1375,7 @@ function installAutomations() {
   var keep = { sendDailyDigest: 1, remindWeeklyUpdates: 1, remindOverdueActions: 1, sendTaskAlerts: 1 };
   ScriptApp.getProjectTriggers().forEach(function (t) { if (keep[t.getHandlerFunction()]) ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('sendDailyDigest').timeBased().everyDays(1).atHour(7).nearMinute(30).create();
-  ScriptApp.newTrigger('remindOverdueActions').timeBased().everyDays(1).atHour(8).nearMinute(15).create();
-  ScriptApp.newTrigger('sendTaskAlerts').timeBased().everyDays(1).atHour(8).nearMinute(30).create();
-  weeklyTriggers_();
-  safeAlert_('اتوماسیون‌ها نصب شدند: خلاصه‌ی صبح ۷:۳۰، یادآوری اقدام‌های معوق ۸:۱۵، یادآوری تسک‌ها و روز تحویل ۸:۳۰، یادآوری گزارش هفتگی (روز مهلت ۱۴ و صبح روز جلسه‌ی هفتگی ۸). روزها و روشن/خاموش از تنظیمات اپ.');
+  safeAlert_('خلاصه‌ی صبحگاهی (۷:۳۰) نصب شد. روشن یا خاموش بودنش از بک‌آفیس ← تنظیمات ← اتوماسیون‌ها.');
 }
 
 // --------------------------------------------------------------------------

@@ -136,6 +136,10 @@ export interface Task {
   link?: string
   /** who asked for it */
   requested_by?: string
+  /** id in the sheet it was imported from */
+  ext_id?: string
+  /** import batch */
+  batch?: string
 }
 
 /** a side from the settings: product, design, tech by default */
@@ -157,6 +161,15 @@ export interface FollowUp {
   done_at: string
   /** who is chasing — follow-ups are personal */
   owner: string
+  /** what exactly we wait for from them */
+  waiting_for?: string
+  /** link, e.g. the Mizito task where the reminder goes */
+  link?: string
+  /** last time we pinged them, and how many times */
+  last_ping?: string
+  ping_count?: number | string
+  ext_id?: string
+  batch?: string
 }
 
 export interface Risk {
@@ -195,6 +208,7 @@ export interface Member {
   access: Access
   /** 'false' disables sign-in */
   active: string
+  batch?: string
 }
 
 export type Access = 'super' | 'exec' | 'head' | 'member'
@@ -283,6 +297,8 @@ export interface Meeting {
   /** preparation checklist — JSON [{id,text,done}] */
   checklist?: string
   sprint_id?: string
+  /** guests from outside the department: emails or names from People, comma or line separated */
+  guests?: string
 }
 
 export interface FileRef {
@@ -311,12 +327,80 @@ export interface Comment {
   author: string
   body: string
   created_at: string // ISO datetime
+  batch?: string
+}
+
+/** Someone who asks, mentions or is chased — inside or outside the department. Their tier sets
+ *  the SLA and the weight of what they ask (Mizito priority). */
+export interface Contact {
+  id: string
+  name: string
+  name_en: string
+  title: string
+  /** unit or organisation */
+  org: string
+  /** tier id from the settings (mz.tiers) */
+  tier: string
+  email: string
+  phone: string
+  notes: string
+  active: string
+  batch?: string
+}
+
+/** One Mizito task the CPTO or the PgM was mentioned on. Re-mentions thread into MizitoMentions. */
+export interface MizitoItem {
+  id: string
+  /** the task id taken from the Mizito link (dedupe key) */
+  mz_key: string
+  link: string
+  title: string
+  description: string
+  /** attachment / document links, one per line */
+  docs: string
+  /** who raised it (the first mention) */
+  asked_by: string
+  /** who was mentioned (CPTO / PgM names, comma-separated) */
+  mentioned: string
+  category: string
+  action: string
+  status: string
+  /** P0..P3 set by hand; blank = computed */
+  priority_override: string
+  override_reason: string
+  /** '1' = urgent by hand */
+  urgent: string
+  /** handed to a unit or a person (no internal task is created) */
+  assigned_to: string
+  due_date: string
+  /** first mention "YYYY-MM-DD HH:mm" */
+  received_at: string
+  last_mention_at: string
+  last_mention_by: string
+  outcome: string
+  notes: string
+  created_at: string
+  updated_at: string
+  closed_at: string
+  ext_id?: string
+  batch?: string
+}
+
+export interface MizitoMention {
+  id: string
+  item_id: string
+  by: string
+  at: string
+  note: string
+  /** status set with this mention, if any */
+  status: string
+  batch?: string
 }
 
 /** One change to a tracked row (field-level log). Written by the server; the app mirrors it locally. */
 export interface HistoryRow {
   id: string
-  entity: 'Tasks' | 'FollowUps'
+  entity: 'Tasks' | 'FollowUps' | 'Mizito'
   entity_id: string
   /** the field that changed, or '_created' / '_deleted' */
   field: string
@@ -325,6 +409,7 @@ export interface HistoryRow {
   by: string
   /** "YYYY-MM-DD HH:mm" */
   at: string
+  batch?: string
 }
 
 export type HandoffStatus = 'sent' | 'accepted' | 'returned'
@@ -385,6 +470,9 @@ export interface DB {
   Handoffs: Handoff[]
   Deliveries: WeeklyDelivery[]
   History: HistoryRow[]
+  Contacts: Contact[]
+  Mizito: MizitoItem[]
+  MizitoMentions: MizitoMention[]
 }
 
 export type SheetName = keyof DB

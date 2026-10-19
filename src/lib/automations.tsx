@@ -2,7 +2,7 @@
 // of an editor); server rules run as Apps Script time triggers. Every rule has an on/off switch
 // stored in the Config tab, so the whole team shares the same behaviour.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { CalendarPlus, CalendarSync, Repeat, Mail, Unlock, Image, PauseCircle, BellRing, Sunrise, FileWarning, UserPlus, Bell, PackageCheck } from 'lucide-react'
+import { CalendarPlus, CalendarSync, Repeat, Mail, Unlock, Image, Sunrise } from 'lucide-react'
 import type { DB, Meeting, Project, Task } from './types'
 import { useStore } from './store'
 import { useGoogle } from './google'
@@ -25,18 +25,12 @@ export interface AutomationDef {
 
 export const AUTOMATIONS: AutomationDef[] = [
   { id: 'gcal_import', where: 'app', icon: CalendarSync, title: ['آوردن ایونت‌های مرتبط تقویم گوگل', 'Bring in related Google Calendar events'], desc: ['ایونتی که نام پروژه را دارد یا دو نفر از تیم در آن هستند، خودکار به «جلسات» اضافه می‌شود.', 'Events that name a project or include two or more teammates are added to Meetings.'] },
-  { id: 'gcal_create', where: 'app', icon: CalendarPlus, title: ['ثبت جلسه‌ها در تقویم گوگل با لینک Meet', 'Put meetings on Google Calendar with a Meet link'], desc: ['حاضران، برگزارکننده و همیشه مدیر برنامه و مدیرعامل دعوت می‌شوند؛ جابجایی یا لغو جلسه در تقویم هم اعمال می‌شود.', 'Attendees, the facilitator and always the program manager and CEO are invited; moves and cancellations follow.'] },
-  { id: 'next_meeting', where: 'app', icon: Repeat, title: ['ساخت جلسه‌ی هفته‌ی بعد پس از بستن جلسه‌ی هفتگی', 'Schedule next week after a weekly is closed'], desc: ['برای همه‌ی جلسه‌های هفتگی (CPTO، پروداکت، دیزاین، تک، پروژه).', 'For every weekly series (CPTO, product, design, tech, project).'] },
+  { id: 'gcal_create', where: 'app', icon: CalendarPlus, title: ['ثبت جلسه‌ها در تقویم گوگل با لینک Meet', 'Put meetings on Google Calendar with a Meet link'], desc: ['حاضران، مهمانان بیرونی، برگزارکننده و همیشه مدیر برنامه و CPTO دعوت می‌شوند؛ جابجایی یا لغو جلسه در تقویم هم اعمال می‌شود.', 'Attendees, outside guests, the facilitator and always the PgM and the CPTO are invited; moves and cancellations follow.'] },
+  { id: 'next_meeting', where: 'app', icon: Repeat, title: ['ساخت جلسه‌ی هفته‌ی بعد پس از بستن جلسه‌ی هفتگی', 'Schedule next week after a weekly is closed'], desc: ['برای ویکلی دپارتمان و ویکلی هر لاین یا تیم.', 'For the department weekly and each line / team weekly.'] },
   { id: 'minutes_mail', where: 'server', icon: Mail, title: ['ایمیل صورت‌جلسه و اکشن‌پلن به حاضران', 'Email minutes & action plan to attendees'], desc: ['وقتی جلسه «برگزار شد» زده می‌شود.', 'When a meeting is marked held.'] },
   { id: 'blocked_followup', where: 'app', icon: Unlock, title: ['پیگیری برای تسکی که بیش از حد مجاز مسدود مانده', 'Follow-up for tasks blocked too long'], desc: ['با کسی که تسک به‌خاطر او مسدود است (یا مسئول تسک)، در پیگیری‌های مدیر برنامه. تعداد روز از تنظیمات تسک.', 'With whoever it is blocked on (or the assignee), on the program manager’s follow-ups. Days from the task settings.'] },
-  { id: 'pause_shift', where: 'app', icon: PauseCircle, title: ['جابجایی ددلاین بعد از ادامه‌ی پروژه‌ی متوقف', 'Shift dates when a paused project resumes'], desc: ['ددلاین، مایلستون‌ها و تحویل‌های باز به اندازه‌ی روزهای توقف جلو می‌روند.', 'Deadline, milestones and open deliverables move by the paused days.'] },
   { id: 'google_photo', where: 'app', icon: Image, title: ['عکس پروفایل از حساب گوگل', 'Profile photo from Google'], desc: ['برای کسی که هنوز عکس آپلود نکرده.', 'For anyone who hasn’t uploaded one.'] },
-  { id: 'update_reminder', where: 'server', icon: FileWarning, title: ['یادآوری گزارش هفتگی', 'Weekly update reminder'], desc: ['روز مهلت ساعت ۱۴ و صبح روز جلسه‌ی هفتگی به مدیر محصول پروژه‌هایی که گزارش نداده‌اند.', 'Deadline day 14:00 and the weekly’s morning to leads who haven’t reported.'] },
-  { id: 'action_reminder', where: 'server', icon: BellRing, title: ['یادآوری اکشن‌های معوق', 'Overdue action reminders'], desc: ['هر صبح به مسئول هر اکشن عقب‌افتاده.', 'Every morning, to the owner of each overdue action.'] },
-  { id: 'assign_mail', where: 'server', icon: UserPlus, title: ['ایمیل به مسئول، وقتی تسکی به او سپرده می‌شود', 'Email the assignee when a task is handed to them'], desc: ['همان لحظه، با سررسید و ددلاین.', 'Right away, with the due date and deadline.'] },
-  { id: 'task_alerts', where: 'server', icon: Bell, title: ['یادآوری تسک‌ها: یادآوری، تحویل، تست و ددلاین', 'Task alerts: follow-up, hand-off, testing and deadline'], desc: ['هر صبح ۸:۳۰ به همه‌ی افراد تسک.', 'Every morning 08:30, to everyone on the task.'] },
-  { id: 'delivery_alerts', where: 'server', icon: PackageCheck, title: ['یادآوری روز تحویل هفتگی پروژه‌ها', 'Weekly delivery-day reminders'], desc: ['صبح روز تحویل به مدیر محصول پروژه؛ اگر ثبت نشد، فردا به مدیر برنامه هم.', 'On the day to the lead; if not recorded, the next morning to the program manager too.'] },
-  { id: 'daily_digest', where: 'server', icon: Sunrise, title: ['خلاصه‌ی صبحگاهی', 'Morning digest'], desc: ['ساعت ۷:۳۰ برای مدیر برنامه.', '07:30, to the program manager.'] },
+  { id: 'daily_digest', where: 'server', icon: Sunrise, title: ['خلاصه‌ی صبحگاهی', 'Morning digest'], desc: ['ساعت ۷:۳۰ برای مدیر برنامه: میزیتوی فوری یا عبور از SLA، پیگیری‌ها، تسک‌های امروز، معوق و مسدود.', '07:30 to the PgM: urgent / SLA-breached Mizito, follow-ups, today’s, late and blocked tasks.'] },
 ]
 
 const names = (s: string) => String(s || '').split(',').map((x) => x.trim()).filter(Boolean)

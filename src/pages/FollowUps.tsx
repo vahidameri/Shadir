@@ -24,13 +24,14 @@ export default function FollowUps() {
   const people = Array.from(new Set(db.FollowUps.map((f) => f.person).filter(Boolean)))
   const sort = (a: FollowUp, b: FollowUp) => (a.due_date || '9999').localeCompare(b.due_date || '9999')
 
-  const overdue = openFu.filter((f) => f.status === 'open' && f.due_date && f.due_date < today)
+  // a ping is due when its date has come, whether we are still to ask (open) or waiting on an answer
+  const overdue = openFu.filter((f) => f.due_date && f.due_date < today)
   const groups: { key: string; title: string; tone: string; items: FollowUp[] }[] =
     group === 'time'
       ? [
-          { key: 'overdue', title: L('معوق', 'Overdue'), tone: 'text-bad', items: overdue },
-          { key: 'today', title: L('امروز', 'Today'), tone: 'text-warn', items: openFu.filter((f) => f.status === 'open' && f.due_date === today) },
-          { key: 'waiting', title: L('منتظر پاسخ', 'Waiting'), tone: 'text-purple-500', items: openFu.filter((f) => f.status === 'waiting') },
+          { key: 'overdue', title: L('پینگ عقب‌افتاده', 'Ping overdue'), tone: 'text-bad', items: overdue },
+          { key: 'today', title: L('پینگ امروز', 'Ping today'), tone: 'text-warn', items: openFu.filter((f) => f.due_date === today) },
+          { key: 'waiting', title: L('منتظر پاسخ', 'Waiting'), tone: 'text-purple-500', items: openFu.filter((f) => f.status === 'waiting' && (!f.due_date || f.due_date > today)) },
           { key: 'week', title: L('این هفته', 'This week'), tone: '', items: openFu.filter((f) => f.status === 'open' && f.due_date > today && f.due_date <= week) },
           { key: 'later', title: L('بعداً', 'Later'), tone: 'text-sub', items: openFu.filter((f) => f.status === 'open' && (!f.due_date || f.due_date > week)) },
         ]
@@ -56,7 +57,7 @@ export default function FollowUps() {
           items={[
             { label: L('پیگیری باز', 'Open'), value: fa(openFu.length) },
             { label: L('معوق', 'Overdue'), value: fa(overdue.length), tone: overdue.length ? 'red' : 'green' },
-            { label: L('امروز', 'Today'), value: fa(openFu.filter((f) => f.status === 'open' && f.due_date === today).length), tone: 'amber' },
+            { label: L('پینگ امروز', 'Ping today'), value: fa(openFu.filter((f) => f.due_date === today).length), tone: 'amber' },
             { label: L('منتظر پاسخ', 'Waiting'), value: fa(openFu.filter((f) => f.status === 'waiting').length) },
             { label: L('افراد', 'People'), value: fa(new Set(openFu.map((f) => f.person)).size) },
             { label: L('بسته‌شده', 'Closed'), value: fa(done.length), tone: 'green' },
