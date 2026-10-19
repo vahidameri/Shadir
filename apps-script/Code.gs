@@ -67,7 +67,7 @@ var SCHEMA = {
   Objectives: ['id', 'team', 'quarter', 'title', 'description', 'owner', 'sort', 'batch'],
   KeyResults: ['id', 'objective_id', 'title', 'owner', 'kind', 'start', 'target', 'current', 'unit', 'confidence', 'project_id', 'note', 'updated_at', 'batch'],
   // product KPIs: latest value against a target; previous = the value before the last update
-  Kpis: ['id', 'project_id', 'name', 'unit', 'direction', 'target', 'current', 'previous', 'updated_at', 'note'],
+  Kpis: ['id', 'project_id', 'name', 'unit', 'direction', 'target', 'current', 'previous', 'updated_at', 'note', 'batch'],
 };
 
 var USERS_SHEET = 'Users';
@@ -477,10 +477,12 @@ function applyPrivacy_(data, user) {
   data.Files = (data.Files || []).filter(function (f) { return !(f.entity === 'Tasks' && hidden[f.entity_id]); });
   var out = applyScope_(data, user, owners);
   // the log of a task or follow-up travels only with the row itself
-  var seen = { Tasks: {}, FollowUps: {}, Mizito: {} };
+  var seen = { Tasks: {}, FollowUps: {}, Mizito: {}, KeyResults: {}, Kpis: {} };
   (out.Tasks || []).forEach(function (t) { seen.Tasks[t.id] = 1; });
   (out.FollowUps || []).forEach(function (f) { seen.FollowUps[f.id] = 1; });
   (out.Mizito || []).forEach(function (m) { seen.Mizito[m.id] = 1; });
+  (out.KeyResults || []).forEach(function (k) { seen.KeyResults[k.id] = 1; });
+  (out.Kpis || []).forEach(function (k) { seen.Kpis[k.id] = 1; });
   out.History = (out.History || []).filter(function (h) { return seen[h.entity] && seen[h.entity][h.entity_id]; });
   return out;
 }

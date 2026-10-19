@@ -45,7 +45,7 @@ function timelineElapsed(p: Pick<Project, 'start_date' | 'end_date'>) {
 }
 
 /** Always-on products have no end date: their health comes from work, risks, KPIs, OKRs and the weekly report. */
-export const isProduct = (p: Pick<Project, 'kind' | 'end_date'>) => p.kind === 'product' || (!p.kind && !p.end_date)
+export const isProduct = (p: Pick<Project, 'kind'>) => p.kind === 'product'
 
 export function projectMetrics(p: Project, db: DB): ProjectMetrics {
   const product = isProduct(p)

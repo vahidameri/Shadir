@@ -180,7 +180,22 @@ function CheckIn({ k }: { k: KeyResult }) {
     <Popover
       width={280}
       align="end"
-      trigger={({ toggle }) => <button className="btn-outline btn-sm" onClick={toggle}>{L('چک‌این', 'Check in')}</button>}
+      trigger={({ open, toggle }) => (
+        <button
+          className="btn-outline btn-sm"
+          onClick={() => {
+            // start from the key result as it is now, not as it was when the row first rendered
+            if (!open) {
+              setV(String(k.current ?? ''))
+              setConf(k.confidence || '')
+              setNote('')
+            }
+            toggle()
+          }}
+        >
+          {L('چک‌این', 'Check in')}
+        </button>
+      )}
     >
       {(close) => (
         <div className="space-y-3 p-3">
@@ -199,8 +214,9 @@ function CheckIn({ k }: { k: KeyResult }) {
           <button
             className="btn-primary btn-sm w-full"
             onClick={async () => {
-              const n = Number(String(v).replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))))
-              await upsert('KeyResults', { ...k, current: Number.isFinite(n) ? n : k.current, confidence: conf, note: note || k.note, updated_at: nowStamp() })
+              const raw = String(v).trim().replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+              const n = Number(raw)
+              await upsert('KeyResults', { ...k, current: raw && Number.isFinite(n) ? n : k.current, confidence: conf, note: note || k.note, updated_at: nowStamp() })
               toast(L('چک‌این ثبت شد', 'Check-in saved'))
               close()
             }}

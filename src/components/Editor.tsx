@@ -686,6 +686,12 @@ function EditorModal({ sheet, row, isNew, onClose }: { sheet: EditableSheet; row
 
   const del = async () => {
     try {
+      // an objective takes its key results with it; their tasks go back to "other work"
+      if (sheet === 'Objectives' || sheet === 'KeyResults') {
+        const krIds = sheet === 'KeyResults' ? [String(form.id)] : db.KeyResults.filter((k) => k.objective_id === form.id).map((k) => k.id)
+        for (const t of db.Tasks.filter((x) => x.kr_id && krIds.includes(x.kr_id))) await upsert('Tasks', { ...t, kr_id: '' })
+        if (sheet === 'Objectives') for (const id of krIds) await remove('KeyResults', id)
+      }
       await remove(sheet, String(form.id))
       toast(L(`${title} حذف شد`, `${title} deleted`))
       onClose()

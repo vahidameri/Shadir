@@ -87,7 +87,7 @@ export default function Tasks() {
       if (whose === 'mine' && !isAssignee(t, me)) return false
       if (whose === 'shared' && !(!isAssignee(t, me) && isMine(t, me))) return false
       if (area && t.area !== area) return false
-      if (kr && (kr === 'none' ? !!t.kr_id : t.kr_id !== kr)) return false
+      if (kr && (kr === 'none' ? !!t.kr_id && db.KeyResults.some((k) => k.id === t.kr_id) : t.kr_id !== kr)) return false
       if (q && !t.title.includes(q) && !t.description.includes(q) && !t.tags.includes(q)) return false
       return true
     })

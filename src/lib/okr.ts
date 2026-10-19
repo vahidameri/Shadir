@@ -8,7 +8,7 @@ import { closed } from './columns'
 import { signals } from './signals'
 
 export const quarterOf = (iso: string = todayISO()) => {
-  const p = isoToJalaliParts(iso)!
+  const p = isoToJalaliParts(iso) || isoToJalaliParts(todayISO())!
   return `${p.jy}-Q${Math.ceil(p.jm / 3)}`
 }
 const parse = (q: string) => {

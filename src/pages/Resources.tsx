@@ -116,7 +116,7 @@ export default function Resources() {
                           <td key={p.id} className="p-1 text-center">
                             <button
                               disabled={!edit}
-                              onClick={() => open('Allocations', list[0] ? (list[0] as never) : { id: undefined, member_id: m.id, project_id: p.id, quarter: q, percent: 20 })}
+                              onClick={() => open('Allocations', (list.find((a) => a.quarter === q) || list[0]) ? ((list.find((a) => a.quarter === q) || list[0]) as never) : { id: undefined, member_id: m.id, project_id: p.id, quarter: q, percent: 20 })}
                               className={cx('group relative h-11 w-full rounded-lg text-xs transition', v ? 'font-semibold text-ink' : 'text-sub/40 hover:bg-muted', !v && n > 0 && 'ring-1 ring-inset ring-warn/50')}
                               style={v ? { background: `rgb(var(--ink) / ${0.05 + Math.min(1, v / 100) * 0.35})`, color: v >= 60 ? 'rgb(var(--surface))' : undefined } : undefined}
                               title={!v && n > 0 ? L('تسک باز دارد ولی تخصیصی ندارد', 'Has open tasks but no allocation') : undefined}

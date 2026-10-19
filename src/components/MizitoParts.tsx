@@ -529,7 +529,7 @@ export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }
             </Popover>
           ))}
           {prop(L('لینک', 'Link'), <input key={m.link} dir="ltr" disabled={!canEdit} defaultValue={m.link} onBlur={(e) => e.target.value.trim() !== m.link && patch({ link: e.target.value.trim() })} placeholder="https://mizito…" className="h-8 w-full rounded-full bg-transparent px-2.5 outline-none hover:bg-muted focus:bg-surface" />)}
-          {prop(L('منشن در میزیتو', 'Mentioned in Mizito'), canEdit ? <StampPicker compact value={m.received_at || ''} onChange={(v) => patch({ received_at: v, last_mention_at: later(m.last_mention_at || '', v) })} /> : <span className="text-sub">{fmtDate(m.received_at)}</span>)}
+          {prop(L('منشن در میزیتو', 'Mentioned in Mizito'), canEdit ? <StampPicker compact value={m.received_at || ''} onChange={(v) => patch({ received_at: v, last_mention_at: mentionsOf(db, m.id).reduce((a, x) => later(a, x.at || ''), v) })} /> : <span className="text-sub">{fmtDate(m.received_at)}</span>)}
           {prop(L('گذشته', 'Age'), <span className="text-sub">{L(`${fa(s.ageDays)} روز از منشن`, `${s.ageDays}d since the mention`)}</span>)}
           {prop(L('ثبت در مدار', 'Logged in Madar'), <span className="text-sub">{fmtDate(m.created_at)}</span>)}
           {m.closed_at && prop(L('بسته شد', 'Closed'), <span className="text-sub">{fmtDayMonth(m.closed_at)}</span>)}
