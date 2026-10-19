@@ -44,7 +44,7 @@ export function Card({
 export function Band({ eyebrow, title, sub, actions, children, nav }: { eyebrow?: ReactNode; title: ReactNode; sub?: ReactNode; actions?: ReactNode; children?: ReactNode; nav?: ReactNode }) {
   return (
     <div className="band -mx-4 @sm:-mx-6 @lg:-mx-8 px-4 @sm:px-6 @lg:px-8 pt-7 pb-20 no-print">
-      <div className="relative z-10 mx-auto max-w-[90rem] rise">
+      <div className="relative z-10 mx-auto max-w-[112rem] rise">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
             {nav ? <div className="mb-5 inline-flex">{nav}</div> : eyebrow && <div className="band-eye mb-4"><span className="eyebrow !text-[#c3d0e8] flex items-center gap-2">{eyebrow}</span></div>}
@@ -61,7 +61,7 @@ export function Band({ eyebrow, title, sub, actions, children, nav }: { eyebrow?
 
 /** Content panel that overlaps the band above it. */
 export function Overlap({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cx('relative z-10 mx-auto -mt-16 max-w-[90rem] stagger', className)}>{children}</div>
+  return <div className={cx('relative z-10 mx-auto -mt-16 max-w-[112rem] stagger', className)}>{children}</div>
 }
 
 /** CPTO stats strip: big numbers separated by hairlines. */

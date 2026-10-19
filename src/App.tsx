@@ -74,7 +74,7 @@ function Gate({ children }: { children: React.ReactNode }) {
   if (mode === 'live' && loading && !lastSync && g.hosted) return <HostedSplash error="" retry={() => g.signIn('')} />
   if (mode === 'live' && loading && !lastSync)
     return (
-      <div className="mx-auto max-w-[90rem] space-y-4 pt-8">
+      <div className="mx-auto max-w-[112rem] space-y-4 pt-8">
         <Skeleton className="h-10 w-1/3" />
         <Skeleton className="h-5 w-1/2" />
         <div className="grid gap-4 pt-6 md:grid-cols-3">

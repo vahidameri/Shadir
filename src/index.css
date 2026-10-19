@@ -69,11 +69,12 @@ body,
 }
 
 /*
-  Desktop scale (13-inch laptops and up): every size in the app is rem-based, so the root font
-  size scales the whole UI — 13px at 1280px wide, about 14px at 1440, 16px at 1920, capped at 17.
+  Desktop scale (13-inch laptops up to large monitors): every size in the app is rem-based, so the
+  root font size scales the whole UI — 13px at 1280px wide, about 16px at 1920, 19px at 2560
+  (27-inch 1440p), capped at 24px on 4K at 100% zoom. Content is capped at 112rem and centred.
 */
 html {
-  font-size: clamp(13px, calc(6.5px + 0.5vw), 17px);
+  font-size: clamp(13px, calc(6.5px + 0.5vw), 24px);
 }
 
 body {
