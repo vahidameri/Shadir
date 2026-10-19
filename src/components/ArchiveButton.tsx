@@ -1,4 +1,5 @@
 import { Archive, ArchiveRestore } from 'lucide-react'
+import { closed } from '../lib/columns'
 import type { Project } from '../lib/types'
 import { useStore } from '../lib/store'
 import { can } from '../lib/access'
@@ -23,7 +24,7 @@ export function ArchiveButton({ p, dark }: { p: Project; dark?: boolean }) {
         <ArchiveRestore size={15} /> {L('خروج از آرشیو', 'Unarchive')}
       </button>
     )
-  const open = db.Tasks.filter((t) => t.project_id === p.id && t.status !== 'done').length
+  const open = db.Tasks.filter((t) => t.project_id === p.id && !closed(t)).length
   return (
     <Popover
       width={300}

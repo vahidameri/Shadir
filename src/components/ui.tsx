@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { X, Inbox, ChevronDown, Check } from 'lucide-react'
 import type { Health, Priority, TaskStatus } from '../lib/types'
 import { HEALTH, PRIORITY } from '../lib/labels'
-import { columnColor, columns, statusLabel } from '../lib/columns'
+import { catOf, columnColor, statusLabel } from '../lib/columns'
 import { daysFromToday, fa, fmtDayMonth, relDays } from '../lib/jalali'
 import { lbl, L } from '../lib/i18n'
 
@@ -126,29 +126,41 @@ export function PriorityBadge({ p }: { p: Priority }) {
   )
 }
 
-/** Linear-style status glyphs. */
+/** Linear-style status glyphs, drawn from the status category (so custom statuses read right). */
 export function StatusIcon({ s, size = 16 }: { s: TaskStatus; size?: number }) {
   const r = size / 2 - 1.5
   const c = size / 2
   const circ = 2 * Math.PI * (r - 2.5)
-  const custom = columns().find((c) => c.id === s)?.color
-  const color = custom ? custom : s === 'done' ? 'rgb(var(--good))' : s === 'blocked' ? 'rgb(var(--bad))' : s === 'review' ? '#8b5cf6' : s === 'in_progress' ? 'rgb(var(--warn))' : s === 'todo' ? 'rgb(var(--sub))' : columnColor(s)
+  const cat = catOf(s)
+  const color = columnColor(s)
+  const fill = { intake: 0, open: 0, active: s === 'review' || s === 'qa' ? 0.75 : 0.5, waiting: 0.5 }[cat as 'open'] ?? 0
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0" aria-label={statusLabel(s)}>
-      {s === 'done' ? (
+      {cat === 'done' ? (
         <>
           <circle cx={c} cy={c} r={r} fill={color} />
           <path d={`M${c - 3} ${c} l2 2 l4 -4`} stroke="white" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
         </>
-      ) : s === 'blocked' ? (
+      ) : cat === 'blocked' ? (
         <>
           <circle cx={c} cy={c} r={r} fill={color} />
           <path d={`M${c - 2.5} ${c - 2.5} l5 5 M${c + 2.5} ${c - 2.5} l-5 5`} stroke="white" strokeWidth="1.6" strokeLinecap="round" />
         </>
+      ) : cat === 'cancelled' ? (
+        <>
+          <circle cx={c} cy={c} r={r} fill="none" stroke={color} strokeWidth="1.6" />
+          <path d={`M${c - 3} ${c + 3} l6 -6`} stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+        </>
+      ) : cat === 'waiting' ? (
+        <>
+          <circle cx={c} cy={c} r={r} fill="none" stroke={color} strokeWidth="1.6" />
+          <path d={`M${c} ${c - 3} V${c} l2 1.6`} stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </>
       ) : (
         <>
-          <circle cx={c} cy={c} r={r} fill="none" stroke={color} strokeWidth="1.6" strokeDasharray={s === 'todo' ? '2.4 1.8' : undefined} />
-          {s !== 'todo' && (
+          <circle cx={c} cy={c} r={r} fill="none" stroke={color} strokeWidth="1.6" strokeDasharray={cat === 'open' || cat === 'intake' ? '2.4 1.8' : undefined} />
+          {cat === 'intake' && <circle cx={c} cy={c} r={1.6} fill={color} />}
+          {fill > 0 && (
             <circle
               cx={c}
               cy={c}
@@ -156,7 +168,7 @@ export function StatusIcon({ s, size = 16 }: { s: TaskStatus; size?: number }) {
               fill="none"
               stroke={color}
               strokeWidth={(r - 2.5) * 2}
-              strokeDasharray={`${circ * (s === 'in_progress' ? 0.5 : 0.75)} ${circ}`}
+              strokeDasharray={`${circ * fill} ${circ}`}
               transform={`rotate(-90 ${c} ${c})`}
             />
           )}

@@ -1,4 +1,4 @@
-import type { BuiltinStatus, Deliverable, Meeting, MeetingSeries, Health, Priority, ProjectStatus, FollowUpStatus, Risk, Milestone, Sprint, ScopeItem, FollowUp } from './types'
+import type { BuiltinStatus, StatusCat, Deliverable, Meeting, MeetingSeries, Health, Priority, ProjectStatus, FollowUpStatus, Risk, Milestone, Sprint, ScopeItem, FollowUp } from './types'
 import type { T2 } from './i18n'
 
 export const PROJECT_STATUS: Record<ProjectStatus, T2> = {
@@ -25,14 +25,32 @@ export const HEALTH: Record<Health, T2> = {
 }
 
 export const TASK_STATUS: Record<BuiltinStatus, T2> = {
+  intake: ['ورودی (تریاژ نشده)', 'Intake'],
+  backlog: ['بک‌لاگ', 'Backlog'],
   todo: ['برای انجام', 'To do'],
   in_progress: ['در حال انجام', 'In progress'],
   review: ['بازبینی', 'In review'],
-  blocked: ['مسدود', 'Blocked'],
+  qa: ['تست / QA', 'Testing / QA'],
+  waiting: ['در انتظار', 'Waiting'],
+  blocked: ['مسدود (Blocker)', 'Blocked'],
   done: ['انجام‌شده', 'Done'],
+  cancelled: ['لغوشده', 'Cancelled'],
 }
 
-export const TASK_STATUS_ORDER: BuiltinStatus[] = ['todo', 'in_progress', 'review', 'blocked', 'done']
+export const TASK_STATUS_ORDER: BuiltinStatus[] = ['intake', 'backlog', 'todo', 'in_progress', 'review', 'qa', 'waiting', 'blocked', 'done', 'cancelled']
+/** The category of each built-in status (custom columns choose theirs in the settings). */
+export const BUILTIN_CAT: Record<BuiltinStatus, StatusCat> = {
+  intake: 'intake', backlog: 'open', todo: 'open', in_progress: 'active', review: 'active', qa: 'active', waiting: 'waiting', blocked: 'blocked', done: 'done', cancelled: 'cancelled',
+}
+export const STATUS_CAT: Record<StatusCat, T2> = {
+  intake: ['ورودی', 'Intake'],
+  open: ['باز، شروع‌نشده', 'Open, not started'],
+  active: ['در جریان', 'In progress'],
+  waiting: ['در انتظار دیگران', 'Waiting on others'],
+  blocked: ['مسدود', 'Blocked'],
+  done: ['انجام‌شده', 'Done'],
+  cancelled: ['لغوشده', 'Cancelled'],
+}
 
 export const FOLLOWUP_STATUS: Record<FollowUpStatus, T2> = {
   open: ['باز', 'Open'],

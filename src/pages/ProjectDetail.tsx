@@ -1,4 +1,5 @@
 import { isAssignee } from '../lib/assignees'
+import { closed } from '../lib/columns'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowRight, Pencil, Plus, Target, Send, Building2, Contact, User, Pause } from 'lucide-react'
@@ -476,7 +477,7 @@ export default function ProjectDetail() {
                   const mem = db.Team.find((x) => x.id === a.member_id)
                   if (!mem) return null
                   const total = memberWeek(db, mem).load
-                  const memTasks = tasks.filter((t) => isAssignee(t, mem.name) && t.status !== 'done').length
+                  const memTasks = tasks.filter((t) => isAssignee(t, mem.name) && !closed(t)).length
                   return (
                     <button key={a.id} onClick={() => open('Allocations', a as never)} className="flex items-center gap-3 rounded-2xl border border-line p-4 text-start transition hover:border-line-strong">
                       <Avatar name={mem.name} size="lg" />

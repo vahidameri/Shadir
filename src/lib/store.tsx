@@ -6,6 +6,8 @@ import { COLUMNS_KEY, readColumns, setColumns } from './columns'
 import { applyOrg } from './org'
 import { TERMS_KEY, applyTerms } from './terms'
 import { setDeliveryCfg } from './cadence'
+import { stampTask } from './taskstamp'
+import { diffRows } from './history'
 import { passFor } from './handoffs'
 import type { Task } from './types'
 import { NOTIFY_KEY, setNotifyOff } from './inbox'
@@ -70,7 +72,7 @@ const NUMERIC: Partial<Record<SheetName, string[]>> = {
 }
 
 function emptyDB(): DB {
-  return { Projects: [], Scope: [], Milestones: [], Sprints: [], Tasks: [], FollowUps: [], Risks: [], Team: [], Allocations: [], Updates: [], Comments: [], Deliverables: [], Meetings: [], Files: [], Config: [], Contracts: [], Handoffs: [], Deliveries: [] }
+  return { Projects: [], Scope: [], Milestones: [], Sprints: [], Tasks: [], FollowUps: [], Risks: [], Team: [], Allocations: [], Updates: [], Comments: [], Deliverables: [], Meetings: [], Files: [], Config: [], Contracts: [], Handoffs: [], Deliveries: [], History: [] }
 }
 
 // Sheets return numbers as numbers or strings, dates as ISO strings. Normalize once here.
@@ -309,11 +311,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const upsert = useCallback(
     async <S extends SheetName>(sheet: S, input: Row<S>) => {
-      const row = mapRow(sheet, input as unknown as Record<string, unknown>, toCanonRef.current) as unknown as Row<S>
+      let row = mapRow(sheet, input as unknown as Record<string, unknown>, toCanonRef.current) as unknown as Row<S>
       const prev = dbRef.current
       const list = prev[sheet] as Row<S>[]
-      const exists = list.some((r) => r.id === row.id)
-      const next = { ...prev, [sheet]: exists ? list.map((r) => (r.id === row.id ? row : r)) : [...list, row] } as DB
+      if (sheet === 'Tasks') row = stampTask(list.find((r) => r.id === row.id) as unknown as Task | undefined, row as unknown as Task) as unknown as Row<S>
+      const old = list.find((r) => r.id === row.id)
+      const exists = !!old
+      const log = diffRows(sheet, old as unknown as Record<string, unknown> | undefined, row as unknown as Record<string, unknown>, canonMeRef.current)
+      const next = { ...prev, [sheet]: exists ? list.map((r) => (r.id === row.id ? row : r)) : [...list, row], ...(log.length ? { History: [...prev.History, ...log] } : {}) } as DB
       // keep the ref current so back-to-back writes build on each other
       dbRef.current = next
       setDb(next)

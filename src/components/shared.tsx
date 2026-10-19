@@ -1,4 +1,7 @@
 import { DeliveredButton, DeliveryBadge, DeliveryHistory } from './DeliveryDay'
+import { closed, firstOf } from '../lib/columns'
+import { signals } from '../lib/signals'
+import { TaskSignals } from './TaskTracking'
 import { everyDay, hasDeliveryDay } from '../lib/cadence'
 import { Link } from 'react-router-dom'
 import { Check, Clock, AlarmClockOff, MessageSquare, Phone, Mail, Users2, MoreHorizontal, AlertTriangle, Star } from 'lucide-react'
@@ -28,7 +31,7 @@ export function useCompleteTask() {
   const { upsert, toast } = useStore()
   return async (t: Task) => {
     const done = t.status === 'done'
-    await upsert('Tasks', { ...t, status: done ? 'todo' : 'done', completed_at: done ? '' : todayISO() })
+    await upsert('Tasks', { ...t, status: done ? firstOf('open') : 'done' })
     if (!done) toast(L('تسک انجام شد', 'Task completed'), 'ok', { label: L('بازگردانی', 'Undo'), run: () => upsert('Tasks', t) })
   }
 }
@@ -38,9 +41,11 @@ export function TaskRow({ t, showProject = true, dense }: { t: Task; showProject
   const { open } = useEditor()
   const pname = useProjectName()
   const complete = useCompleteTask()
-  const done = t.status === 'done'
+  const done = closed(t)
   const nComments = db.Comments.filter((c) => c.entity === 'Tasks' && c.entity_id === t.id).length
-  const patch = (p: Partial<Task>) => upsert('Tasks', { ...t, ...p, ...(p.status ? { completed_at: p.status === 'done' ? todayISO() : '' } : {}) })
+  const patch = (p: Partial<Task>) => upsert('Tasks', { ...t, ...p })
+  const sg = signals(t)
+  const loud = !!t.flag || sg.blockedDays !== null || sg.stale || !!t.link
   return (
     <div onClick={() => open('Tasks', t as never)} className={cx('group flex cursor-pointer items-center gap-2 rounded-xl px-2 transition hover:bg-muted/70', dense ? 'py-1.5' : 'py-2')}>
       <button
@@ -52,15 +57,16 @@ export function TaskRow({ t, showProject = true, dense }: { t: Task; showProject
         aria-label={L('انجام شد', 'Done')}
         title={L('انجام شد', 'Mark done')}
       >
-        <StatusIcon s={done ? 'done' : t.status} size={17} />
+        <StatusIcon s={t.status} size={17} />
       </button>
       <div className="min-w-0 flex-1">
         <div className={cx('flex items-center gap-1.5 truncate text-sm', done && 'text-sub line-through')}>
           {isPrivateTask(t, db) && <Lock size={12} className="shrink-0 text-sub" aria-label={L('خصوصی', 'Private')} />}
           <span className="truncate">{t.title}</span>
         </div>
-        {(showProject && t.project_id) || nComments ? (
-          <div className="mt-0.5 flex items-center gap-2 text-[0.6875rem] text-sub">
+        {(showProject && t.project_id) || nComments || loud ? (
+          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[0.6875rem] text-sub">
+            {loud && <TaskSignals t={t} assign={false} />}
             {showProject && t.project_id && <span className="max-w-[14rem] truncate">{pname(t.project_id)}</span>}
             {nComments > 0 && (
               <span className="inline-flex items-center gap-0.5">

@@ -5,7 +5,7 @@ import type { SheetName } from '../lib/types'
 import { weekCfg } from '../lib/weeks'
 import { canPersonal, dueFor, fieldOn, fieldReq, needsDue, needsProject, taskCfg, TASK_FIELDS, type TaskField } from '../lib/taskcfg'
 import { DAY_OPTIONS } from '../lib/cadence'
-import { columns, statusLabel } from '../lib/columns'
+import { columns, isBlocked, statusLabel } from '../lib/columns'
 import { useStore } from '../lib/store'
 import { uid } from '../lib/api'
 import { todayISO } from '../lib/jalali'
@@ -20,7 +20,7 @@ import { ItemSheet } from './ItemSheet'
 import { useAuto } from '../lib/automations'
 import { can } from '../lib/access'
 
-type FieldType = 'text' | 'textarea' | 'select' | 'multi' | 'date' | 'number' | 'project' | 'person' | 'people' | 'sprint' | 'member' | 'scale' | 'status' | 'area' | 'side' | 'title' | 'assignees'
+type FieldType = 'text' | 'textarea' | 'select' | 'multi' | 'date' | 'number' | 'project' | 'person' | 'people' | 'sprint' | 'member' | 'scale' | 'status' | 'area' | 'side' | 'title' | 'assignees' | 'flag'
 export interface Field {
   key: string
   label: T2
@@ -31,7 +31,7 @@ export interface Field {
   placeholder?: T2
 }
 
-export type EditableSheet = Exclude<SheetName, 'Comments' | 'Files' | 'Config' | 'Handoffs' | 'Deliveries'>
+export type EditableSheet = Exclude<SheetName, 'Comments' | 'Files' | 'Config' | 'Handoffs' | 'Deliveries' | 'History'>
 
 export const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields: Field[]; defaults: () => Record<string, unknown> }> = {
   Tasks: {
@@ -44,12 +44,17 @@ export const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields:
       { key: 'area', label: ['حوزه', 'Area'], type: 'area', half: true },
       { key: 'sprint_id', label: ['اسپرینت', 'Sprint'], type: 'sprint', half: true },
       { key: 'assignee', label: ['مسئول انجام (یک یا چند نفر)', 'Assignees (one or more)'], type: 'assignees' },
+      { key: 'requested_by', label: ['درخواست‌دهنده', 'Requested by'], type: 'person', half: true },
+      { key: 'assigned_at', label: ['تاریخ اساین', 'Assigned on'], type: 'date', half: true },
       { key: 'collaborators', label: ['همکاران (تسک مشترک)', 'Shared with'], type: 'people' },
       { key: 'watchers', label: ['ناظرها (دیده‌بان و اعلان)', 'Watchers (Lookout & alerts)'], type: 'people' },
       { key: 'status', label: ['وضعیت', 'Status'], type: 'status', half: true },
       { key: 'priority', label: ['اولویت', 'Priority'], type: 'select', options: PRIORITY, half: true },
+      { key: 'blocked_reason', label: ['علت انسداد', 'Why is it blocked?'], type: 'textarea' },
+      { key: 'blocked_by', label: ['مسدود به‌خاطر (شخص، واحد یا موضوع)', 'Blocked by (person, unit or thing)'], type: 'person', half: true },
+      { key: 'flag', label: ['پرچم', 'Flag'], type: 'flag', half: true },
       { key: 'start_date', label: ['تاریخ شروع', 'Start date'], type: 'date', half: true },
-      { key: 'due_date', label: ['سررسید', 'Due date'], type: 'date', half: true },
+      { key: 'due_date', label: ['ددلاین', 'Deadline'], type: 'date', half: true },
       { key: 'follow_date', label: ['تاریخ یادآوری', 'Reminder date'], type: 'date', half: true },
       { key: 'handoff_date', label: ['تحویل به پروداکت', 'Hand-off to product'], type: 'date', half: true },
       { key: 'test_date', label: ['زمان تست', 'Testing'], type: 'date', half: true },
@@ -60,8 +65,9 @@ export const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields:
       { key: 'tags', label: ['برچسب‌ها', 'Tags'], type: 'text', half: true, placeholder: ['با کاما جدا کنید', 'Comma separated'] },
       { key: 'track', label: ['واحد', 'Unit'], type: 'side', half: true },
       { key: 'private', label: ['دیده‌شدن', 'Visibility'], type: 'select', options: { '': ['عمومی', 'Visible'], '1': ['خصوصی', 'Private'] }, half: true },
+      { key: 'link', label: ['لینک (میزیتو یا سند)', 'Link (Mizito or doc)'], type: 'text', placeholder: ['https://mizito.noyanet.com/…', 'https://mizito.noyanet.com/…'] },
     ],
-    defaults: () => ({ private: '', status: 'todo', priority: 'medium', points: 0, created_at: todayISO(), track: '', depends_on: '', meeting_id: '', deadline: '', handoff_date: '', test_date: '', follow_date: '', area: '', collaborators: '', watchers: '', notify: '', start_date: '', estimate: '', checklist: '' }),
+    defaults: () => ({ private: '', flag: '', link: '', requested_by: '', assigned_at: '', blocked_reason: '', blocked_by: '', blocked_since: '', updated_at: '', status: 'todo', priority: 'medium', points: 0, created_at: todayISO(), track: '', depends_on: '', meeting_id: '', deadline: '', handoff_date: '', test_date: '', follow_date: '', area: '', collaborators: '', watchers: '', notify: '', start_date: '', estimate: '', checklist: '' }),
   },
   FollowUps: {
     title: ['پیگیری', 'Follow-up'],
@@ -332,6 +338,17 @@ export function FieldInput({ f, value, set, form, disabled, autoFocus, onSubmit 
           ))}
         </select>
       )
+    case 'flag':
+      return (
+        <select {...common} value={String(v)} onChange={(e) => set(e.target.value)}>
+          <option value="">{L('بدون پرچم', 'No flag')}</option>
+          {taskCfg().flags.map((x) => (
+            <option key={x.id} value={x.id}>
+              {L(x.fa, x.en)}
+            </option>
+          ))}
+        </select>
+      )
     case 'side':
       return (
         <select {...common} value={String(v)} onChange={(e) => set(e.target.value)}>
@@ -491,6 +508,8 @@ function EditorModal({ sheet, row, isNew, onClose }: { sheet: EditableSheet; row
           ...base,
           fields: base.fields
             .filter((f) => !optional.has(f.key) || fieldOn(f.key as TaskField))
+            // the blocker's reason and owner only matter while the task is blocked
+            .filter((f) => (f.key !== 'blocked_reason' && f.key !== 'blocked_by') || isBlocked(String(form.status)))
             .map((f) => ((f.key === 'due_date' && needsDue(owner)) || (f.key === 'project_id' && needsProject(owner)) || (optional.has(f.key) && fieldReq(f.key as TaskField)) ? { ...f, required: true } : f)),
         }
   const missing = schema.fields.filter((f) => f.required && !String(form[f.key] ?? '').trim())
@@ -502,7 +521,7 @@ function EditorModal({ sheet, row, isNew, onClose }: { sheet: EditableSheet; row
     const out = { ...form }
     if (isNew) out.id = uid(schema.prefix)
     // Auto-stamp completion dates so burndown & history stay accurate.
-    if (sheet === 'Tasks') out.completed_at = out.status === 'done' ? out.completed_at || todayISO() : ''
+    // completion, blocked-since, assign and update stamps are set by the store (lib/taskstamp)
     if (sheet === 'Tasks' && isNew && !out.reporter) out.reporter = me
     if (sheet === 'FollowUps' && !out.owner) out.owner = me
     if (sheet === 'FollowUps') out.done_at = out.status === 'done' ? out.done_at || todayISO() : ''

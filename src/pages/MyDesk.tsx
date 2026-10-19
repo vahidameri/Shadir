@@ -1,4 +1,6 @@
 import { assigneesOf, isAssignee } from '../lib/assignees'
+import { signals, viewCounts } from '../lib/signals'
+import { closed, isBlocked } from '../lib/columns'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Send, Copy, Lightbulb, UserCheck, ListChecks, BellRing, Hourglass, Sparkles, CalendarDays, Target } from 'lucide-react'
@@ -8,7 +10,7 @@ import { useEditor } from '../components/Editor'
 import { Band, Card, Empty, Overlap, Avatar, cx, Segmented, StatStrip, Chip, Ring, PriorityIcon, Due } from '../components/ui'
 import { FollowUpRow, TaskRow, useProjectName } from '../components/shared'
 import { PersonPicker, ProjectPicker } from '../components/pickers'
-import { canPersonal, dueDaysFor, needsDue, needsProject } from '../lib/taskcfg'
+import { canPersonal, dueDaysFor, needsDue, needsProject, taskCfg } from '../lib/taskcfg'
 import { addDays, daysFromToday, fa, fmtDate, todayISO, daysBetween, firstName, greeting, fmtWeekday, dayNum } from '../lib/jalali'
 import { isTaskOverdue, riskScore } from '../lib/metrics'
 import { uid } from '../lib/api'
@@ -67,7 +69,7 @@ export default function MyDesk() {
   }
 
   // ---------- My lists ----------
-  const myOpen = db.Tasks.filter((t) => isAssignee(t, me) && t.status !== 'done')
+  const myOpen = db.Tasks.filter((t) => isAssignee(t, me) && !closed(t))
   const myToday = myOpen.filter((t) => t.due_date && t.due_date <= today).sort(byDue)
   const myWeek = myOpen.filter((t) => t.due_date > today && t.due_date <= weekEnd).sort(byDue)
   const myLater = myOpen.filter((t) => !t.due_date || t.due_date > weekEnd).sort(byDue)
@@ -102,13 +104,13 @@ export default function MyDesk() {
   const suggestions = useMemo<Suggestion[]>(() => {
     const out: Suggestion[] = []
     // a blocker nobody is chasing: offer the follow-up
-    db.Tasks.filter((t) => t.status === 'blocked' && !db.FollowUps.some((f) => f.status !== 'done' && f.subject.includes(t.title))).forEach((t) => {
-      const who = assigneesOf(t)[0] || ''
+    db.Tasks.filter((t) => isBlocked(t.status) && !db.FollowUps.some((f) => f.status !== 'done' && f.subject.includes(t.title))).forEach((t) => {
+      const who = t.blocked_by || assigneesOf(t)[0] || ''
       out.push({
         key: `blk-${t.id}`, tone: 'bad',
         text: L(`«${t.title}» مسدود است و کسی پیگیرش نیست`, `“${t.title}” is blocked and nobody is chasing it`),
         action: L('ساخت پیگیری', 'Follow up'),
-        run: () => open('FollowUps', { project_id: t.project_id, person: who, subject: L(`رفع مانع: ${t.title}`, `Unblock: ${t.title}`), priority: 'high' }),
+        run: () => open('FollowUps', { project_id: t.project_id, person: who, subject: L(`رفع انسداد: ${t.title}`, `Unblock: ${t.title}`), priority: 'high' }),
       })
     })
     db.Risks.filter((r) => r.status !== 'closed' && riskScore(r) >= 15 && r.due_date && r.due_date < today).forEach((r) =>
@@ -130,9 +132,11 @@ export default function MyDesk() {
   const nextMeeting = db.Meetings.filter((m) => m.status === 'scheduled' && m.date >= today && names(m.attendees).includes(me)).sort((a, b) => (a.date + a.time < b.date + b.time ? -1 : 1))[0]
   const scope = can.portfolio(access) ? db.Tasks : db.Tasks.filter((t) => isAssignee(t, me))
   const lateAll = scope.filter((t) => isTaskOverdue(t))
-  const blockedAll = scope.filter((t) => t.status === 'blocked')
+  const blockedAll = scope.filter((t) => isBlocked(t.status))
   const fuDueAll = db.FollowUps.filter((f) => f.status !== 'done' && f.due_date && f.due_date <= today)
-  const myActions = db.Tasks.filter((t) => t.meeting_id && isAssignee(t, me) && t.status !== 'done')
+  const vc = viewCounts(db.Tasks, me)
+  const watch = { flagged: vc.flagged, stale: vc.stale, intake: vc.intake, blockedLong: db.Tasks.filter((t) => signals(t).blockedLong).length }
+  const myActions = db.Tasks.filter((t) => t.meeting_id && isAssignee(t, me) && !closed(t))
 
   const first = firstName(me)
   const hello = me ? L(`${greeting()}، ${first} جان`, `${greeting()}, ${first}`) : greeting()
@@ -223,7 +227,7 @@ export default function MyDesk() {
             sub={nextMeeting ? `${nextMeeting.date === today ? L('امروز', 'Today') : fmtWeekday(nextMeeting.date)} ${fa(nextMeeting.time)}${myActions.length ? L(` · ${fa(myActions.length)} اقدام باز شما`, ` · ${myActions.length} open actions`) : ''}` : L('جلسه‌ای در پیش نیست', 'Nothing scheduled')}
           />
           <RhythmTile
-            to="/tasks?due=overdue"
+            to="/tasks?v=late"
             icon={Hourglass}
             label={L('تسک‌های معوق', 'Overdue tasks')}
             value={fa(lateAll.length)}
@@ -231,7 +235,7 @@ export default function MyDesk() {
             tone={lateAll.length ? 'bad' : undefined}
           />
           <RhythmTile
-            to="/tasks?status=blocked"
+            to="/tasks?v=blocked"
             icon={Ban}
             label={L('مسدود (Blocker)', 'Blocked')}
             value={fa(blockedAll.length)}
@@ -247,6 +251,26 @@ export default function MyDesk() {
             tone={fuDueAll.some((f) => f.due_date < today) ? 'warn' : undefined}
           />
         </div>
+
+        {can.portfolio(access) && (watch.flagged + watch.stale + watch.intake + watch.blockedLong > 0) && (
+          <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-surface px-4 py-3 text-xs">
+            <span className="font-semibold">{L('زیر نظر', 'Watchlist')}</span>
+            {(
+              [
+                ['flagged', watch.flagged, L('پرچم‌دار', 'flagged'), 'text-warn'],
+                ['blocked', watch.blockedLong, L(`مسدود بیش از ${fa(taskCfg().blockedDays)} روز`, `blocked > ${taskCfg().blockedDays}d`), 'text-bad'],
+                ['stale', watch.stale, L(`راکد (بی‌تغییر ${fa(taskCfg().staleDays)}+ روز)`, `quiet ${taskCfg().staleDays}+ days`), 'text-sub'],
+                ['intake', watch.intake, L('در ورودی، منتظر تصمیم', 'in intake'), 'text-sky-600'],
+              ] as const
+            )
+              .filter(([, n]) => n > 0)
+              .map(([v, n, label, tone]) => (
+                <Link key={v} to={`/tasks?v=${v}`} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 transition hover:bg-line">
+                  <b className={cx('num', tone)}>{fa(n)}</b> {label}
+                </Link>
+              ))}
+          </div>
+        )}
 
         <div className="grid gap-4 @lg:grid-cols-5">
           <Card className="@lg:col-span-3" eyebrow={<span className="flex items-center gap-1.5"><CalendarDays size={12} /> {L('هفته‌ی پیش رو', 'The week ahead')}</span>} title={day ? `${fmtWeekday(day)} ${fmtDate(day, 'long')}` : L('برنامه‌ی ۷ روز آینده', 'Next 7 days')} action={day ? <button className="btn-ghost btn-sm" onClick={() => setDay('')}>{L('همه', 'All')} ×</button> : undefined}>

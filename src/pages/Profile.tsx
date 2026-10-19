@@ -1,4 +1,5 @@
 import { isAssignee } from '../lib/assignees'
+import { closed } from '../lib/columns'
 import { Link, useParams } from 'react-router-dom'
 import { JOB_TITLE, TEAM_NAMES, teamCodes } from '../lib/labels'
 import { Mail, Phone, Pencil, Lock, CalendarDays, Plus } from 'lucide-react'
@@ -27,7 +28,7 @@ export default function Profile() {
   const isMe = m.name === me
   const today = todayISO()
   const w = memberWeek(db, m)
-  const tasks = db.Tasks.filter((t) => isAssignee(t, m.name) && t.status !== 'done').sort((a, b) => ((a.due_date || '9') < (b.due_date || '9') ? -1 : 1))
+  const tasks = db.Tasks.filter((t) => isAssignee(t, m.name) && !closed(t)).sort((a, b) => ((a.due_date || '9') < (b.due_date || '9') ? -1 : 1))
   const hiddenCount = String(m.tasks_private) === '1' && !isMe ? true : false
   const dels = db.Deliverables.filter((d) => d.owner === m.name && !isClosed(d)).sort((a, b) => (a.target_date < b.target_date ? -1 : 1))
   const meetings = db.Meetings.filter((x) => x.date >= today && x.status === 'scheduled' && x.attendees.split(',').map((s) => s.trim()).includes(m.name)).sort((a, b) => (a.date + a.time < b.date + b.time ? -1 : 1)).slice(0, 5)

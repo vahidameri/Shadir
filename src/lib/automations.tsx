@@ -12,6 +12,8 @@ import { addDays, daysBetween, fa, todayISO } from './jalali'
 import { weekStart } from './weeks'
 import { uid } from './api'
 import { isWeeklySeries } from './labels'
+import { isBlocked } from './columns'
+import { taskCfg } from './taskcfg'
 
 export interface AutomationDef {
   id: string
@@ -26,7 +28,7 @@ export const AUTOMATIONS: AutomationDef[] = [
   { id: 'gcal_create', where: 'app', icon: CalendarPlus, title: ['ثبت جلسه‌ها در تقویم گوگل با لینک Meet', 'Put meetings on Google Calendar with a Meet link'], desc: ['حاضران، برگزارکننده و همیشه مدیر برنامه و مدیرعامل دعوت می‌شوند؛ جابجایی یا لغو جلسه در تقویم هم اعمال می‌شود.', 'Attendees, the facilitator and always the program manager and CEO are invited; moves and cancellations follow.'] },
   { id: 'next_meeting', where: 'app', icon: Repeat, title: ['ساخت جلسه‌ی هفته‌ی بعد پس از بستن جلسه‌ی هفتگی', 'Schedule next week after a weekly is closed'], desc: ['برای همه‌ی جلسه‌های هفتگی (CPTO، پروداکت، دیزاین، تک، پروژه).', 'For every weekly series (CPTO, product, design, tech, project).'] },
   { id: 'minutes_mail', where: 'server', icon: Mail, title: ['ایمیل صورت‌جلسه و اکشن‌پلن به حاضران', 'Email minutes & action plan to attendees'], desc: ['وقتی جلسه «برگزار شد» زده می‌شود.', 'When a meeting is marked held.'] },
-  { id: 'blocked_followup', where: 'app', icon: Unlock, title: ['پیگیری برای تسکی که بیش از ۳ روز مسدود مانده', 'Follow-up for tasks blocked over 3 days'], desc: ['با مسئول تسک، در پیگیری‌های مدیر برنامه.', 'With the assignee, on the program manager’s follow-ups.'] },
+  { id: 'blocked_followup', where: 'app', icon: Unlock, title: ['پیگیری برای تسکی که بیش از حد مجاز مسدود مانده', 'Follow-up for tasks blocked too long'], desc: ['با کسی که تسک به‌خاطر او مسدود است (یا مسئول تسک)، در پیگیری‌های مدیر برنامه. تعداد روز از تنظیمات تسک.', 'With whoever it is blocked on (or the assignee), on the program manager’s follow-ups. Days from the task settings.'] },
   { id: 'pause_shift', where: 'app', icon: PauseCircle, title: ['جابجایی ددلاین بعد از ادامه‌ی پروژه‌ی متوقف', 'Shift dates when a paused project resumes'], desc: ['ددلاین، مایلستون‌ها و تحویل‌های باز به اندازه‌ی روزهای توقف جلو می‌روند.', 'Deadline, milestones and open deliverables move by the paused days.'] },
   { id: 'google_photo', where: 'app', icon: Image, title: ['عکس پروفایل از حساب گوگل', 'Profile photo from Google'], desc: ['برای کسی که هنوز عکس آپلود نکرده.', 'For anyone who hasn’t uploaded one.'] },
   { id: 'update_reminder', where: 'server', icon: FileWarning, title: ['یادآوری گزارش هفتگی', 'Weekly update reminder'], desc: ['روز مهلت ساعت ۱۴ و صبح روز جلسه‌ی هفتگی به مدیر محصول پروژه‌هایی که گزارش نداده‌اند.', 'Deadline day 14:00 and the weekly’s morning to leads who haven’t reported.'] },
@@ -140,15 +142,17 @@ export function AutomationProvider({ children }: { children: ReactNode }) {
     if (!on('blocked_followup') || !(store.access === 'super') || ran.current.has('blocked')) return
     ran.current.add('blocked')
     const t = todayISO()
-    const stuck = db.Tasks.filter((k: Task) => k.status === 'blocked' && ((k.due_date && daysBetween(k.due_date, t) >= 3) || (k.created_at && daysBetween(k.created_at, t) >= 3)))
+    const n = taskCfg().blockedDays
+    const since = (k: Task) => k.blocked_since || (k.updated_at || '').slice(0, 10) || k.created_at
+    const stuck = db.Tasks.filter((k: Task) => isBlocked(k.status) && since(k) && daysBetween(since(k), t) >= n)
     const subject = (k: Task) => L(`رفع انسداد: ${k.title}`, `Unblock: ${k.title}`)
     const fresh = stuck.filter((k) => !db.FollowUps.some((f) => f.subject === subject(k)))
     if (!fresh.length) return
     ;(async () => {
       for (const k of fresh)
         await upsert('FollowUps', {
-          id: uid('F'), project_id: k.project_id, subject: subject(k), person: k.assignee, channel: 'chat', due_date: t, status: 'open', priority: 'high',
-          notes: L('خودکار: این تسک بیش از ۳ روز مسدود مانده است.', 'Automatic: this task has been blocked for over 3 days.'), created_at: t, done_at: '', owner: me,
+          id: uid('F'), project_id: k.project_id, subject: subject(k), person: k.blocked_by || k.assignee.split(',')[0].trim(), channel: 'chat', due_date: t, status: 'open', priority: 'high',
+          notes: L(`خودکار: این تسک ${fa(daysBetween(since(k), t))} روز است مسدود مانده.${k.blocked_reason ? ` علت: ${k.blocked_reason}` : ''}`, `Automatic: blocked for ${daysBetween(since(k), t)} days.${k.blocked_reason ? ` Reason: ${k.blocked_reason}` : ''}`), created_at: t, done_at: '', owner: me,
         })
       fire(L(`${fa(fresh.length)} پیگیری برای تسک‌های مسدود ساخته شد`, `${fresh.length} follow-up(s) created for blocked tasks`))
     })()

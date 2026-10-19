@@ -1,4 +1,4 @@
-﻿مدار — راهنمای نصب از صفر (نسخه 0.1.0)
+﻿مدار — راهنمای نصب از صفر (نسخه 0.2.0)
 =======================================
 
 فایل‌های این بسته
@@ -22,7 +22,7 @@
  3. کنار Files روی + ← HTML ← اسمش را دقیقاً Index بگذار ← کل Index.html را بچسبان.
  4. ⚙️ Project Settings ← تیک Show "appsscript.json" manifest file ← محتوای appsscript.json را بچسبان.
  5. Ctrl+S.
- ✔ چک: در Code.gs با Ctrl+F دنبال MADAR_VERSION بگرد ← باید '0.1.0' باشد.
+ ✔ چک: در Code.gs با Ctrl+F دنبال MADAR_VERSION بگرد ← باید '0.2.0' باشد.
 
 
 مرحله ۲ — اجرای setup
@@ -58,7 +58,7 @@
 
 مرحله ۶ — چک با diagnose
 ------------------------
- diagnose ← ▷ Run ← در Execution log باید «نسخه‌ی Code.gs = 0.1.0» و API_URL درست باشد.
+ diagnose ← ▷ Run ← در Execution log باید «نسخه‌ی Code.gs = 0.2.0» و API_URL درست باشد.
 
 
 مرحله ۷ — تنظیمات داخل مدار

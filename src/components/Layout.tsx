@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { closed } from '../lib/columns'
 import { NavLink, useLocation, useNavigate, Link } from 'react-router-dom'
 import {
   Briefcase, ListChecks, BellRing, ShieldAlert, Settings, Moon, Sun, Search, Plus, RefreshCw, Menu,
@@ -83,7 +84,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const myCount = inbox.filter((i) => i.kind !== 'milestone' && i.kind !== 'risk' && i.kind !== 'blocked').length
 
   // Madar: my work → tracking → watching → back office
-  const openTasks = db.Tasks.filter((t) => t.status !== 'done').length
+  const openTasks = db.Tasks.filter((t) => !closed(t)).length
   const groups: { label: string; links: { to: string; label: string; icon: typeof ListChecks; badge?: number; count?: number; hub?: Hub }[] }[] = [
     {
       label: L('کار من', 'My work'),

@@ -1,12 +1,14 @@
-// Task configuration for the program manager: rules, which fields a task has, areas and kanban columns.
+// Task configuration for the program manager: rules, which fields a task has, areas, statuses, flags and alerts.
 // Shown in the back office (Settings) and from the Tasks page; everything is stored in the Config tab.
 import { useState } from 'react'
-import { ArrowDown, ArrowUp, Bell, Columns3, ListChecks, Plus, SlidersHorizontal, Tags, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Bell, Columns3, Flag as FlagIcon, ListChecks, Plus, SlidersHorizontal, Tags, Trash2 } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { Card, Sheet, cx } from './ui'
 import { L, tr, type T2 } from '../lib/i18n'
-import { TASK_FIELDS, TASK_KEYS, fieldKey, taskCfg, type FieldMode, type TaskField } from '../lib/taskcfg'
-import { BUILTIN, COLUMNS_KEY, columnColor, columns, statusLabel, withColumn, type Column } from '../lib/columns'
+import { TASK_FIELDS, TASK_KEYS, fieldKey, taskCfg, type FieldMode, type Flag, type TaskField } from '../lib/taskcfg'
+import { BUILTIN, COLUMNS_KEY, catOf, columnHex, columns, firstOf, statusLabel, withColumn, type Column } from '../lib/columns'
+import { STATUS_CAT } from '../lib/labels'
+import type { StatusCat } from '../lib/types'
 import { StatusIcon } from './ui'
 import { useEditor } from './Editor'
 import { NOTIFY_KEY, NOTIFY_KINDS, notifyOff } from '../lib/inbox'
@@ -25,7 +27,7 @@ export function Switch({ on, onChange, disabled }: { on: boolean; onChange: (v: 
   )
 }
 
-const DUE_OPTS: [string, T2][] = [['', ['بدون سررسید', 'None']], ['0', ['امروز', 'Today']], ['1', ['فردا', 'Tomorrow']], ['3', ['۳ روز بعد', 'In 3 days']], ['7', ['هفته‌ی بعد', 'Next week']]]
+const DUE_OPTS: [string, T2][] = [['', ['بدون ددلاین', 'None']], ['0', ['امروز', 'Today']], ['1', ['فردا', 'Tomorrow']], ['3', ['۳ روز بعد', 'In 3 days']], ['7', ['هفته‌ی بعد', 'Next week']]]
 
 /** Task rules: defaults, what is required, and who may skip the due date or log personal tasks. */
 export function TaskCard({ admin }: { admin: boolean }) {
@@ -68,12 +70,12 @@ export function TaskCard({ admin }: { admin: boolean }) {
   return (
     <Card eyebrow={<span className="flex items-center gap-1.5"><ListChecks size={12} /> {L('تسک', 'Tasks')}</span>} title={L('قوانین تسک', 'Task rules')}>
       <div className="space-y-4">
-        {due(L('سررسید پیش‌فرض', 'Default due date'), TASK_KEYS.defaultDue, c.defaultDue)}
-        {toggle(L('سررسید اجباری', 'Due date required'), TASK_KEYS.dueRequired, c.dueRequired)}
+        {due(L('ددلاین پیش‌فرض', 'Default deadline'), TASK_KEYS.defaultDue, c.defaultDue)}
+        {toggle(L('ددلاین اجباری', 'Deadline required'), TASK_KEYS.dueRequired, c.dueRequired)}
         {toggle(L('پروژه اجباری', 'Project required'), TASK_KEYS.projectRequired, c.projectRequired)}
         <div className="space-y-4 border-t border-line pt-4">
-          {pick(L('بدون سررسید مجاز برای', 'May skip the due date'), TASK_KEYS.noDue, c.noDue)}
-          {due(L('سررسید پیش‌فرض این افراد', 'Their default due date'), TASK_KEYS.flexDefaultDue, c.flexDefaultDue)}
+          {pick(L('بدون ددلاین مجاز برای', 'May skip the deadline'), TASK_KEYS.noDue, c.noDue)}
+          {due(L('ددلاین پیش‌فرض این افراد', 'Their default due date'), TASK_KEYS.flexDefaultDue, c.flexDefaultDue)}
           {pick(L('تسک شخصی (بدون پروژه) برای', 'Personal tasks (no project) for'), TASK_KEYS.personal, c.personal)}
         </div>
       </div>
@@ -82,10 +84,14 @@ export function TaskCard({ admin }: { admin: boolean }) {
 }
 
 const FIELD_LABEL: Record<TaskField, T2> = {
+  assigned_at: ['تاریخ اساین', 'Assigned on'],
+  flag: ['پرچم', 'Flag'],
+  requested_by: ['درخواست‌دهنده', 'Requested by'],
+  link: ['لینک (مثلاً میزیتو)', 'Link (e.g. Mizito)'],
   start_date: ['تاریخ شروع', 'Start date'],
   estimate: ['تخمین زمان (ساعت)', 'Time estimate (hours)'],
   checklist: ['چک‌لیست', 'Checklist'],
-  deadline: ['ددلاین (تحویل نهایی)', 'Deadline (final delivery)'],
+  deadline: ['ددلاین دوم (تحویل نهایی)', 'Second deadline (final delivery)'],
   handoff_date: ['تحویل به پروداکت', 'Hand-off to product'],
   test_date: ['زمان تست', 'Testing'],
   follow_date: ['تاریخ یادآوری', 'Reminder date'],
@@ -95,7 +101,7 @@ const FIELD_LABEL: Record<TaskField, T2> = {
   sprint_id: ['اسپرینت', 'Sprint'],
   points: ['امتیاز', 'Story points'],
   tags: ['برچسب', 'Tags'],
-  track: ['تیم (پروداکت/تک)', 'Track'],
+  track: ['واحد', 'Unit'],
 }
 const MODES: [FieldMode, T2][] = [['off', ['خاموش', 'Off']], ['on', ['اختیاری', 'Optional']], ['req', ['اجباری', 'Required']]]
 
@@ -156,12 +162,14 @@ export function FieldsCard({ admin }: { admin: boolean }) {
   )
 }
 
-/** Kanban columns: rename, reorder, add; added columns can be removed (their tasks go back to "to do"). */
+/** Statuses: rename, recolour, reorder, add; each added status has a category; added ones can be removed (their tasks go back to "to do"). */
 export function ColumnsCard({ admin }: { admin: boolean }) {
   const { db, setSetting, upsert, toast } = useStore()
   const list = columns()
   const [name, setName] = useState('')
+  const [cat, setCat] = useState<StatusCat>('active')
   const save = (next: Column[]) => setSetting(COLUMNS_KEY, JSON.stringify(next))
+  const cats = Object.keys(STATUS_CAT) as StatusCat[]
   const move = (i: number, d: number) => {
     const j = i + d
     if (j < 0 || j >= list.length) return
@@ -176,20 +184,28 @@ export function ColumnsCard({ admin }: { admin: boolean }) {
   const del = async (c: Column) => {
     const moved = db.Tasks.filter((t) => t.status === c.id)
     await save(list.filter((x) => x.id !== c.id))
-    for (const t of moved) await upsert('Tasks', { ...t, status: 'todo' })
+    for (const t of moved) await upsert('Tasks', { ...t, status: firstOf('open') })
     toast(L(`ستون حذف شد${moved.length ? ` و ${moved.length} تسک به «برای انجام» رفت` : ''}`, `Column removed${moved.length ? `; ${moved.length} task(s) moved to To do` : ''}`))
   }
   return (
-    <Card eyebrow={<span className="flex items-center gap-1.5"><Columns3 size={12} /> {L('کانبان', 'Kanban')}</span>} title={L('ستون‌های بورد', 'Board columns')}>
+    <Card eyebrow={<span className="flex items-center gap-1.5"><Columns3 size={12} /> {L('وضعیت‌ها و بورد', 'Statuses & board')}</span>} title={L('وضعیت‌های تسک', 'Task statuses')}>
+      <p className="mb-3 text-xs leading-6 text-sub">{L('هر وضعیت یک «دسته» دارد که معنی‌اش را برای پیگیری مشخص می‌کند: باز، در جریان، در انتظار، مسدود، انجام‌شده یا لغوشده. معوق‌ها، داشبورد و هشدارها از روی دسته حساب می‌شوند. «ورودی» و «لغوشده» در بورد نمی‌آیند.', 'Each status has a category that says what it means for tracking. Overdue counts, the desk and alerts follow the category. Intake and cancelled stay off the board.')}</p>
       <ul className="space-y-1.5">
         {list.map((c, i) => (
           <li key={c.id} className="flex items-center gap-2 rounded-2xl border border-line px-2.5 py-1.5">
             {admin ? (
-              <input type="color" className="h-6 w-6 shrink-0 cursor-pointer rounded-full border-0 bg-transparent p-0" defaultValue={c.color || columnColor(c.id)} onBlur={(e) => e.target.value !== (c.color || '') && save(list.map((x, k) => (k === i ? { ...x, color: e.target.value } : x)))} aria-label={L('رنگ ستون', 'Column colour')} />
+              <input type="color" className="h-6 w-6 shrink-0 cursor-pointer rounded-full border-0 bg-transparent p-0" defaultValue={c.color || columnHex(c.id)} onBlur={(e) => e.target.value !== (c.color || columnHex(c.id)) && save(list.map((x, k) => (k === i ? { ...x, color: e.target.value } : x)))} aria-label={L('رنگ ستون', 'Column colour')} />
             ) : (
               <StatusIcon s={c.id} size={15} />
             )}
             <input key={statusLabel(c.id)} className="h-8 min-w-0 flex-1 rounded-lg bg-transparent px-2 text-sm outline-none focus:bg-muted disabled:opacity-80" disabled={!admin} defaultValue={statusLabel(c.id)} onBlur={(e) => rename(i, e.target.value)} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
+            {BUILTIN.has(c.id) || !admin ? (
+              <span className="hidden shrink-0 rounded-full bg-muted px-2 py-0.5 text-[0.625rem] text-sub sm:inline">{tr(STATUS_CAT[catOf(c.id)])}</span>
+            ) : (
+              <select className="h-7 shrink-0 rounded-lg bg-muted px-1.5 text-[0.6875rem]" value={catOf(c.id)} onChange={(e) => save(list.map((x, k) => (k === i ? { ...x, cat: e.target.value as StatusCat } : x)))} aria-label={L('دسته', 'Category')}>
+                {cats.map((k) => <option key={k} value={k}>{tr(STATUS_CAT[k])}</option>)}
+              </select>
+            )}
             <span className="text-[0.6875rem] text-sub num">{db.Tasks.filter((t) => t.status === c.id).length}</span>
             {admin && (
               <>
@@ -212,13 +228,65 @@ export function ColumnsCard({ admin }: { admin: boolean }) {
         ))}
       </ul>
       {admin && (
-        <form className="mt-3 flex gap-2" onSubmit={(e) => (e.preventDefault(), name.trim() && save(withColumn(list, name.trim())), setName(''))}>
-          <input className="input h-9 flex-1 text-xs" value={name} onChange={(e) => setName(e.target.value)} placeholder={L('ستون جدید، مثلاً «آماده‌ی تست»', 'New column, e.g. “Ready for QA”')} />
+        <form className="mt-3 flex gap-2" onSubmit={(e) => (e.preventDefault(), name.trim() && save(withColumn(list, name.trim(), cat)), setName(''))}>
+          <input className="input h-9 flex-1 text-xs" value={name} onChange={(e) => setName(e.target.value)} placeholder={L('وضعیت جدید، مثلاً «منتظر تأیید CPTO»', 'New status, e.g. “Awaiting CPTO sign-off”')} />
+          <select className="input h-9 w-36 text-xs" value={cat} onChange={(e) => setCat(e.target.value as StatusCat)} aria-label={L('دسته', 'Category')}>
+            {cats.map((k) => <option key={k} value={k}>{tr(STATUS_CAT[k])}</option>)}
+          </select>
           <button className="btn-outline btn-sm h-9" disabled={!name.trim()}>
             <Plus size={14} /> {L('افزودن', 'Add')}
           </button>
         </form>
       )}
+    </Card>
+  )
+}
+
+/** Tracking flags (watch, key, escalate, …) and when an open task counts as stale or a blocker raises an alert. */
+export function FlagsCard({ admin }: { admin: boolean }) {
+  const { setSetting } = useStore()
+  const c = taskCfg()
+  const [name, setName] = useState('')
+  const save = (next: Flag[]) => setSetting(TASK_KEYS.flags, JSON.stringify(next))
+  const num = (label: string, hint: string, key: string, value: number) => (
+    <div className="flex items-center justify-between gap-4">
+      <div>
+        <div className="text-sm font-medium">{label}</div>
+        <div className="text-[0.6875rem] text-sub">{hint}</div>
+      </div>
+      <input type="number" min={1} max={90} className="input h-9 w-20 text-center text-xs" disabled={!admin} defaultValue={value} onBlur={(e) => Number(e.target.value) > 0 && Number(e.target.value) !== value && setSetting(key, String(Number(e.target.value)))} />
+    </div>
+  )
+  return (
+    <Card eyebrow={<span className="flex items-center gap-1.5"><FlagIcon size={12} /> {L('پیگیری', 'Tracking')}</span>} title={L('پرچم‌ها و هشدارها', 'Flags & alerts')}>
+      <ul className="space-y-1.5">
+        {c.flags.map((x, i) => (
+          <li key={x.id} className="flex items-center gap-2 rounded-2xl border border-line px-2.5 py-1.5">
+            <input type="color" disabled={!admin} className="h-6 w-6 shrink-0 cursor-pointer rounded-full border-0 bg-transparent p-0" defaultValue={x.color} onBlur={(e) => e.target.value !== x.color && save(c.flags.map((y, k) => (k === i ? { ...y, color: e.target.value } : y)))} aria-label={L('رنگ', 'Colour')} />
+            <FlagIcon size={14} style={{ color: x.color }} className="shrink-0" fill={x.color} />
+            <input key={L(x.fa, x.en)} className="h-8 min-w-0 flex-1 rounded-lg bg-transparent px-2 text-sm outline-none focus:bg-muted disabled:opacity-80" disabled={!admin} defaultValue={L(x.fa, x.en)}
+              onBlur={(e) => e.target.value.trim() && e.target.value.trim() !== L(x.fa, x.en) && save(c.flags.map((y, k) => (k === i ? { ...y, fa: L(e.target.value.trim(), y.fa), en: L(y.en, e.target.value.trim()) } : y)))}
+              onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
+            {admin && (
+              <button className="icon-btn h-7 w-7 hover:text-bad" onClick={() => save(c.flags.filter((y) => y.id !== x.id))} aria-label={L('حذف', 'Remove')}>
+                <Trash2 size={13} />
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {admin && (
+        <form className="mt-3 flex gap-2" onSubmit={(e) => (e.preventDefault(), name.trim() && save([...c.flags, { id: `f-${Date.now().toString(36)}`, fa: name.trim(), en: name.trim(), color: '#6b7180' }]), setName(''))}>
+          <input className="input h-9 flex-1 text-xs" value={name} onChange={(e) => setName(e.target.value)} placeholder={L('پرچم جدید، مثلاً «درخواست CPTO»', 'New flag, e.g. “CPTO ask”')} />
+          <button className="btn-outline btn-sm h-9" disabled={!name.trim()}>
+            <Plus size={14} /> {L('افزودن', 'Add')}
+          </button>
+        </form>
+      )}
+      <div className="mt-5 space-y-3 border-t border-line pt-4">
+        {num(L('راکد بعد از (روز)', 'Stale after (days)'), L('تسک بازی که این مدت تغییری نکرده «راکد» حساب می‌شود', 'An open task untouched this long counts as stale'), TASK_KEYS.staleDays, c.staleDays)}
+        {num(L('هشدار انسداد بعد از (روز)', 'Blocker alert after (days)'), L('تسکی که این مدت مسدود مانده، هشدار و پیشنهاد پیگیری می‌گیرد', 'A task blocked this long raises an alert and a follow-up suggestion'), TASK_KEYS.blockedDays, c.blockedDays)}
+      </div>
     </Card>
   )
 }
@@ -254,6 +322,7 @@ export function TaskSettingsSheet({ onClose }: { onClose: () => void }) {
       <div className="grid gap-4 p-4 md:grid-cols-2">
         <FieldsCard admin={admin} />
         <ColumnsCard admin={admin} />
+        <FlagsCard admin={admin} />
         <TaskCard admin={admin} />
       </div>
     </Sheet>

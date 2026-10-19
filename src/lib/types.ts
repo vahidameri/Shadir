@@ -71,7 +71,9 @@ export interface Sprint {
   status: 'planned' | 'active' | 'closed'
 }
 
-export type BuiltinStatus = 'todo' | 'in_progress' | 'review' | 'blocked' | 'done'
+export type BuiltinStatus = 'intake' | 'backlog' | 'todo' | 'in_progress' | 'review' | 'qa' | 'waiting' | 'blocked' | 'done' | 'cancelled'
+/** What a status means for tracking; every column (built-in or custom) has one. */
+export type StatusCat = 'intake' | 'open' | 'active' | 'waiting' | 'blocked' | 'done' | 'cancelled'
 /** a built-in status or the id of a kanban column added in the settings */
 export type TaskStatus = BuiltinStatus | (string & {})
 
@@ -119,6 +121,21 @@ export interface Task {
   estimate?: number | string
   /** checklist, one item per line: "[ ] item" / "[x] item" */
   checklist?: string
+  /** when the task was handed to its (lead) assignee — set automatically, editable */
+  assigned_at?: string
+  /** tracking flag id from the settings (watch, key, escalate, …) */
+  flag?: string
+  /** why it is blocked, and on whom / what (a person, a unit or free text) */
+  blocked_reason?: string
+  blocked_by?: string
+  /** first day of the current blocked spell — set and cleared automatically */
+  blocked_since?: string
+  /** last change, "YYYY-MM-DD HH:mm" — set automatically (stale detection) */
+  updated_at?: string
+  /** outside link, e.g. the task in Mizito */
+  link?: string
+  /** who asked for it */
+  requested_by?: string
 }
 
 /** a side from the settings: product, design, tech by default */
@@ -296,6 +313,20 @@ export interface Comment {
   created_at: string // ISO datetime
 }
 
+/** One change to a tracked row (field-level log). Written by the server; the app mirrors it locally. */
+export interface HistoryRow {
+  id: string
+  entity: 'Tasks' | 'FollowUps'
+  entity_id: string
+  /** the field that changed, or '_created' / '_deleted' */
+  field: string
+  from: string
+  to: string
+  by: string
+  /** "YYYY-MM-DD HH:mm" */
+  at: string
+}
+
 export type HandoffStatus = 'sent' | 'accepted' | 'returned'
 
 /** One pass of work from one side to another (product → design → tech …). A return sends it back;
@@ -353,6 +384,7 @@ export interface DB {
   Contracts: Contract[]
   Handoffs: Handoff[]
   Deliveries: WeeklyDelivery[]
+  History: HistoryRow[]
 }
 
 export type SheetName = keyof DB

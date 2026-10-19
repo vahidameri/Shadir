@@ -10,7 +10,8 @@ import { useEditor } from './Editor'
 import { useComposer } from './UpdateComposer'
 import { Avatar, AvatarStack, Due, cx, HealthBadge, Chip, StatusIcon, PriorityIcon } from './ui'
 import { MILESTONE_STATUS, HEALTH } from '../lib/labels'
-import { COLUMNS_KEY, columns, readColumns, statusLabel, withColumn } from '../lib/columns'
+import { COLUMNS_KEY, boardColumns, catOf, isClosed, readColumns, statusLabel, withColumn } from '../lib/columns'
+import { FlagMark, TaskSignals } from './TaskTracking'
 import { can } from '../lib/access'
 import type { Activity } from '../lib/activity'
 import { DIM, DIMS, type Assessment } from '../lib/rag'
@@ -48,12 +49,12 @@ export function Kanban({ tasks, defaults, showProject = true }: { tasks: Task[];
     const t = tasks.find((x) => x.id === drag)
     setDrag(null)
     if (!t || t.status === s) return
-    await upsert('Tasks', { ...t, status: s, completed_at: s === 'done' ? todayISO() : '' })
+    await upsert('Tasks', { ...t, status: s })
   }
 
   return (
     <div className="grid auto-cols-[minmax(272px,1fr)] grid-flow-col gap-3 overflow-x-auto pb-3">
-      {columns().map(({ id: s }) => {
+      {boardColumns().map(({ id: s }) => {
         const col = tasks.filter((t) => t.status === s)
         const pts = col.reduce((a, t) => a + (Number(t.points) || 0), 0)
         return (
@@ -85,8 +86,12 @@ export function Kanban({ tasks, defaults, showProject = true }: { tasks: Task[];
                     className={cx('cursor-pointer rounded-2xl border border-line bg-surface p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-float', drag === t.id && 'rotate-1 opacity-40')}
                   >
                     {showProject && t.project_id && <div className="mb-1 truncate font-mono text-[0.625rem] uppercase tracking-wider text-sub" dir="auto">{db.Projects.find((p) => p.id === t.project_id)?.code || pname(t.project_id)}</div>}
-                    <div className={cx('text-sm leading-6', s === 'done' && 'text-sub line-through')}>{t.title}</div>
-                    {t.status === 'blocked' && t.description && <div className="mt-2 rounded-lg bg-bad/[0.07] px-2 py-1 text-[0.6875rem] leading-5 text-bad">{t.description}</div>}
+                    <div className={cx('flex items-start gap-1.5 text-sm leading-6', isClosed(s) && 'text-sub line-through')}>
+                      {t.flag && <span className="mt-1"><FlagMark id={t.flag} size={12} /></span>}
+                      <span className="min-w-0 flex-1">{t.title}</span>
+                    </div>
+                    {catOf(t.status) === 'blocked' && t.blocked_reason && <div className="mt-2 rounded-lg bg-bad/[0.07] px-2 py-1 text-[0.6875rem] leading-5 text-bad">{t.blocked_reason}</div>}
+                    <TaskSignals t={{ ...t, flag: '' }} assign={false} className="mt-2" />
                     <div className="mt-3 flex items-center gap-2">
                       <PriorityIcon p={t.priority} />
                       {trackOf(t, db) && <span className="h-2 w-2 rounded-full" style={sideDot(trackOf(t, db))} title={lbl(TRACK, trackOf(t, db) as Track)} />}
@@ -99,12 +104,7 @@ export function Kanban({ tasks, defaults, showProject = true }: { tasks: Task[];
                         </span>
                       )}
                       <span className="flex-1" />
-                      {t.deadline && s !== 'done' && (
-                        <span className={cx('inline-flex items-center gap-0.5 text-[0.625rem]', t.deadline < todayISO() ? 'text-bad' : 'text-sub')} title={L('ددلاین', 'Deadline')}>
-                          <Flag size={10} /> {fmtDayMonth(t.deadline)}
-                        </span>
-                      )}
-                      <Due iso={t.due_date} done={s === 'done'} />
+                      {isClosed(s) && <Due iso={t.due_date} done />}
                       <AvatarStack names={assigneesOf(t)} max={2} />
                     </div>
                   </div>

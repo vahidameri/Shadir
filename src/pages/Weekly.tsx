@@ -1,4 +1,5 @@
 import { assigneesOf } from '../lib/assignees'
+import { closed } from '../lib/columns'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import {
@@ -62,7 +63,7 @@ export default function Weekly() {
   const current = db.Meetings.find((m) => m.id === sel)
 
   const actions = db.Tasks.filter((t) => t.meeting_id)
-  const openActions = actions.filter((t) => t.status !== 'done')
+  const openActions = actions.filter((t) => !closed(t))
   const overdueActions = openActions.filter(isTaskOverdue)
   const decisions = meetings.filter((m) => m.status === 'held').reduce((s, m) => s + lines(m.decisions).length, 0)
 
@@ -160,7 +161,7 @@ function MeetingRoom({ m }: { m: Meeting }) {
   const fromPrev = prev ? db.Tasks.filter((t) => t.meeting_id === prev.id) : []
   // anything still open from older meetings of the same series carries over
   const older = series.filter((x) => x.date < (prev?.date || m.date)).map((x) => x.id)
-  const carried = db.Tasks.filter((t) => older.includes(t.meeting_id) && t.status !== 'done')
+  const carried = db.Tasks.filter((t) => older.includes(t.meeting_id) && !closed(t))
 
   const [notes, setNotes] = useState(m.notes)
   const [decisions, setDecisions] = useState(m.decisions)
@@ -436,11 +437,11 @@ function buildAgenda(m: Meeting, db: DB, open: ReturnType<typeof useEditor>['ope
 
   if (track) {
     const otherSide = (s: string) => !!s && s !== track
-    const waiting = db.Tasks.filter((t) => t.status !== 'done' && trackOf(t, db) === track && waitingOn(t, db).some((d) => otherSide(trackOf(d, db))))
-    const owed = db.Tasks.filter((t) => t.status !== 'done' && trackOf(t, db) === track && db.Tasks.some((x) => x.status !== 'done' && otherSide(trackOf(x, db)) && waitingOn(x, db).some((d) => d.id === t.id)))
+    const waiting = db.Tasks.filter((t) => !closed(t) && trackOf(t, db) === track && waitingOn(t, db).some((d) => otherSide(trackOf(d, db))))
+    const owed = db.Tasks.filter((t) => !closed(t) && trackOf(t, db) === track && db.Tasks.some((x) => !closed(x) && otherSide(trackOf(x, db)) && waitingOn(x, db).some((d) => d.id === t.id)))
     const sideOf = (t: Task) => lbl(TRACK, trackOf(t, db) || '')
     const waitsOn = (t: Task) => [...new Set(waitingOn(t, db).map((d) => trackOf(d, db)).filter(otherSide))].map((s) => lbl(TRACK, s)).join('، ')
-    const owedTo = (t: Task) => [...new Set(db.Tasks.filter((x) => x.status !== 'done' && otherSide(trackOf(x, db)) && waitingOn(x, db).some((d) => d.id === t.id)).map((x) => trackOf(x, db)))].map((s) => lbl(TRACK, s)).join('، ')
+    const owedTo = (t: Task) => [...new Set(db.Tasks.filter((x) => !closed(x) && otherSide(trackOf(x, db)) && waitingOn(x, db).some((d) => d.id === t.id)).map((x) => trackOf(x, db)))].map((s) => lbl(TRACK, s)).join('، ')
     // this unit's hand-overs and returns of the last two weeks
     const hs = recent(db).filter((h) => (h.from_side === track || h.to_side === track) && (!m.project_id || h.project_id === m.project_id)).sort((a, b) => Number(isReturn(b)) - Number(isReturn(a)))
     return [
@@ -589,7 +590,7 @@ function ActionPlan() {
   const { db } = useStore()
   const [series, setSeries] = useState<Meeting['series'] | ''>('')
   const meetingOf = (t: Task) => db.Meetings.find((m) => m.id === t.meeting_id)
-  const actions = db.Tasks.filter((t) => t.meeting_id && t.status !== 'done' && (!series || meetingOf(t)?.series === series))
+  const actions = db.Tasks.filter((t) => t.meeting_id && !closed(t) && (!series || meetingOf(t)?.series === series))
   const done = db.Tasks.filter((t) => t.meeting_id && t.status === 'done' && t.completed_at >= addDays(todayISO(), -14)).length
   const by = new Map<string, Task[]>()
   actions.sort((a, b) => ((a.due_date || '9') < (b.due_date || '9') ? -1 : 1)).forEach((t) => (assigneesOf(t).length ? assigneesOf(t) : ['—']).forEach((a) => by.set(a, [...(by.get(a) || []), t])))

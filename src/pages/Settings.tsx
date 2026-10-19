@@ -11,7 +11,7 @@ import { L, lbl, tr, useI18n } from '../lib/i18n'
 import { ROLE } from '../lib/labels'
 import { APP_NAME } from '../lib/brand'
 import { WEEK_KEYS, weekCfg } from '../lib/weeks'
-import { ColumnsCard, FieldsCard, NotifyCard, Switch, TaskCard } from '../components/TaskSettings'
+import { ColumnsCard, FieldsCard, FlagsCard, NotifyCard, Switch, TaskCard } from '../components/TaskSettings'
 
 export default function Settings({ embedded }: { embedded?: boolean }) {
   const { config, setConfig, mode, resetDemo, role, db, access } = useStore()
@@ -78,6 +78,7 @@ export default function Settings({ embedded }: { embedded?: boolean }) {
         <TaskCard admin={admin} />
         <FieldsCard admin={admin} />
         <ColumnsCard admin={admin} />
+        <FlagsCard admin={admin} />
 
         <Card eyebrow="Google" title={L('ورود با گوگل و تقویم', 'Google sign-in & calendar')}>
           <div className="space-y-4">

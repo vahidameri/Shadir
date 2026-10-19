@@ -18,14 +18,14 @@
  *   viewer — read only (leadership)
  */
 
-var MADAR_VERSION = '0.1.0'; // shown on the login page and by diagnose()
+var MADAR_VERSION = '0.2.0'; // shown on the login page and by diagnose()
 
 var SCHEMA = {
   Projects: ['id', 'code', 'name', 'description', 'category', 'owner', 'client', 'liaison', 'liaison_contact', 'status', 'priority', 'phase', 'start_date', 'end_date', 'progress', 'health_override', 'objective', 'paused_at', 'pause_reason', 'delivery_day', 'last_delivery', 'archived', 'archived_at', 'links'],
   Scope: ['id', 'project_id', 'item', 'type', 'status', 'change_note', 'date'],
   Milestones: ['id', 'project_id', 'title', 'planned_date', 'actual_date', 'status', 'owner', 'weight'],
   Sprints: ['id', 'project_id', 'name', 'start_date', 'end_date', 'goal', 'committed_points', 'completed_points', 'status'],
-  Tasks: ['id', 'project_id', 'sprint_id', 'title', 'description', 'assignee', 'reporter', 'status', 'priority', 'due_date', 'points', 'tags', 'created_at', 'completed_at', 'track', 'depends_on', 'meeting_id', 'private', 'deadline', 'handoff_date', 'test_date', 'follow_date', 'area', 'collaborators', 'watchers', 'notify', 'start_date', 'estimate', 'checklist'],
+  Tasks: ['id', 'project_id', 'sprint_id', 'title', 'description', 'assignee', 'reporter', 'status', 'priority', 'due_date', 'points', 'tags', 'created_at', 'completed_at', 'track', 'depends_on', 'meeting_id', 'private', 'deadline', 'handoff_date', 'test_date', 'follow_date', 'area', 'collaborators', 'watchers', 'notify', 'start_date', 'estimate', 'checklist', 'assigned_at', 'flag', 'blocked_reason', 'blocked_by', 'blocked_since', 'updated_at', 'link', 'requested_by'],
   // owner = who is chasing; follow-ups are personal
   FollowUps: ['id', 'project_id', 'subject', 'person', 'channel', 'due_date', 'status', 'priority', 'notes', 'created_at', 'done_at', 'owner'],
   Risks: ['id', 'project_id', 'title', 'type', 'probability', 'impact', 'owner', 'mitigation', 'status', 'due_date'],
@@ -54,12 +54,14 @@ var SCHEMA = {
   Handoffs: ['id', 'task_id', 'project_id', 'title', 'from_side', 'to_side', 'from_person', 'to_person', 'status', 'round', 'sent_at', 'due_date', 'responded_at', 'note', 'reply'],
   // Weekly delivery log: one row per project per week (status delivered | partial | skipped).
   Deliveries: ['id', 'project_id', 'week', 'date', 'status', 'note', 'by'],
+  // field-level change log for tasks and follow-ups (written by history_, never by the app directly)
+  History: ['id', 'entity', 'entity_id', 'field', 'from', 'to', 'by', 'at'],
 };
 
 var USERS_SHEET = 'Users';
 var USERS_HEADERS = ['key', 'name', 'email', 'role', 'active'];
 var LOG_SHEET = 'AuditLog';
-var DATE_COLS = ['start_date', 'end_date', 'planned_date', 'actual_date', 'due_date', 'created_at', 'completed_at', 'done_at', 'week_date', 'date', 'target_date', 'baseline_date', 'delivered_date', 'time', 'deadline', 'handoff_date', 'test_date', 'follow_date', 'last_delivery', 'archived_at', 'sent_at', 'responded_at', 'week'];
+var DATE_COLS = ['start_date', 'end_date', 'planned_date', 'actual_date', 'due_date', 'created_at', 'completed_at', 'done_at', 'week_date', 'date', 'target_date', 'baseline_date', 'delivered_date', 'time', 'deadline', 'handoff_date', 'test_date', 'follow_date', 'last_delivery', 'archived_at', 'sent_at', 'responded_at', 'week', 'assigned_at', 'blocked_since', 'updated_at'];
 
 // --------------------------------------------------------------------------
 // HTTP entry points
@@ -111,12 +113,18 @@ function doPost(e) {
       if (!SCHEMA[body.sheet]) throw new Error('Unknown sheet: ' + body.sheet);
             guardPrivate_(body.sheet, body.action === 'delete' ? { id: body.id } : body.row, user);
       guardWrite_(body.sheet, body.action === 'delete' ? existingRow_(body.sheet, body.id) : body.row, user);
-      var before = body.action === 'upsert' && body.sheet === 'Tasks' ? existingRow_('Tasks', body.row.id) : null;
+      if (body.sheet === 'History') throw new Error('سابقه‌ی تغییرات فقط خودکار ثبت می‌شود');
+      var logged = !!HISTORY_FIELDS[body.sheet];
+      var before = (body.action === 'upsert' && (body.sheet === 'Tasks' || logged)) ? existingRow_(body.sheet, body.row.id) : null;
       if (body.action === 'upsert') {
         result = upsert_(body.sheet, body.row, user);
-        // the assignment email must never turn a saved row into an error
+        // the log and the assignment email must never turn a saved row into an error
+        if (logged) { try { history_(body.sheet, before, body.row, user); } catch (eLog) {} }
         if (body.sheet === 'Tasks') { try { mailAssigned_(before, body.row, user); } catch (eMail) {} }
-      } else if (body.action === 'delete') result = delete_(body.sheet, body.id, user);
+      } else if (body.action === 'delete') {
+        result = delete_(body.sheet, body.id, user);
+        if (logged) { try { historyRows_([{ entity: body.sheet, entity_id: body.id, field: '_deleted', from: '', to: '' }], user); } catch (eLog2) {} }
+      }
       else throw new Error('Unknown action: ' + body.action);
     }
     return json_({ ok: true, row: result });
@@ -449,7 +457,13 @@ function applyPrivacy_(data, user) {
   });
   data.Comments = (data.Comments || []).filter(function (c) { return !(c.entity === 'Tasks' && hidden[c.entity_id]); });
   data.Files = (data.Files || []).filter(function (f) { return !(f.entity === 'Tasks' && hidden[f.entity_id]); });
-  return applyScope_(data, user, owners);
+  var out = applyScope_(data, user, owners);
+  // the log of a task or follow-up travels only with the row itself
+  var seen = { Tasks: {}, FollowUps: {} };
+  (out.Tasks || []).forEach(function (t) { seen.Tasks[t.id] = 1; });
+  (out.FollowUps || []).forEach(function (f) { seen.FollowUps[f.id] = 1; });
+  out.History = (out.History || []).filter(function (h) { return seen[h.entity] && seen[h.entity][h.entity_id]; });
+  return out;
 }
 
 /** Access scoping (mirrors src/lib/access.ts). */
@@ -742,6 +756,43 @@ function googleEmail_(token) {
   var email = String(info.email).toLowerCase();
   cache.put(k, email, Math.min(3000, Number(info.expires_in) || 3000));
   return email;
+}
+
+// --------------------------------------------------------------------------
+// History — one row per changed field of a task or follow-up (mirrors src/lib/history.ts)
+// --------------------------------------------------------------------------
+
+var HISTORY_FIELDS = {
+  Tasks: ['title', 'description', 'status', 'priority', 'assignee', 'due_date', 'assigned_at', 'flag', 'track', 'project_id', 'blocked_reason', 'blocked_by', 'link', 'requested_by', 'collaborators', 'watchers', 'private', 'deadline'],
+  FollowUps: ['subject', 'person', 'status', 'due_date', 'priority', 'channel', 'notes', 'project_id', 'owner'],
+};
+
+function clip_(v) { return String(v === undefined || v === null ? '' : v).slice(0, 300); }
+
+function history_(sheet, before, row, user) {
+  var fields = HISTORY_FIELDS[sheet];
+  if (!fields || !row) return;
+  if (!before) return historyRows_([{ entity: sheet, entity_id: row.id, field: '_created', from: '', to: clip_(row.status) }], user);
+  var out = [];
+  fields.forEach(function (f) {
+    if (!(f in row)) return;
+    var a = clip_(before[f]), b = clip_(row[f]);
+    if (a !== b) out.push({ entity: sheet, entity_id: row.id, field: f, from: a, to: b });
+  });
+  historyRows_(out, user);
+}
+
+function historyRows_(rows, user) {
+  if (!rows.length) return;
+  var sh = ensureSheet_('History', SCHEMA.History);
+  var at = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
+  // values are written as text so Sheets doesn't turn "1405" or "2026-10-19" into numbers or dates
+  var t = function (v) { return v === '' ? '' : "'" + v; };
+  var vals = rows.map(function (r, i) {
+    return ['H' + Date.now().toString(36) + i, r.entity, r.entity_id, r.field, t(r.from), t(r.to), user.name, "'" + at];
+  });
+  sh.getRange(sh.getLastRow() + 1, 1, vals.length, SCHEMA.History.length).setValues(vals);
+  bumpVersion_();
 }
 
 function log_(user, action, sheet, id) {

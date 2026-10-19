@@ -3,6 +3,7 @@
 // been in counts as a return (رفت و برگشت), and each pass between the same two units is a new round.
 // Handoff.status: 'sent' = forward pass, 'returned' = back to an earlier unit.
 import type { DB, Handoff, Task } from './types'
+import { closed } from './columns'
 import { addDays, daysBetween, nowStamp, todayISO } from './jalali'
 import { memberTrack } from './tracks'
 import { uid } from './api'
@@ -36,7 +37,7 @@ export function daysHeld(h: Handoff, db: DB, today = todayISO()) {
 }
 /** The latest pass of a task that is still open, if it has been sitting there for `days` or more. */
 export function stuck(db: DB, days = 3) {
-  return db.Tasks.filter((t) => t.status !== 'done')
+  return db.Tasks.filter((t) => !closed(t))
     .map((t) => ({ t, h: forTask(db, t.id).slice(-1)[0] }))
     .filter((x) => x.h && daysHeld(x.h, db) >= days)
 }

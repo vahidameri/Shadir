@@ -1,6 +1,7 @@
 // Product vs Tech tracks: every task belongs to a track (explicit, or inferred from the
 // assignee's team) and can depend on tasks in the other track (handoffs).
 import type React from 'react'
+import { closed } from './columns'
 import type { DB, Task, Track } from './types'
 import type { T2 } from './i18n'
 import { isTaskOverdue } from './metrics'
@@ -27,7 +28,7 @@ export const depIds = (t: Task) => String(t.depends_on || '').split(',').map((x)
 export const depsOf = (t: Task, db: DB) => depIds(t).map((id) => db.Tasks.find((x) => x.id === id)).filter(Boolean) as Task[]
 export const dependentsOf = (t: Task, db: DB) => db.Tasks.filter((x) => depIds(x).includes(t.id))
 /** Open dependencies — the task is waiting on someone else. */
-export const waitingOn = (t: Task, db: DB) => (t.status === 'done' ? [] : depsOf(t, db).filter((d) => d.status !== 'done'))
+export const waitingOn = (t: Task, db: DB) => (closed(t) ? [] : depsOf(t, db).filter((d) => !closed(d)))
 
 export interface TrackStats {
   total: number

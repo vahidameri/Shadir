@@ -2,6 +2,7 @@
 // per project, which dimension is off (schedule, scope, risk, resourcing, delivery),
 // why, and whether it is getting better or worse.
 import type { DB, Health, Project } from './types'
+import { closed } from './columns'
 import { projectMetrics, riskScore, sprintDonePoints, isTaskOverdue } from './metrics'
 import { addDays, daysBetween, fa, todayISO } from './jalali'
 import { L, type T2 } from './i18n'
@@ -80,7 +81,7 @@ export function assess(p: Project, db: DB): Assessment {
         : { h: 'green', why: members.length ? L('ظرفیت کافی', 'Capacity OK') : L('تخصیص ثبت نشده', 'No allocations') }
 
   // Delivery: blocked / overdue work and sprint pace
-  const tasks = db.Tasks.filter((t) => t.project_id === p.id && t.status !== 'done')
+  const tasks = db.Tasks.filter((t) => t.project_id === p.id && !closed(t))
   const blocked = tasks.filter((t) => t.status === 'blocked').length
   const late = tasks.filter(isTaskOverdue).length
   let sprintBehind = false

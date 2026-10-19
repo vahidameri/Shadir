@@ -1,4 +1,5 @@
 import type { DB, Health, Project, Task, Sprint, Risk } from './types'
+import { closed, isBlocked } from './columns'
 import { daysBetween, daysFromToday, todayISO, addDays, parseISO, fa } from './jalali'
 import { L } from './i18n'
 
@@ -32,7 +33,7 @@ export const riskScore = (r: Pick<Risk, 'probability' | 'impact'>) => (Number(r.
 export const riskLevel = (score: number): Health => (score >= 15 ? 'red' : score >= 8 ? 'amber' : 'green')
 
 export function isTaskOverdue(t: Task) {
-  return t.status !== 'done' && !!t.due_date && daysFromToday(t.due_date) < 0
+  return !closed(t) && !!t.due_date && daysFromToday(t.due_date) < 0
 }
 
 export function timelineElapsed(p: Pick<Project, 'start_date' | 'end_date'>) {
@@ -69,7 +70,7 @@ export function projectMetrics(p: Project, db: DB): ProjectMetrics {
     .filter((m) => m.status !== 'done')
     .sort((a, b) => (a.planned_date < b.planned_date ? -1 : 1))[0]
   const overdueTasks = tasks.filter(isTaskOverdue).length
-  const blockedTasks = tasks.filter((t) => t.status === 'blocked').length
+  const blockedTasks = tasks.filter((t) => isBlocked(t.status)).length
   const highRisks = risks.filter((r) => riskScore(r) >= 15).length
   const activeSprint = sprints.find((s) => s.status === 'active')
 
@@ -121,7 +122,7 @@ export function projectMetrics(p: Project, db: DB): ProjectMetrics {
     reasons,
     overdueMilestones: overdueMs.length,
     nextMilestone: upcoming,
-    openTasks: tasks.filter((t) => t.status !== 'done').length,
+    openTasks: tasks.filter((t) => !closed(t)).length,
     overdueTasks,
     blockedTasks,
     doneTasks: tasks.filter((t) => t.status === 'done').length,

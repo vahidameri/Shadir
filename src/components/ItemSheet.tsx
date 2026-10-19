@@ -1,14 +1,16 @@
 // Rich detail sheet for a task or follow-up: inline-editable properties, description, comments & activity.
 import { useMemo, useState } from 'react'
+import { catOf, closed, firstOf } from '../lib/columns'
+import { historyOf } from '../lib/history'
+import { BlockerPanel, FlagPicker, TaskSignals, historyText } from './TaskTracking'
 import { Link } from 'react-router-dom'
-import { Mail, ListChecks, Trash2, Send, Check, Clock, AlarmClockOff, Hash, Zap, MessageSquare, CircleDot, CheckCircle2, Sparkles, Bell, BellOff, Binoculars } from 'lucide-react'
+import { Mail, ListChecks, Trash2, Send, Check, Clock, AlarmClockOff, Hash, Zap, MessageSquare, CircleDot, CheckCircle2, Sparkles, Bell, BellOff, Binoculars, Ban, XCircle, Inbox, History as HistoryIcon, ExternalLink } from 'lucide-react'
 import { fieldOn, taskCfg } from '../lib/taskcfg'
 import type { FollowUp, Task, Comment, TaskStatus } from '../lib/types'
 
 type Item = Omit<Task, 'status'> & Omit<FollowUp, 'status'> & { status: Task['status'] | FollowUp['status'] }
 import { useStore } from '../lib/store'
 import { Attachments } from './Files'
-import { HandoffSection } from './Handoffs'
 import { assigneesOf } from '../lib/assignees'
 import { can } from '../lib/access'
 import { uid } from '../lib/api'
@@ -32,13 +34,14 @@ export function ItemSheet({ sheet, id, onClose }: { sheet: 'Tasks' | 'FollowUps'
   const [confirmDel, setConfirmDel] = useState(false)
   const [draft, setDraft] = useState('')
   const comments = useMemo(() => db.Comments.filter((c) => c.entity === sheet && c.entity_id === id).sort((a, b) => (a.created_at < b.created_at ? -1 : 1)), [db.Comments, sheet, id])
+  const log = useMemo(() => historyOf(db, sheet, id).reverse(), [db, sheet, id])
+  const [showLog, setShowLog] = useState(true)
 
   if (!item) return null
   const isTask = sheet === 'Tasks'
   const project = db.Projects.find((p) => p.id === item.project_id)
   const patch = async (p: Partial<Item>) => {
     const next = { ...item, ...p }
-    if (isTask && 'status' in p) next.completed_at = p.status === 'done' ? item.completed_at || todayISO() : ''
     if (!isTask && 'status' in p) next.done_at = p.status === 'done' ? item.done_at || todayISO() : ''
     await upsert(sheet, next as never)
   }
@@ -143,6 +146,59 @@ export function ItemSheet({ sheet, id, onClose }: { sheet: 'Tasks' | 'FollowUps'
             className="mt-3 w-full resize-none rounded-xl bg-transparent text-sm leading-7 text-ink/85 outline-none placeholder:text-sub/60 focus:bg-muted/50 focus:p-3 transition-all"
           />
 
+          {isTask && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-sub">
+              <TaskSignals t={item as unknown as Task} />
+              {item.requested_by && <span>{L('درخواست از', 'Asked by')} <b className="font-medium text-ink">{item.requested_by}</b></span>}
+            </div>
+          )}
+
+          {isTask && canEdit && catOf(item.status) === 'intake' && (
+            <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-sky-500/25 bg-sky-500/[0.06] p-3 text-sm">
+              <Inbox size={15} className="text-sky-600" />
+              <span className="flex-1">{L('این مورد در صف ورودی است و هنوز تصمیمی برایش گرفته نشده.', 'This is in intake and waits for a decision.')}</span>
+              <button className="btn-primary btn-sm" onClick={() => patch({ status: firstOf('open') })}>
+                <Check size={14} /> {L('قبول و ورود به کارها', 'Accept')}
+              </button>
+              <button className="btn-ghost btn-sm text-sub" onClick={() => patch({ status: 'cancelled' })}>
+                <XCircle size={14} /> {L('رد', 'Decline')}
+              </button>
+            </div>
+          )}
+
+          {isTask && canEdit && !closed(item as { status: string }) && catOf(item.status) !== 'intake' && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button className="btn-primary btn-sm" onClick={() => patch({ status: 'done' })}>
+                <Check size={14} /> {L('انجام شد', 'Done')}
+              </button>
+              {catOf(item.status) !== 'blocked' && (
+                <button className="btn-outline btn-sm" onClick={() => patch({ status: 'blocked' })}>
+                  <Ban size={14} /> {L('مسدود شد', 'Blocked')}
+                </button>
+              )}
+              {catOf(item.status) !== 'waiting' && (
+                <button className="btn-outline btn-sm" onClick={() => patch({ status: 'waiting' })}>
+                  <Clock size={14} /> {L('در انتظار', 'Waiting')}
+                </button>
+              )}
+              <button className="btn-ghost btn-sm text-sub" onClick={() => patch({ due_date: addDays(item.due_date && item.due_date > todayISO() ? item.due_date : todayISO(), 7) })}>
+                <AlarmClockOff size={14} /> {L('یک هفته عقب', 'Push a week')}
+              </button>
+              <button className="btn-ghost btn-sm text-sub" onClick={() => patch({ status: 'cancelled' })}>
+                <XCircle size={14} /> {L('لغو', 'Cancel')}
+              </button>
+            </div>
+          )}
+          {isTask && closed(item as { status: string }) && canEdit && (
+            <div className="mt-4">
+              <button className="btn-outline btn-sm" onClick={() => patch({ status: firstOf('open') })}>
+                {L('بازگشایی', 'Reopen')}
+              </button>
+            </div>
+          )}
+
+          {isTask && catOf(item.status) === 'blocked' && <BlockerPanel t={item as unknown as Task} patch={(p) => patch(p as Partial<Item>)} />}
+
           {!isTask && canEdit && item.status !== 'done' && (
             <div className="mt-4 flex flex-wrap gap-2">
               <button className="btn-primary btn-sm" onClick={() => patch({ status: 'done' })}>
@@ -161,7 +217,6 @@ export function ItemSheet({ sheet, id, onClose }: { sheet: 'Tasks' | 'FollowUps'
 
           {isTask && <Stages task={item as unknown as Task} />}
 
-          {isTask && <HandoffSection task={item as unknown as Task} />}
 
           {isTask && <Dependencies task={item as unknown as Task} onChange={(ids) => patch({ depends_on: ids.join(',') })} />}
 
@@ -174,7 +229,12 @@ export function ItemSheet({ sheet, id, onClose }: { sheet: 'Tasks' | 'FollowUps'
 
           <div className="mt-8">
             <div className="eyebrow mb-4 flex items-center gap-2">
-              <MessageSquare size={13} /> {L('گفتگو و فعالیت', 'Activity')}
+              <MessageSquare size={13} /> {L('گفتگو و تاریخچه', 'Activity & history')}
+              {log.length > 0 && (
+                <button className="ms-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 normal-case tracking-normal text-sub hover:bg-muted hover:text-ink" onClick={() => setShowLog((v) => !v)}>
+                  <HistoryIcon size={12} /> {showLog ? L('پنهان کردن تغییرات', 'Hide changes') : L(`نمایش ${fa(log.length)} تغییر`, `Show ${log.length} changes`)}
+                </button>
+              )}
             </div>
             <ol className="relative space-y-5 border-s border-line ps-6">
               <ActivityDot icon={<CircleDot size={12} />}>
@@ -182,6 +242,17 @@ export function ItemSheet({ sheet, id, onClose }: { sheet: 'Tasks' | 'FollowUps'
                   {item.reporter || L('سیستم', 'System')} {L('این مورد را ایجاد کرد', 'created this')} · {fmtDate(item.created_at)}
                 </span>
               </ActivityDot>
+              {showLog &&
+                log
+                  .filter((h) => h.field !== '_created')
+                  .map((h) => (
+                    <ActivityDot key={h.id} icon={<HistoryIcon size={11} />}>
+                      <span className="text-sub">
+                        <b className="font-medium text-ink">{h.by || L('سیستم', 'System')}</b> {historyText(h, (pid) => db.Projects.find((p) => p.id === pid)?.name || '')}
+                        <span className="text-[0.6875rem]"> · {timeAgo(stampToDate(h.at))}</span>
+                      </span>
+                    </ActivityDot>
+                  ))}
               {comments.map((c) => (
                 <li key={c.id} className="relative">
                   <span className="absolute -start-[37px] top-0">
@@ -230,7 +301,7 @@ export function ItemSheet({ sheet, id, onClose }: { sheet: 'Tasks' | 'FollowUps'
               onClick={() => patch({ watchers: watching ? watchers.filter((x) => x !== me).join(',') : [...watchers, me].join(',') })}
               className={cx('mb-4 flex w-full items-center justify-center gap-2 rounded-2xl border px-3 py-2.5 text-xs font-medium transition', watching ? 'border-brand/30 bg-brand-soft/40 text-ink' : 'border-line bg-surface text-sub hover:text-ink')}
             >
-              <Binoculars size={14} /> {watching ? L('در دیده‌بان شماست ✓', 'On your Lookout ✓') : L('زیر نظر در دیده‌بان', 'Track on my Lookout')}
+              <Binoculars size={14} /> {watching ? L('زیر نظر شماست ✓', 'You’re watching ✓') : L('زیر نظر من باشد', 'Watch this')}
             </button>
           )}
           <div className="eyebrow mb-2 px-2.5">{L('مشخصات', 'Properties')}</div>
@@ -245,12 +316,27 @@ export function ItemSheet({ sheet, id, onClose }: { sheet: 'Tasks' | 'FollowUps'
               <Prop label={L('مسئول', 'Assignee')}>
                 <AssigneesPicker value={item.assignee} onChange={(v) => patch({ assignee: v })} />
               </Prop>
+              {fieldOn('flag') && (
+                <Prop label={L('پرچم', 'Flag')}>
+                  <FlagPicker value={item.flag} onChange={(v) => patch({ flag: v })} />
+                </Prop>
+              )}
+              {fieldOn('assigned_at') && (
+                <Prop label={L('اساین', 'Assigned')}>
+                  <DatePicker compact value={item.assigned_at || ''} onChange={(v) => patch({ assigned_at: v })} />
+                </Prop>
+              )}
+              {fieldOn('requested_by') && (
+                <Prop label={L('درخواست از', 'Asked by')}>
+                  <PersonPicker value={item.requested_by || ''} onChange={(v) => patch({ requested_by: v })} placeholder={L('انتخاب', 'Choose')} />
+                </Prop>
+              )}
               {fieldOn('start_date') && (
                 <Prop label={L('شروع', 'Start')}>
                   <DatePicker compact value={item.start_date || ''} onChange={(v) => patch({ start_date: v })} />
                 </Prop>
               )}
-              <Prop label={L('سررسید', 'Due')}>
+              <Prop label={L('ددلاین', 'Deadline')}>
                 <DatePicker compact value={item.due_date} onChange={(v) => patch({ due_date: v })} />
               </Prop>
               {fieldOn('estimate') && (
@@ -311,9 +397,12 @@ export function ItemSheet({ sheet, id, onClose }: { sheet: 'Tasks' | 'FollowUps'
               <Prop label={L('پروژه', 'Project')}>
                 <ProjectPicker value={item.project_id} onChange={(v) => patch({ project_id: v, sprint_id: '' })} />
               </Prop>
+              {fieldOn('sprint_id') && (
               <Prop label={L('اسپرینت', 'Sprint')}>
                 <SprintPicker projectId={item.project_id} value={item.sprint_id} onChange={(v) => patch({ sprint_id: v })} />
               </Prop>
+              )}
+              {fieldOn('points') && (
               <Prop label={L('امتیاز', 'Points')}>
                 <input
                   type="number"
@@ -324,6 +413,27 @@ export function ItemSheet({ sheet, id, onClose }: { sheet: 'Tasks' | 'FollowUps'
                   placeholder="—"
                 />
               </Prop>
+              )}
+              {fieldOn('link') && (
+                <Prop label={L('لینک', 'Link')}>
+                  <span className="flex items-center gap-1">
+                    <input
+                      key={item.link}
+                      dir="ltr"
+                      defaultValue={item.link || ''}
+                      disabled={!canEdit}
+                      onBlur={(e) => e.target.value.trim() !== (item.link || '') && patch({ link: e.target.value.trim() })}
+                      placeholder="https://mizito…"
+                      className="h-8 min-w-0 flex-1 rounded-full bg-transparent px-2.5 text-xs outline-none hover:bg-muted focus:bg-surface focus:ring-1 focus:ring-line-strong"
+                    />
+                    {item.link && (
+                      <a href={item.link} target="_blank" rel="noreferrer" className="icon-btn h-7 w-7 shrink-0" aria-label={L('باز کردن', 'Open')}>
+                        <ExternalLink size={13} />
+                      </a>
+                    )}
+                  </span>
+                </Prop>
+              )}
               <Prop label={L('واحد', 'Unit')}>
                 <TrackPicker task={item as unknown as Task} onChange={(v) => patch({ track: v })} />
               </Prop>
@@ -585,7 +695,7 @@ function Dependencies({ task, onChange }: { task: Task; onChange: (ids: string[]
   const [q, setQ] = useState('')
   const deps = depsOf(task, db)
   const blocking = dependentsOf(task, db)
-  const waiting = deps.filter((d) => d.status !== 'done')
+  const waiting = deps.filter((d) => !closed(d))
   const ids = depIds(task)
   const candidates = db.Tasks.filter((t) => t.id !== task.id && !ids.includes(t.id) && (!q || t.title.includes(q)) && (t.project_id === task.project_id || q)).slice(0, 8)
   const RowT = ({ t, onRemove }: { t: Task; onRemove?: () => void }) => {

@@ -1,4 +1,5 @@
 import type { DB } from './types'
+import { closed } from './columns'
 import { addDays, daysFromToday, todayISO } from './jalali'
 import { isMine } from './access'
 import { isAssignee } from './assignees'
@@ -51,11 +52,11 @@ export function buildInbox(db: DB, me: string): InboxItem[] {
     out.push({ id: `b-${t.id}`, kind: 'blocked', tone: 'warn', when: t.due_date || today, title: t.title, sub: L(`مسدود · ${t.assignee}`, `Blocked · ${t.assignee}`), target: { sheet: 'Tasks', id: t.id } }),
   )
   // new work handed to me in the last two days
-  db.Tasks.filter((t) => isAssignee(t, me) && t.reporter && t.reporter !== me && t.status !== 'done' && t.created_at >= addDays(today, -2)).forEach((t) =>
+  db.Tasks.filter((t) => isAssignee(t, me) && t.reporter && t.reporter !== me && !closed(t) && t.created_at >= addDays(today, -2)).forEach((t) =>
     out.push({ id: `a-${t.id}`, kind: 'assigned', tone: 'brand', when: t.created_at, title: t.title, sub: L(`${t.reporter} به شما سپرد`, `${t.reporter} assigned it to you`), target: { sheet: 'Tasks', id: t.id } }),
   )
   // follow-up dates and stage dates today, deadlines today or tomorrow — for everyone on the task
-  db.Tasks.filter((t) => t.status !== 'done' && t.notify !== 'off' && isMine(t, me)).forEach((t) => {
+  db.Tasks.filter((t) => !closed(t) && t.notify !== 'off' && isMine(t, me)).forEach((t) => {
     if (t.follow_date === today) out.push({ id: `rm-${t.id}`, kind: 'remind', tone: 'warn', when: today, title: t.title, sub: L(`یادآوری · ${t.assignee || '—'}`, `Follow-up reminder · ${t.assignee || '—'}`), target: { sheet: 'Tasks', id: t.id } })
     if (t.handoff_date === today || t.test_date === today) out.push({ id: `st-${t.id}`, kind: 'remind', tone: 'warn', when: today, title: t.title, sub: t.handoff_date === today ? L('امروز: تحویل به پروداکت', 'Today: hand-off to product') : L('امروز: زمان تست', 'Today: testing'), target: { sheet: 'Tasks', id: t.id } })
     if (t.deadline && t.deadline >= today && t.deadline <= addDays(today, 1)) out.push({ id: `dl-${t.id}`, kind: 'deadline', tone: 'bad', when: t.deadline, title: t.title, sub: t.deadline === today ? L('ددلاین امروز است', 'Deadline is today') : L('ددلاین فردا است', 'Deadline is tomorrow'), target: { sheet: 'Tasks', id: t.id } })

@@ -1,5 +1,6 @@
 // What the Radar watches on a task: every date it carries (due, follow-up, hand-off, testing, deadline).
 import type { Task } from './types'
+import { closed } from './columns'
 import { addDays, todayISO } from './jalali'
 import { L } from './i18n'
 import { fieldOn } from './taskcfg'
@@ -13,7 +14,7 @@ export interface TaskDate {
 
 export function taskDates(t: Task): TaskDate[] {
   const all: TaskDate[] = [
-    { key: 'due_date', d: t.due_date, label: L('سررسید', 'Due') },
+    { key: 'due_date', d: t.due_date, label: L('ددلاین', 'Deadline') },
     { key: 'follow_date', d: t.follow_date || '', label: L('یادآوری', 'Reminder') },
     { key: 'handoff_date', d: t.handoff_date || '', label: L('تحویل به پروداکت', 'Hand-off') },
     { key: 'test_date', d: t.test_date || '', label: L('تست', 'Testing') },
@@ -23,7 +24,7 @@ export function taskDates(t: Task): TaskDate[] {
 }
 
 /** Late = the due date or the deadline has passed (follow-up and stage dates only prompt). */
-export const isLate = (t: Task, today = todayISO()) => t.status !== 'done' && ((!!t.due_date && t.due_date < today) || (!!t.deadline && t.deadline < today))
+export const isLate = (t: Task, today = todayISO()) => !closed(t) && ((!!t.due_date && t.due_date < today) || (!!t.deadline && t.deadline < today))
 
 /** The next date coming up (today or later), or the most recent one if all have passed. */
 export function nextDate(t: Task, today = todayISO()): TaskDate | undefined {
