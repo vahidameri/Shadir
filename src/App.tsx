@@ -13,6 +13,7 @@ import ProjectDetail from './pages/ProjectDetail'
 import Tasks from './pages/Tasks'
 import MizitoPage from './pages/Mizito'
 import Teams from './pages/Teams'
+import Overview from './pages/Overview'
 import FollowUps from './pages/FollowUps'
 import Risks from './pages/Risks'
 import CalendarPage from './pages/Calendar'
@@ -107,6 +108,7 @@ export default function App() {
                 <Route path="/weekly" element={<Navigate to="/meetings" replace />} />
                 <Route path="/calendar" element={<CalendarPage />} />
                 <Route path="/teams" element={<Teams />} />
+                <Route path="/overview" element={<Overview />} />
                 <Route path="/projects" element={<Projects />} />
                 <Route path="/projects/:id" element={<ProjectDetail />} />
                 <Route path="/risks" element={<Only rule="portfolio"><Risks /></Only>} />

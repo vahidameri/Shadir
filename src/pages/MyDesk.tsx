@@ -309,7 +309,7 @@ export default function MyDesk() {
               {Array.from({ length: 7 }, (_, i) => addDays(today, i)).map((d) => {
                 const tasksN = myOpen.filter((t) => t.due_date === d).length + (d === today ? myToday.filter((t) => t.due_date < today).length : 0)
                 const fuN = fuOpen.filter((f) => f.due_date === d || (d === today && f.due_date < today && f.status === 'open')).length
-                const msN = db.Milestones.filter((m) => m.status !== 'done' && m.planned_date === d).length
+                const mtN = db.Meetings.filter((m) => m.date === d && m.status !== 'cancelled' && (m.attendees.includes(me) || m.facilitator === me)).length
                 const weekend = !isWorkday(d)
                 const sel = day === d
                 return (
@@ -327,7 +327,7 @@ export default function MyDesk() {
                     <span className="mt-2 flex h-2 items-center gap-1">
                       {tasksN > 0 && <span className={cx('h-1.5 rounded-full', sel ? 'bg-surface' : 'bg-ink')} style={{ width: Math.min(18, 4 + tasksN * 3) }} />}
                       {fuN > 0 && <span className="h-1.5 w-1.5 rounded-full bg-warn" />}
-                      {msN > 0 && <span className="h-1.5 w-1.5 rotate-45 rounded-[1px] bg-bad" />}
+                      {mtN > 0 && <span className="h-1.5 w-1.5 rotate-45 rounded-[1px] bg-[#1a73e8]" />}
                     </span>
                     <span className={cx('mt-1.5 text-[0.625rem] num', sel ? 'text-surface/70' : 'text-sub')}>{tasksN + fuN ? fa(tasksN + fuN) : '—'}</span>
                   </button>
@@ -337,7 +337,7 @@ export default function MyDesk() {
             <div className="mt-3 flex flex-wrap items-center gap-4 text-[0.6875rem] text-sub">
               <span className="flex items-center gap-1.5"><span className="h-1.5 w-3 rounded-full bg-ink" /> {L('تسک', 'Tasks')}</span>
               <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-warn" /> {L('پیگیری', 'Follow-ups')}</span>
-              <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rotate-45 rounded-[1px] bg-bad" /> {L('مایلستون', 'Milestone')}</span>
+              <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rotate-45 rounded-[1px] bg-[#1a73e8]" /> {L('جلسه', 'Meeting')}</span>
             </div>
           </Card>
 

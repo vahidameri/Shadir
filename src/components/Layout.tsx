@@ -4,6 +4,7 @@ import { NavLink, useLocation, useNavigate, Link } from 'react-router-dom'
 import {
   Briefcase, ListChecks, Users, BellRing, ShieldAlert, Settings, Moon, Sun, Search, Plus, RefreshCw, Menu,
   Sparkles, CheckCircle2, AlertCircle, Bell, PanelLeftClose, PanelLeftOpen, Languages, Star, AtSign, Flag, Clock, CircleAlert, Ban, CalendarDays, Keyboard, CalendarRange, UserRound, LogOut, PackageCheck, Repeat,
+  LayoutDashboard,
 } from 'lucide-react'
 import { useStore, clearSnaps } from '../lib/store'
 import { useI18n, L } from '../lib/i18n'
@@ -92,6 +93,7 @@ export function Layout({ children }: { children: ReactNode }) {
       label: L('کار من', 'My work'),
       links: [
         { to: '/my', label: L('میز کار', 'My desk'), icon: Sparkles, badge: myCount },
+        { to: '/overview', label: L('نمای کلی', 'Overview'), icon: LayoutDashboard },
         { to: '/calendar', label: L('تقویم', 'Calendar'), icon: CalendarDays },
         { to: '/meetings', label: L('جلسات', 'Meetings'), icon: CalendarRange },
       ],

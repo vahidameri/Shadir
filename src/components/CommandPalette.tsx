@@ -51,7 +51,6 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
             { key: 'new-task', group: G.act, label: L('تسک جدید', 'New task'), icon: ico(Plus), run: () => editor.open('Tasks', { assignee: me }) },
             { key: 'new-fu', group: G.act, label: L('پیگیری جدید', 'New follow-up'), icon: ico(Plus), run: () => editor.open('FollowUps') },
             { key: 'new-upd', group: G.act, label: L('گزارش هفتگی جدید', 'New weekly update'), icon: ico(Plus), run: () => composer.openComposer() },
-            { key: 'new-del', group: G.act, label: L('خروجی جدید', 'New deliverable'), icon: ico(Plus), run: () => editor.open('Deliverables') },
             { key: 'new-mt', group: G.act, label: L('جلسه‌ی جدید', 'New meeting'), icon: ico(Plus), run: () => editor.open('Meetings') },
           ]
         : []),

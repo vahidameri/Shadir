@@ -51,7 +51,7 @@ export function Bars({ rows, max, unit }: { rows: { label: string; value: number
               <span className="shrink-0 font-medium num">
                 {fa(r.value)}
                 {unit}
-                {r.sub && <span className="ms-1 font-normal text-sub">{r.sub}</span>}
+                {r.sub && <span className="ms-2 rounded-full bg-bad/10 px-1.5 text-[0.625rem] font-normal text-bad">{r.sub}</span>}
               </span>
             </div>
             <div className="mt-1 h-2 rounded-full bg-ink/[0.06]">

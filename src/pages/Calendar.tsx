@@ -1,22 +1,30 @@
 import { assigneesOf } from '../lib/assignees'
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Flag, BellRing, Zap, CalendarRange, Package } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { ChevronLeft, ChevronRight, BellRing, CalendarRange, MessageSquareText } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { useEditor } from '../components/Editor'
-import { Band, Card, Overlap, cx, StatusIcon, Segmented, FilterSelect, Toolbar } from '../components/ui'
+import { Band, Card, Overlap, cx, StatusIcon, FilterSelect, Toolbar } from '../components/ui'
 import {
   fa, todayISO, parseISO, toISO, isoToJalaliParts, jalaliPartsToISO, jalaliMonthLength, weekdayIndex, J_MONTHS, J_MONTHS_EN, G_MONTHS_EN, G_MONTHS_FA,
   dayNum, fmtWeekday, fmtDate, addDays,
 } from '../lib/jalali'
-import { L, locale } from '../lib/i18n'
+import { L, locale, tr } from '../lib/i18n'
 import { useAuto } from '../lib/automations'
+import { closed } from '../lib/columns'
 import { relate } from '../lib/gcal'
+import { can } from '../lib/access'
+import { mzClosed, mzSignals, P_COLOR } from '../lib/mizito'
+import { teamOf } from '../lib/teams'
+import { teamName } from '../components/TeamParts'
+import { TRACKS } from '../lib/tracks'
+import { CAL_KEY, CAL_LAYERS, readPicks, type CalLayer } from '../lib/views'
 
-type Kind = 'all' | 'tasks' | 'followups' | 'milestones' | 'plan'
-
-/** Month grid of everything with a date: tasks, follow-ups, milestones and sprint spans. */
+/** Month grid of what has a date: task deadlines, meetings, follow-ups, Mizito due dates and other
+ *  Google Calendar events. Which layers exist and which start on is a setting (Config cal.layers). */
 export default function CalendarPage() {
-  const { db, me } = useStore()
+  const { db, me, access, setting } = useStore()
+  const nav = useNavigate()
   const { open } = useEditor()
   const auto = useAuto()
   const gOnly = auto.events.filter((e) => !relate(e, db).meeting)
@@ -32,9 +40,12 @@ export default function CalendarPage() {
     return { y: d.getFullYear(), m: d.getMonth() + 1 }
   }
   const [view, setView] = useState(init)
-  const [kind, setKind] = useState<Kind>('all')
+  // layers enabled in settings; the viewer can hide some of them for the session
+  const offered = readPicks(setting(CAL_KEY), CAL_LAYERS).filter((p) => p.on && (p.id !== 'mizito' || can.mizito(access))).map((p) => p.id)
+  const [hidden, setHidden] = useState<CalLayer[]>([])
+  const layers = offered.filter((k) => !hidden.includes(k))
   const [who, setWho] = useState('')
-  const [project, setProject] = useState('')
+  const [teamF, setTeamF] = useState('')
   const [sel, setSel] = useState(today)
 
   const { cells, title } = useMemo(() => {
@@ -59,16 +70,18 @@ export default function CalendarPage() {
 
   const weekdays = en && !jalali ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] : en ? ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'] : ['شنبه', 'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه']
 
-  const pass = (pid: string, person?: string) => (!project || pid === project) && (!who || person === who)
+  const isOn = (k: CalLayer) => layers.includes(k)
+  const pteam = (pid: string) => db.Projects.find((p) => p.id === pid)?.team || ''
+  const inTeam = (team: string) => !teamF || team === teamF
   const itemsOn = (d: string) => ({
-    tasks: kind === 'all' || kind === 'tasks' ? db.Tasks.filter((t) => t.due_date === d && pass(t.project_id, t.assignee.split(',')[0] || '')) : [],
-    fus: kind === 'all' || kind === 'followups' ? db.FollowUps.filter((f) => f.due_date === d && f.status !== 'done' && pass(f.project_id)) : [],
-    ms: kind === 'all' || kind === 'milestones' ? db.Milestones.filter((m) => m.planned_date === d && pass(m.project_id, m.owner)) : [],
-    sprintStarts: kind === 'all' ? db.Sprints.filter((s) => s.start_date === d && pass(s.project_id)) : [],
-    meets: kind === 'all' || kind === 'plan' ? db.Meetings.filter((m) => m.date === d && m.status !== 'cancelled' && (!project || m.project_id === project) && (!who || m.attendees.includes(who))) : [],
-    dels: kind === 'all' || kind === 'plan' ? db.Deliverables.filter((x) => x.target_date === d && x.status !== 'dropped' && pass(x.project_id, x.owner)) : [],
-    gev: (kind === 'all' || kind === 'plan') && !project && !who ? gOnly.filter((e) => e.date === d) : [],
+    tasks: isOn('tasks') ? db.Tasks.filter((t) => t.due_date === d && inTeam(teamOf(t, db)) && (!who || assigneesOf(t).includes(who))) : [],
+    fus: isOn('followups') ? db.FollowUps.filter((f) => f.due_date === d && f.status !== 'done' && inTeam(pteam(f.project_id)) && (!who || f.person === who)) : [],
+    meets: isOn('meetings') ? db.Meetings.filter((m) => m.date === d && m.status !== 'cancelled' && inTeam(pteam(m.project_id)) && (!who || m.attendees.includes(who))) : [],
+    mz: isOn('mizito') && !teamF && !who ? db.Mizito.filter((m) => m.due_date === d && !mzClosed(m)) : [],
+    gev: isOn('google') && !teamF && !who ? gOnly.filter((e) => e.date === d) : [],
   })
+  const count = (it: ReturnType<typeof itemsOn>) => it.tasks.length + it.fus.length + it.meets.length + it.mz.length + it.gev.length
+  const openMz = (id: string) => nav(`/mizito?id=${id}`)
 
   const move = (delta: number) => {
     let m = view.m + delta
@@ -86,7 +99,6 @@ export default function CalendarPage() {
   const Prev = locale.lang === 'fa' ? ChevronRight : ChevronLeft
   const Next = locale.lang === 'fa' ? ChevronLeft : ChevronRight
   const selItems = itemsOn(sel)
-  const pcode = (id: string) => db.Projects.find((p) => p.id === id)?.code.replace(/^PRJ-/, '') || ''
   const people = Array.from(new Set(db.Tasks.flatMap((t) => assigneesOf(t))))
 
   return (
@@ -111,8 +123,17 @@ export default function CalendarPage() {
       <Overlap>
         <div className="card mb-4 p-3">
           <Toolbar className="!mb-0">
-            <Segmented value={kind} onChange={setKind} options={[{ value: 'all', label: L('همه', 'All') }, { value: 'tasks', label: L('تسک', 'Tasks') }, { value: 'followups', label: L('پیگیری', 'Follow-ups') }, { value: 'milestones', label: L('مایلستون', 'Milestones') }, { value: 'plan', label: L('جلسه و تحویل', 'Meetings & deliveries') }]} />
-            <FilterSelect value={project} onChange={setProject} placeholder={L('همه‌ی پروژه‌ها', 'All projects')} options={db.Projects.map((p) => ({ value: p.id, label: p.name }))} />
+            <div className="flex flex-wrap gap-1.5">
+              {offered.map((k) => {
+                const on = layers.includes(k)
+                return (
+                  <button key={k} onClick={() => setHidden((h) => (on ? [...h, k] : h.filter((x) => x !== k)))} className={cx('inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs transition', on ? 'border-transparent bg-ink text-surface' : 'border-line text-sub hover:text-ink')} aria-pressed={on}>
+                    <span className="h-2 w-2 rounded-full" style={{ background: LAYER_DOT[k] }} /> {tr(CAL_LAYERS.find((c) => c.id === k)!.label)}
+                  </button>
+                )
+              })}
+            </div>
+            <FilterSelect value={teamF} onChange={setTeamF} placeholder={L('همه‌ی تیم‌ها', 'All teams')} options={TRACKS.map((t) => ({ value: t, label: teamName(t) }))} />
             <FilterSelect value={who} onChange={setWho} placeholder={L('همه‌ی افراد', 'Everyone')} options={people.map((p) => ({ value: p, label: p === me ? `${p} (${L('من', 'me')})` : p }))} />
           </Toolbar>
         </div>
@@ -123,7 +144,7 @@ export default function CalendarPage() {
             .filter((c) => !c.out)
             .map(({ d }) => {
               const it = itemsOn(d)
-              const n = it.tasks.length + it.fus.length + it.ms.length + it.sprintStarts.length + it.meets.length + it.dels.length + it.gev.length
+              const n = count(it)
               if (!n && d !== today) return null
               return (
                 <div key={d} className={cx('card p-4', d === today && 'ring-2 ring-ink')}>
@@ -136,10 +157,8 @@ export default function CalendarPage() {
                     <div className="text-xs text-sub">{L('برنامه‌ای نیست', 'Nothing scheduled')}</div>
                   ) : (
                     <div className="space-y-0.5">
-                      {it.meets.map((m) => <Row key={m.id} onClick={() => (window.location.hash = '#/meetings')} icon={<CalendarRange size={14} />} title={`${fa(m.time)} · ${m.title}`} sub={m.facilitator} />)}
-                      {it.dels.map((x) => <Row key={x.id} onClick={() => open('Deliverables', x as never)} icon={<Package size={14} className="text-brand" />} title={x.title} sub={db.Projects.find((p) => p.id === x.project_id)?.name} />)}
-                      {it.ms.map((m) => <Row key={m.id} onClick={() => open('Milestones', m as never)} icon={<Flag size={14} className="text-bad" />} title={m.title} sub={db.Projects.find((p) => p.id === m.project_id)?.name} />)}
-                      {it.sprintStarts.map((x) => <Row key={x.id} icon={<Zap size={14} className="text-brand" />} title={x.name} sub={x.goal} />)}
+                      {it.meets.map((m) => <Row key={m.id} onClick={() => nav('/meetings')} icon={<CalendarRange size={14} />} title={`${fa(m.time)} · ${m.title}`} sub={m.facilitator} />)}
+                      {it.mz.map((m) => <Row key={m.id} onClick={() => openMz(m.id)} icon={<MessageSquareText size={14} style={{ color: P_COLOR[mzSignals(db, m).p] }} />} title={m.title} sub={m.assigned_to || m.asked_by} />)}
                       {it.fus.map((f) => <Row key={f.id} onClick={() => open('FollowUps', f as never)} icon={<BellRing size={14} className="text-warn" />} title={f.subject} sub={f.person} />)}
                       {it.tasks.map((t) => <Row key={t.id} onClick={() => open('Tasks', t as never)} icon={<StatusIcon s={t.status} size={14} />} title={t.title} sub={t.assignee} />)}
                     </div>
@@ -163,12 +182,10 @@ export default function CalendarPage() {
                 const it = itemsOn(d)
                 const all = [
                   ...it.gev.map((e) => ({ k: `g${e.id}`, el: <Pill key={e.id} tone="plain" icon={<CalendarRange size={10} className="text-[#1a73e8]" />} text={`${fa(e.time)} ${e.title}`} onClick={() => setSel(d)} /> })),
-                  ...it.meets.map((m) => ({ k: `mt${m.id}`, el: <Pill key={m.id} tone="ink" icon={<CalendarRange size={10} />} text={`${fa(m.time)} ${m.title}`} onClick={() => (window.location.hash = '#/meetings')} /> })),
-                  ...it.dels.map((x) => ({ k: `d${x.id}`, el: <Pill key={x.id} tone={x.status === 'delivered' ? 'good' : x.target_date < today ? 'bad' : 'brand'} icon={<Package size={10} />} text={`${x.title} · ${pcode(x.project_id)}`} onClick={() => open('Deliverables', x as never)} /> })),
-                  ...it.ms.map((m) => ({ k: `m${m.id}`, el: <Pill key={m.id} tone={m.status === 'done' ? 'good' : m.planned_date < today ? 'bad' : 'ink'} icon={<Flag size={10} />} text={m.title} onClick={() => open('Milestones', m as never)} /> })),
-                  ...it.sprintStarts.map((s) => ({ k: `s${s.id}`, el: <Pill key={s.id} tone="brand" icon={<Zap size={10} />} text={`${s.name} · ${pcode(s.project_id)}`} onClick={() => setSel(d)} /> })),
+                  ...it.meets.map((m) => ({ k: `mt${m.id}`, el: <Pill key={m.id} tone="ink" icon={<CalendarRange size={10} />} text={`${fa(m.time)} ${m.title}`} onClick={() => nav('/meetings')} /> })),
+                  ...it.mz.map((m) => ({ k: `z${m.id}`, el: <Pill key={m.id} tone={m.due_date < today ? 'bad' : 'mz'} icon={<MessageSquareText size={10} />} text={m.title} onClick={() => openMz(m.id)} /> })),
                   ...it.fus.map((f) => ({ k: `f${f.id}`, el: <Pill key={f.id} tone="warn" icon={<BellRing size={10} />} text={f.subject} onClick={() => open('FollowUps', f as never)} /> })),
-                  ...it.tasks.map((t) => ({ k: `t${t.id}`, el: <Pill key={t.id} tone={t.status === 'done' ? 'muted' : 'plain'} icon={<StatusIcon s={t.status} size={10} />} text={t.title} done={t.status === 'done'} onClick={() => open('Tasks', t as never)} /> })),
+                  ...it.tasks.map((t) => ({ k: `t${t.id}`, el: <Pill key={t.id} tone={closed(t) ? 'muted' : t.due_date < today ? 'late' : 'plain'} icon={<StatusIcon s={t.status} size={10} />} text={t.title} done={closed(t)} onClick={() => open('Tasks', t as never)} /> })),
                 ]
                 const isToday = d === today
                 return (
@@ -189,14 +206,14 @@ export default function CalendarPage() {
           </div>
 
           <Card eyebrow={fmtWeekday(sel)} title={fmtDate(sel, 'long')}>
-            {selItems.tasks.length + selItems.fus.length + selItems.ms.length + selItems.sprintStarts.length + selItems.meets.length + selItems.dels.length + selItems.gev.length === 0 ? (
+            {count(selItems) === 0 ? (
               <div className="py-8 text-center text-sm text-sub">{L('برای این روز چیزی ثبت نشده', 'Nothing scheduled')}</div>
             ) : (
               <div className="space-y-5">
                 {selItems.meets.length > 0 && (
                   <Group title={L('جلسه', 'Meetings')}>
                     {selItems.meets.map((m) => (
-                      <Row key={m.id} onClick={() => (window.location.hash = '#/meetings')} icon={<CalendarRange size={14} className="text-ink" />} title={`${fa(m.time)} · ${m.title}`} sub={m.facilitator} />
+                      <Row key={m.id} onClick={() => nav('/meetings')} icon={<CalendarRange size={14} className="text-ink" />} title={`${fa(m.time)} · ${m.title}`} sub={m.facilitator} />
                     ))}
                   </Group>
                 )}
@@ -207,24 +224,10 @@ export default function CalendarPage() {
                     ))}
                   </Group>
                 )}
-                {selItems.dels.length > 0 && (
-                  <Group title={L('تحویل', 'Deliveries')}>
-                    {selItems.dels.map((x) => (
-                      <Row key={x.id} onClick={() => open('Deliverables', x as never)} icon={<Package size={14} className="text-brand" />} title={x.title} sub={db.Projects.find((p) => p.id === x.project_id)?.name} />
-                    ))}
-                  </Group>
-                )}
-                {selItems.ms.length > 0 && (
-                  <Group title={L('مایلستون', 'Milestones')}>
-                    {selItems.ms.map((m) => (
-                      <Row key={m.id} onClick={() => open('Milestones', m as never)} icon={<Flag size={14} className="text-bad" />} title={m.title} sub={db.Projects.find((p) => p.id === m.project_id)?.name} />
-                    ))}
-                  </Group>
-                )}
-                {selItems.sprintStarts.length > 0 && (
-                  <Group title={L('شروع اسپرینت', 'Sprint starts')}>
-                    {selItems.sprintStarts.map((s) => (
-                      <Row key={s.id} icon={<Zap size={14} className="text-brand" />} title={s.name} sub={s.goal} />
+                {selItems.mz.length > 0 && (
+                  <Group title={L('موعد میزیتو', 'Mizito due')}>
+                    {selItems.mz.map((m) => (
+                      <Row key={m.id} onClick={() => openMz(m.id)} icon={<MessageSquareText size={14} style={{ color: P_COLOR[mzSignals(db, m).p] }} />} title={m.title} sub={m.assigned_to || m.asked_by} />
                     ))}
                   </Group>
                 )}
@@ -259,7 +262,10 @@ const pillTone = {
   warn: 'bg-warn/15 text-warn',
   plain: 'bg-surface border border-line text-ink',
   muted: 'bg-muted text-sub',
+  late: 'bg-surface border border-bad/40 text-bad',
+  mz: 'bg-[#2f6f9f]/12 text-[#2f6f9f] dark:text-sky-300',
 }
+const LAYER_DOT: Record<CalLayer, string> = { tasks: 'rgb(var(--brand))', meetings: 'rgb(var(--ink))', followups: '#f5b301', mizito: '#2f6f9f', google: '#1a73e8' }
 function Pill({ tone, icon, text, onClick, done }: { tone: keyof typeof pillTone; icon: React.ReactNode; text: string; onClick: () => void; done?: boolean }) {
   return (
     <button

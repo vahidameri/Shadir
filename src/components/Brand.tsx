@@ -23,7 +23,7 @@ export function ShadMark({ className = 'h-7 w-7' }: { className?: string }) {
         </linearGradient>
       </defs>
       <rect x="2" y="2" width="96" height="96" rx="26" fill={`url(#${id}g)`} />
-      {DOTS.map(([cx, cy]) => <circle key={cx + cy} cx={cx} cy={cy} r="8.5" fill="#fff" />)}
+      {DOTS.map(([cx, cy], i) => <circle key={i} cx={cx} cy={cy} r="8.5" fill="#fff" />)}
       <path d={WAVE_D} fill="none" stroke={`url(#${id}y)`} strokeWidth="11" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
