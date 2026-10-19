@@ -1,0 +1,628 @@
+import { createContext, useCallback, useContext, useState, type ReactNode } from 'react'
+import { Plus, Trash2 } from 'lucide-react'
+import { ORG_KEYS, orgList } from '../lib/org'
+import type { SheetName } from '../lib/types'
+import { weekCfg } from '../lib/weeks'
+import { canPersonal, dueFor, fieldOn, fieldReq, needsDue, needsProject, taskCfg, TASK_FIELDS, type TaskField } from '../lib/taskcfg'
+import { DAY_OPTIONS } from '../lib/cadence'
+import { columns, statusLabel } from '../lib/columns'
+import { useStore } from '../lib/store'
+import { uid } from '../lib/api'
+import { todayISO } from '../lib/jalali'
+import { L, lbl, tr, type T2 } from '../lib/i18n'
+import { TRACK, TRACKS } from '../lib/tracks'
+import {
+  CHANNEL, CONFIDENCE, CONTRACT_KIND, CONTRACT_STATUS, DELIVERABLE_STATUS, MEETING_SERIES, MEETING_STATUS, PLAN_PURPOSE, AGILE_SERIES, FOLLOWUP_STATUS, HEALTH, MILESTONE_STATUS, PRIORITY, PROJECT_STATUS, RISK_STATUS, RISK_TYPE, SCOPE_STATUS, SPRINT_STATUS,
+  ACCESS, JOB_TITLE_OPTIONS, TEAM_NAMES } from '../lib/labels'
+import { Sheet, cx } from './ui'
+import { DatePicker } from './DatePicker'
+import { ItemSheet } from './ItemSheet'
+import { useAuto } from '../lib/automations'
+import { can } from '../lib/access'
+
+type FieldType = 'text' | 'textarea' | 'select' | 'multi' | 'date' | 'number' | 'project' | 'person' | 'people' | 'sprint' | 'member' | 'scale' | 'status' | 'area' | 'side' | 'title' | 'assignees'
+export interface Field {
+  key: string
+  label: T2
+  type: FieldType
+  options?: Record<string, T2>
+  half?: boolean
+  required?: boolean
+  placeholder?: T2
+}
+
+export type EditableSheet = Exclude<SheetName, 'Comments' | 'Files' | 'Config' | 'Handoffs' | 'Deliveries'>
+
+export const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields: Field[]; defaults: () => Record<string, unknown> }> = {
+  Tasks: {
+    title: ['تسک', 'Task'],
+    prefix: 'T',
+    fields: [
+      { key: 'title', label: ['عنوان تسک', 'Task title'], type: 'text', required: true },
+      { key: 'description', label: ['توضیحات', 'Description'], type: 'textarea' },
+      { key: 'project_id', label: ['پروژه', 'Project'], type: 'project', half: true },
+      { key: 'area', label: ['حوزه', 'Area'], type: 'area', half: true },
+      { key: 'sprint_id', label: ['اسپرینت', 'Sprint'], type: 'sprint', half: true },
+      { key: 'assignee', label: ['مسئول انجام (یک یا چند نفر)', 'Assignees (one or more)'], type: 'assignees' },
+      { key: 'collaborators', label: ['همکاران (تسک مشترک)', 'Shared with'], type: 'people' },
+      { key: 'watchers', label: ['ناظرها (دیده‌بان و اعلان)', 'Watchers (Lookout & alerts)'], type: 'people' },
+      { key: 'status', label: ['وضعیت', 'Status'], type: 'status', half: true },
+      { key: 'priority', label: ['اولویت', 'Priority'], type: 'select', options: PRIORITY, half: true },
+      { key: 'start_date', label: ['تاریخ شروع', 'Start date'], type: 'date', half: true },
+      { key: 'due_date', label: ['سررسید', 'Due date'], type: 'date', half: true },
+      { key: 'follow_date', label: ['تاریخ یادآوری', 'Reminder date'], type: 'date', half: true },
+      { key: 'handoff_date', label: ['تحویل به پروداکت', 'Hand-off to product'], type: 'date', half: true },
+      { key: 'test_date', label: ['زمان تست', 'Testing'], type: 'date', half: true },
+      { key: 'deadline', label: ['ددلاین (تحویل نهایی)', 'Deadline (final delivery)'], type: 'date', half: true },
+      { key: 'notify', label: ['اعلان‌ها', 'Alerts'], type: 'select', options: { '': ['روشن', 'On'], off: ['خاموش', 'Off'] }, half: true },
+      { key: 'estimate', label: ['تخمین (ساعت)', 'Estimate (hours)'], type: 'number', half: true },
+      { key: 'points', label: ['امتیاز', 'Story points'], type: 'number', half: true },
+      { key: 'tags', label: ['برچسب‌ها', 'Tags'], type: 'text', half: true, placeholder: ['با کاما جدا کنید', 'Comma separated'] },
+      { key: 'track', label: ['واحد', 'Unit'], type: 'side', half: true },
+      { key: 'private', label: ['دیده‌شدن', 'Visibility'], type: 'select', options: { '': ['عمومی', 'Visible'], '1': ['خصوصی', 'Private'] }, half: true },
+    ],
+    defaults: () => ({ private: '', status: 'todo', priority: 'medium', points: 0, created_at: todayISO(), track: '', depends_on: '', meeting_id: '', deadline: '', handoff_date: '', test_date: '', follow_date: '', area: '', collaborators: '', watchers: '', notify: '', start_date: '', estimate: '', checklist: '' }),
+  },
+  FollowUps: {
+    title: ['پیگیری', 'Follow-up'],
+    prefix: 'F',
+    fields: [
+      { key: 'subject', label: ['موضوع پیگیری', 'Follow-up subject'], type: 'text', required: true },
+      { key: 'person', label: ['از چه کسی؟', 'With whom?'], type: 'person', half: true },
+      { key: 'channel', label: ['کانال', 'Channel'], type: 'select', options: CHANNEL, half: true },
+      { key: 'project_id', label: ['پروژه', 'Project'], type: 'project', half: true },
+      { key: 'due_date', label: ['تاریخ پیگیری بعدی', 'Next follow-up'], type: 'date', half: true },
+      { key: 'status', label: ['وضعیت', 'Status'], type: 'select', options: FOLLOWUP_STATUS, half: true },
+      { key: 'priority', label: ['اولویت', 'Priority'], type: 'select', options: PRIORITY, half: true },
+      { key: 'notes', label: ['یادداشت / سابقه', 'Notes / history'], type: 'textarea' },
+    ],
+    defaults: () => ({ status: 'open', priority: 'medium', channel: 'meeting', created_at: todayISO(), due_date: todayISO(), owner: '' }),
+  },
+  Projects: {
+    title: ['پروژه', 'Project'],
+    prefix: 'P',
+    fields: [
+      { key: 'name', label: ['نام پروژه', 'Project name'], type: 'text', required: true },
+      { key: 'code', label: ['کد', 'Code'], type: 'text', half: true, placeholder: ['ACG-XXX', 'ACG-XXX'] },
+      { key: 'category', label: ['دسته', 'Category'], type: 'text', half: true },
+      { key: 'description', label: ['شرح', 'Description'], type: 'textarea' },
+      { key: 'objective', label: ['هدف کسب‌وکاری', 'Business objective'], type: 'text' },
+      { key: 'owner', label: ['مدیر محصول پروژه', 'Project PM'], type: 'person', half: true },
+      { key: 'client', label: ['کارفرما', 'Client'], type: 'text', half: true },
+      { key: 'liaison', label: ['رابط پروژه', 'Client liaison'], type: 'text', half: true },
+      { key: 'liaison_contact', label: ['تلفن یا ایمیل رابط', 'Liaison phone or email'], type: 'text', half: true },
+      { key: 'status', label: ['وضعیت', 'Status'], type: 'select', options: PROJECT_STATUS, half: true },
+      { key: 'priority', label: ['اولویت', 'Priority'], type: 'select', options: PRIORITY, half: true },
+      { key: 'phase', label: ['فاز فعلی', 'Current phase'], type: 'text', half: true },
+      { key: 'progress', label: ['پیشرفت دستی', 'Manual progress'], type: 'number', half: true },
+      { key: 'start_date', label: ['شروع', 'Start'], type: 'date', half: true },
+      { key: 'end_date', label: ['ددلاین', 'Deadline'], type: 'date', half: true },
+      { key: 'delivery_day', label: ['روز تحویل هفتگی', 'Weekly delivery day'], type: 'select', options: DAY_OPTIONS, half: true },
+      { key: 'health_override', label: ['سلامت دستی', 'Health override'], type: 'select', options: { '': ['خودکار', 'Automatic'], ...HEALTH }, half: true },
+    ],
+    defaults: () => ({ status: 'planning', priority: 'medium', start_date: todayISO(), progress: '', health_override: '', paused_at: '', pause_reason: '', delivery_day: '', last_delivery: '', archived: '', archived_at: '' }),
+  },
+  Milestones: {
+    title: ['مایلستون', 'Milestone'],
+    prefix: 'MS',
+    fields: [
+      { key: 'title', label: ['عنوان', 'Title'], type: 'text', required: true },
+      { key: 'project_id', label: ['پروژه', 'Project'], type: 'project', half: true, required: true },
+      { key: 'owner', label: ['مسئول', 'Assignee'], type: 'person', half: true },
+      { key: 'planned_date', label: ['تاریخ برنامه', 'Planned date'], type: 'date', half: true },
+      { key: 'actual_date', label: ['تاریخ واقعی', 'Actual date'], type: 'date', half: true },
+      { key: 'status', label: ['وضعیت', 'Status'], type: 'select', options: MILESTONE_STATUS, half: true },
+      { key: 'weight', label: ['وزن در پیشرفت', 'Weight in progress'], type: 'number', half: true },
+    ],
+    defaults: () => ({ status: 'pending', weight: 1 }),
+  },
+  Sprints: {
+    title: ['اسپرینت', 'Sprint'],
+    prefix: 'S',
+    fields: [
+      { key: 'name', label: ['نام', 'Name'], type: 'text', required: true, half: true },
+      { key: 'project_id', label: ['پروژه', 'Project'], type: 'project', half: true, required: true },
+      { key: 'goal', label: ['هدف اسپرینت', 'Sprint goal'], type: 'text' },
+      { key: 'start_date', label: ['شروع', 'Start'], type: 'date', half: true },
+      { key: 'end_date', label: ['پایان', 'End'], type: 'date', half: true },
+      { key: 'committed_points', label: ['امتیاز تعهدشده', 'Committed points'], type: 'number', half: true },
+      { key: 'completed_points', label: ['امتیاز انجام‌شده', 'Completed points'], type: 'number', half: true },
+      { key: 'status', label: ['وضعیت', 'Status'], type: 'select', options: SPRINT_STATUS },
+    ],
+    defaults: () => ({ status: 'planned', committed_points: 0, completed_points: 0 }),
+  },
+  Risks: {
+    title: ['ریسک / مسئله', 'Risk / issue'],
+    prefix: 'R',
+    fields: [
+      { key: 'title', label: ['عنوان', 'Title'], type: 'text', required: true },
+      { key: 'type', label: ['نوع', 'Type'], type: 'select', options: RISK_TYPE, half: true },
+      { key: 'project_id', label: ['پروژه', 'Project'], type: 'project', half: true },
+      { key: 'probability', label: ['احتمال', 'Probability'], type: 'scale', half: true },
+      { key: 'impact', label: ['اثر', 'Impact'], type: 'scale', half: true },
+      { key: 'owner', label: ['مالک', 'Owner'], type: 'person', half: true },
+      { key: 'due_date', label: ['تاریخ اقدام', 'Action date'], type: 'date', half: true },
+      { key: 'mitigation', label: ['برنامه‌ی کاهش / اقدام', 'Mitigation / action'], type: 'textarea' },
+      { key: 'status', label: ['وضعیت', 'Status'], type: 'select', options: RISK_STATUS },
+    ],
+    defaults: () => ({ type: 'risk', probability: 3, impact: 3, status: 'open' }),
+  },
+  Scope: {
+    title: ['آیتم محدوده‌ی کار', 'Scope item'],
+    prefix: 'SC',
+    fields: [
+      { key: 'item', label: ['آیتم', 'Item'], type: 'text', required: true },
+      { key: 'project_id', label: ['پروژه', 'Project'], type: 'project', half: true, required: true },
+      { key: 'type', label: ['داخل / خارج محدوده‌ی کار', 'In / out of scope'], type: 'select', options: { in: ['داخل محدوده‌ی کار', 'In scope'], out: ['خارج از محدوده‌ی کار', 'Out of scope'] }, half: true },
+      { key: 'status', label: ['وضعیت', 'Status'], type: 'select', options: SCOPE_STATUS, half: true },
+      { key: 'date', label: ['تاریخ', 'Date'], type: 'date', half: true },
+      { key: 'change_note', label: ['یادداشت تغییر', 'Change note'], type: 'textarea' },
+    ],
+    defaults: () => ({ type: 'in', status: 'planned', date: todayISO() }),
+  },
+  Updates: {
+    title: ['گزارش وضعیت هفتگی', 'Weekly status update'],
+    prefix: 'U',
+    fields: [
+      { key: 'project_id', label: ['پروژه', 'Project'], type: 'project', half: true, required: true },
+      { key: 'week_date', label: ['تاریخ', 'Date'], type: 'date', half: true },
+      { key: 'health', label: ['وضعیت کلی', 'Overall health'], type: 'select', options: HEALTH, half: true },
+      { key: 'author', label: ['گزارش‌دهنده', 'Reporter'], type: 'person', half: true },
+      { key: 'summary', label: ['خلاصه برای مدیریت', 'Executive summary'], type: 'textarea', required: true },
+      { key: 'done', label: ['انجام‌شده‌ها', 'Done'], type: 'textarea' },
+      { key: 'next', label: ['برنامه‌ی هفته‌ی بعد', 'Next week'], type: 'textarea' },
+      { key: 'blockers', label: ['موانع / نیاز به کمک مدیریت', 'Blockers / help needed'], type: 'textarea' },
+    ],
+    defaults: () => ({ health: 'green', week_date: todayISO() }),
+  },
+  Team: {
+    title: ['عضو تیم', 'Team member'],
+    prefix: 'M',
+    fields: [
+      { key: 'name', label: ['نام', 'Name'], type: 'text', required: true, half: true },
+      { key: 'name_en', label: ['نام انگلیسی', 'Name in English'], type: 'text', half: true },
+      { key: 'username', label: ['نام کاربری', 'Username'], type: 'text', half: true, placeholder: ['خودکار از نام انگلیسی', 'From the English name'] },
+      { key: 'role', label: ['سمت', 'Title'], type: 'title', half: true },
+      { key: 'team', label: ['تیم‌ها', 'Teams'], type: 'multi', options: TEAM_NAMES },
+      { key: 'track', label: ['واحد', 'Unit'], type: 'side', half: true },
+      { key: 'capacity', label: ['ظرفیت', 'Capacity'], type: 'number', half: true },
+      { key: 'email', label: ['ایمیل گوگل', 'Google email'], type: 'text', half: true },
+      { key: 'phone', label: ['تلفن', 'Phone'], type: 'text', half: true },
+      { key: 'access', label: ['سطح دسترسی', 'Access level'], type: 'select', options: ACCESS, half: true },
+      { key: 'active', label: ['ورود', 'Sign-in'], type: 'select', options: { true: ['فعال', 'Active'], false: ['غیرفعال', 'Disabled'] }, half: true },
+      { key: 'tasks_private', label: ['تسک‌های این فرد', 'This person’s tasks'], type: 'select', options: { '': ['عمومی', 'Visible'], '1': ['خصوصی', 'Private'] } },
+    ],
+    defaults: () => ({ name_en: '', capacity: 100, photo: '', tasks_private: '', phone: '', access: 'member', active: 'true' }),
+  },
+  Allocations: {
+    title: ['تخصیص منابع', 'Allocation'],
+    prefix: 'A',
+    fields: [
+      { key: 'member_id', label: ['عضو', 'Member'], type: 'member', half: true, required: true },
+      { key: 'project_id', label: ['پروژه', 'Project'], type: 'project', half: true, required: true },
+      { key: 'percent', label: ['درصد تخصیص', 'Allocation %'], type: 'number' },
+      { key: 'start_date', label: ['از تاریخ', 'From'], type: 'date', half: true },
+      { key: 'end_date', label: ['تا تاریخ', 'Until'], type: 'date', half: true },
+    ],
+    defaults: () => ({ percent: 50, start_date: '', end_date: '' }),
+  },
+  Deliverables: {
+    title: ['خروجی', 'Deliverable'],
+    prefix: 'D',
+    fields: [
+      { key: 'title', label: ['چه چیزی تحویل می‌شود؟', 'What gets delivered?'], type: 'text', required: true },
+      { key: 'project_id', label: ['پروژه', 'Project'], type: 'project', half: true, required: true },
+      { key: 'owner', label: ['مسئول', 'Owner'], type: 'person', half: true },
+      { key: 'target_date', label: ['تاریخ تحویل', 'Target date'], type: 'date', half: true, required: true },
+      { key: 'track', label: ['واحد', 'Unit'], type: 'side', half: true },
+      { key: 'status', label: ['وضعیت', 'Status'], type: 'select', options: DELIVERABLE_STATUS, half: true },
+      { key: 'confidence', label: ['اطمینان', 'Confidence'], type: 'select', options: CONFIDENCE, half: true },
+      { key: 'baseline_date', label: ['تاریخ تعهد اولیه', 'Baseline date'], type: 'date', half: true },
+      { key: 'delivered_date', label: ['تاریخ تحویل واقعی', 'Actual delivery'], type: 'date', half: true },
+      { key: 'notes', label: ['یادداشت', 'Notes'], type: 'textarea' },
+    ],
+    defaults: () => ({ status: 'planned', confidence: 'medium', track: '', baseline_date: '', delivered_date: '', notes: '' }),
+  },
+  Meetings: {
+    title: ['جلسه', 'Meeting'],
+    prefix: 'MT',
+    fields: [
+      { key: 'title', label: ['عنوان', 'Title'], type: 'text', required: true },
+      { key: 'series', label: ['نوع / سری', 'Series'], type: 'select', options: MEETING_SERIES, half: true },
+      { key: 'purpose', label: ['برنامه‌ریزی برای', 'Planning for'], type: 'select', options: PLAN_PURPOSE, half: true },
+      { key: 'project_id', label: ['پروژه', 'Project'], type: 'project', half: true },
+      { key: 'date', label: ['تاریخ', 'Date'], type: 'date', half: true, required: true },
+      { key: 'time', label: ['ساعت', 'Time'], type: 'text', half: true, placeholder: ['10:00', '10:00'] },
+      { key: 'duration', label: ['مدت', 'Duration'], type: 'number', half: true },
+      { key: 'meet_url', label: ['لینک Google Meet', 'Google Meet link'], type: 'text', half: true },
+      { key: 'facilitator', label: ['برگزارکننده', 'Facilitator'], type: 'person', half: true },
+      { key: 'status', label: ['وضعیت', 'Status'], type: 'select', options: MEETING_STATUS, half: true },
+      { key: 'attendees', label: ['حاضران', 'Attendees'], type: 'people' },
+      { key: 'notes', label: ['صورت‌جلسه', 'Minutes'], type: 'textarea' },
+      { key: 'decisions', label: ['تصمیم‌ها', 'Decisions'], type: 'textarea' },
+    ],
+    defaults: () => ({ series: 'portfolio', status: 'scheduled', date: todayISO(), time: weekCfg().weeklyTime, duration: 45, notes: '', decisions: '', project_id: '', gcal_id: '', meet_url: '', attendees: '', facilitator: '', items: '', checklist: '', sprint_id: '' }),
+  },
+  Contracts: {
+    title: ['قرارداد', 'Contract'],
+    prefix: 'K',
+    fields: [
+      { key: 'title', label: ['عنوان قرارداد', 'Contract title'], type: 'text', required: true },
+      { key: 'project_id', label: ['پروژه', 'Project'], type: 'project', half: true, required: true },
+      { key: 'counterparty', label: ['طرف قرارداد', 'Counterparty'], type: 'text', half: true },
+      { key: 'kind', label: ['نوع', 'Type'], type: 'select', options: CONTRACT_KIND, half: true },
+      { key: 'status', label: ['وضعیت', 'Status'], type: 'select', options: CONTRACT_STATUS, half: true },
+      { key: 'number', label: ['شماره', 'Number'], type: 'text', half: true },
+      { key: 'value', label: ['شرایط مالی', 'Commercial terms'], type: 'text', half: true },
+      { key: 'start_date', label: ['شروع', 'Start'], type: 'date', half: true },
+      { key: 'end_date', label: ['پایان', 'End'], type: 'date', half: true },
+      { key: 'notes', label: ['یادداشت', 'Notes'], type: 'textarea' },
+    ],
+    defaults: () => ({ kind: 'client', status: 'draft', start_date: todayISO(), notes: '', value: '', number: '' }),
+  },
+}
+
+interface EditorCtx {
+  open: (sheet: EditableSheet, row?: Record<string, unknown>) => void
+}
+const Ctx = createContext<EditorCtx | null>(null)
+export const useEditor = () => useContext(Ctx)!
+
+export function EditorProvider({ children }: { children: ReactNode }) {
+  const { db, me } = useStore()
+  const [state, setState] = useState<{ sheet: EditableSheet; row: Record<string, unknown>; isNew: boolean } | null>(null)
+  const open = useCallback((sheet: EditableSheet, row?: Record<string, unknown>) => {
+    const isNew = !row?.id
+    const who = db.Team.find((m) => m.name === (String(row?.assignee || '').split(',')[0] || me))
+    const base = { ...SCHEMAS[sheet].defaults(), ...(sheet === 'Tasks' ? { due_date: dueFor(who) } : {}) }
+    setState({ sheet, row: isNew ? { ...base, ...row } : { ...row }, isNew })
+  }, [db.Team, me])
+  const close = () => setState(null)
+  // Existing tasks & follow-ups open in the rich item sheet (inline edit + comments).
+  const rich = state && !state.isNew && (state.sheet === 'Tasks' || state.sheet === 'FollowUps')
+  return (
+    <Ctx.Provider value={{ open }}>
+      {children}
+      {state && rich && <ItemSheet key={String(state.row.id)} sheet={state.sheet as 'Tasks' | 'FollowUps'} id={String(state.row.id)} onClose={close} />}
+      {state && !rich && <EditorModal key={String(state.row.id ?? 'new')} {...state} onClose={close} />}
+    </Ctx.Provider>
+  )
+}
+
+export function FieldInput({ f, value, set, form, disabled, autoFocus, onSubmit }: { f: Field; value: unknown; set: (v: unknown) => void; form: Record<string, unknown>; disabled?: boolean; autoFocus?: boolean; onSubmit?: () => void }) {
+  const { db } = useStore()
+  const v = value ?? ''
+  const common = { className: 'input', disabled }
+  const people = Array.from(new Set([...db.Team.map((m) => m.name), ...db.FollowUps.map((x) => x.person)].filter(Boolean)))
+  switch (f.type) {
+    case 'textarea':
+      return <textarea {...common} rows={3} value={String(v)} placeholder={f.placeholder && tr(f.placeholder)} onChange={(e) => set(e.target.value)} />
+    case 'select':
+      return (
+        <select {...common} value={String(v)} onChange={(e) => set(e.target.value)}>
+          {Object.entries(f.options!).map(([k, l]) => (
+            <option key={k} value={k}>
+              {tr(l)}
+            </option>
+          ))}
+        </select>
+      )
+    case 'multi': {
+      const on = String(v || '').split(',').filter(Boolean)
+      return (
+        <div className="flex flex-wrap gap-1.5">
+          {Object.entries(f.options!).map(([k, l]) => {
+            const sel = on.includes(k)
+            return (
+              <button key={k} type="button" disabled={disabled} onClick={() => set((sel ? on.filter((x) => x !== k) : [...on, k]).join(','))} className={cx('h-9 rounded-full border px-3.5 text-xs transition disabled:opacity-60', sel ? 'border-ink bg-ink text-surface' : 'border-line text-sub hover:text-ink')}>
+                {tr(l)}
+              </button>
+            )
+          })}
+        </div>
+      )
+    }
+    case 'status':
+      return (
+        <select {...common} value={String(v)} onChange={(e) => set(e.target.value)}>
+          {columns().map((c) => (
+            <option key={c.id} value={c.id}>
+              {statusLabel(c.id)}
+            </option>
+          ))}
+        </select>
+      )
+    case 'side':
+      return (
+        <select {...common} value={String(v)} onChange={(e) => set(e.target.value)}>
+          <option value="">{f.key === 'track' && 'assignee' in form ? L('خودکار (واحد مسئول)', 'Auto (assignee’s unit)') : '—'}</option>
+          {TRACKS.map((t) => (
+            <option key={t} value={t}>
+              {lbl(TRACK, t)}
+            </option>
+          ))}
+        </select>
+      )
+    case 'title':
+      return <TitleField value={String(v)} set={set} disabled={disabled} />
+    case 'area':
+      return (
+        <select {...common} value={String(v)} onChange={(e) => set(e.target.value)}>
+          <option value="">—</option>
+          {[...taskCfg().areas, ...(v && !taskCfg().areas.includes(String(v)) ? [String(v)] : [])].map((a) => (
+            <option key={a} value={a}>
+              {a}
+            </option>
+          ))}
+        </select>
+      )
+    case 'assignees': {
+      const on = String(v || '').split(',').map((x) => x.trim()).filter(Boolean)
+      const team = Array.from(new Set([...db.Team.filter((m) => String(m.active) !== 'false').map((m) => m.name), ...on]))
+      return (
+        <div className="flex flex-wrap gap-1.5">
+          {team.map((n) => {
+            const i = on.indexOf(n)
+            return (
+              <button key={n} type="button" disabled={disabled} onClick={() => set((i >= 0 ? on.filter((x) => x !== n) : [...on, n]).join(','))} className={cx('h-8 rounded-full border px-3 text-xs transition disabled:opacity-60', i >= 0 ? 'border-ink bg-ink text-surface' : 'border-line text-sub hover:text-ink')}>
+                {n}
+                {i === 0 && on.length > 1 && <span className="ms-1 opacity-60">{L('· اصلی', '· lead')}</span>}
+              </button>
+            )
+          })}
+        </div>
+      )
+    }
+    case 'people': {
+      const on = String(v || '').split(',').map((x) => x.trim()).filter(Boolean)
+      const team = db.Team.filter((m) => String(m.active) !== 'false' && !String(form.assignee || '').split(',').includes(m.name))
+      return (
+        <div className="flex flex-wrap gap-1.5">
+          {team.map((m) => {
+            const sel = on.includes(m.name)
+            return (
+              <button key={m.id} type="button" disabled={disabled} onClick={() => set((sel ? on.filter((x) => x !== m.name) : [...on, m.name]).join(','))} className={cx('h-8 rounded-full border px-3 text-xs transition disabled:opacity-60', sel ? 'border-ink bg-ink text-surface' : 'border-line text-sub hover:text-ink')}>
+                {m.name}
+              </button>
+            )
+          })}
+        </div>
+      )
+    }
+    case 'date':
+      return <DatePicker value={String(v)} onChange={(iso) => set(iso)} />
+    case 'number':
+      return <input {...common} type="number" dir="ltr" className="input num" value={v === '' ? '' : Number(v)} onChange={(e) => set(e.target.value === '' ? '' : Number(e.target.value))} />
+    case 'scale':
+      return (
+        <div className="flex gap-1">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button
+              type="button"
+              key={n}
+              disabled={disabled}
+              onClick={() => set(n)}
+              className={cx('h-11 flex-1 rounded-xl border text-sm font-semibold transition', Number(v) === n ? 'border-ink bg-ink text-surface' : 'border-line-strong hover:bg-muted')}
+            >
+              {n.toLocaleString(document.documentElement.lang === 'fa' ? 'fa-IR' : 'en-US')}
+            </button>
+          ))}
+        </div>
+      )
+    case 'project':
+      return (
+        <select {...common} value={String(v)} onChange={(e) => set(e.target.value)}>
+          <option value="">{canPersonal(db.Team.find((m) => m.name === String(form.assignee || '').split(',')[0])) ? L('— شخصی —', '— Personal —') : L('— بدون پروژه —', '— No project —')}</option>
+          {db.Projects.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      )
+    case 'sprint': {
+      const ss = db.Sprints.filter((s) => !form.project_id || s.project_id === form.project_id)
+      return (
+        <select {...common} value={String(v)} onChange={(e) => set(e.target.value)}>
+          <option value="">{L('— بک‌لاگ —', '— Backlog —')}</option>
+          {ss.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name} {s.status === 'active' ? L('(فعال)', '(active)') : ''}
+            </option>
+          ))}
+        </select>
+      )
+    }
+    case 'member':
+      return (
+        <select {...common} value={String(v)} onChange={(e) => set(e.target.value)}>
+          <option value="">—</option>
+          {db.Team.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </select>
+      )
+    case 'person':
+      return (
+        <>
+          <input {...common} list="people-list" value={String(v)}  onChange={(e) => set(e.target.value)} />
+          <datalist id="people-list">
+            {people.map((p) => (
+              <option key={p} value={p} />
+            ))}
+          </datalist>
+        </>
+      )
+    default:
+      return (
+        <input
+          {...common}
+          value={String(v)}
+          placeholder={f.placeholder && tr(f.placeholder)}
+          autoFocus={autoFocus}
+          onChange={(e) => set(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && onSubmit?.()}
+        />
+      )
+  }
+}
+
+function EditorModal({ sheet, row, isNew, onClose }: { sheet: EditableSheet; row: Record<string, unknown>; isNew: boolean; onClose: () => void }) {
+  const { db, upsert, remove, toast, canEdit: editor, access, me } = useStore()
+  // projects, people, allocations and contracts are managed by leadership only
+  const canEdit = editor && (!['Projects', 'Team', 'Allocations', 'Contracts'].includes(sheet) || can.manage(access)) && (sheet !== 'Contracts' || can.contracts(access))
+  const auto = useAuto()
+  const base = SCHEMAS[sheet]
+  const [form, setForm] = useState<Record<string, unknown>>(row)
+  const [saving, setSaving] = useState(false)
+  const [confirmDel, setConfirmDel] = useState(false)
+  const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }))
+  // task rules from the back office: deadline / project may be required, except for listed people
+  const owner = db.Team.find((m) => m.name === String(form.assignee || '').split(',')[0])
+  const optional = new Set<string>(TASK_FIELDS)
+  const schema =
+    sheet === 'Meetings'
+      ? { ...base, fields: base.fields.filter((f) => f.key !== 'purpose' || AGILE_SERIES.includes(String(form.series))) }
+      : sheet !== 'Tasks'
+      ? base
+      : {
+          ...base,
+          fields: base.fields
+            .filter((f) => !optional.has(f.key) || fieldOn(f.key as TaskField))
+            .map((f) => ((f.key === 'due_date' && needsDue(owner)) || (f.key === 'project_id' && needsProject(owner)) || (optional.has(f.key) && fieldReq(f.key as TaskField)) ? { ...f, required: true } : f)),
+        }
+  const missing = schema.fields.filter((f) => f.required && !String(form[f.key] ?? '').trim())
+  const title = tr(schema.title)
+
+  const save = async () => {
+    if (missing.length) return
+    setSaving(true)
+    const out = { ...form }
+    if (isNew) out.id = uid(schema.prefix)
+    // Auto-stamp completion dates so burndown & history stay accurate.
+    if (sheet === 'Tasks') out.completed_at = out.status === 'done' ? out.completed_at || todayISO() : ''
+    if (sheet === 'Tasks' && isNew && !out.reporter) out.reporter = me
+    if (sheet === 'FollowUps' && !out.owner) out.owner = me
+    if (sheet === 'FollowUps') out.done_at = out.status === 'done' ? out.done_at || todayISO() : ''
+    // The first committed date becomes the baseline; later moves show up as slippage.
+    if (sheet === 'Deliverables') {
+      if (!out.baseline_date) out.baseline_date = out.target_date
+      out.delivered_date = out.status === 'delivered' ? out.delivered_date || todayISO() : ''
+    }
+    try {
+      await upsert(sheet, out as never)
+      if (sheet === 'Meetings') auto.meetingSaved(out as never, isNew ? undefined : (row as never))
+      toast(isNew ? L(`${title} ایجاد شد`, `${title} created`) : L('تغییرات ذخیره شد', 'Changes saved'))
+      onClose()
+    } catch {
+      setSaving(false)
+    }
+  }
+
+  const del = async () => {
+    try {
+      await remove(sheet, String(form.id))
+      toast(L(`${title} حذف شد`, `${title} deleted`))
+      onClose()
+    } catch {}
+  }
+
+  return (
+    <Sheet
+      open
+      onClose={onClose}
+      header={
+        <div>
+          <div className="eyebrow">{isNew ? L('ایجاد', 'Create') : L('ویرایش', 'Edit')}</div>
+          <h2 className="font-semibold">{isNew ? L(`${title} جدید`, `New ${title.toLowerCase()}`) : title}</h2>
+        </div>
+      }
+      footer={
+        canEdit ? (
+          <>
+            <button className="btn-primary" onClick={save} disabled={saving || missing.length > 0}>
+              {saving ? L('در حال ذخیره…', 'Saving…') : isNew ? L('ایجاد', 'Create') : L('ذخیره', 'Save')}
+            </button>
+            <button className="btn-ghost" onClick={onClose}>
+              {L('انصراف', 'Cancel')}
+            </button>
+            <div className="flex-1" />
+            {!isNew &&
+              (confirmDel ? (
+                <button className="btn-danger" onClick={del}>
+                  {L('تأیید حذف', 'Confirm delete')}
+                </button>
+              ) : (
+                <button className="btn-danger" onClick={() => setConfirmDel(true)}>
+                  <Trash2 size={16} /> {L('حذف', 'Delete')}
+                </button>
+              ))}
+          </>
+        ) : (
+          <span className="text-xs text-sub">{L('دسترسی شما فقط مشاهده است.', 'You have view-only access.')}</span>
+        )
+      }
+    >
+      <div className="grid grid-cols-2 gap-x-4 gap-y-5 px-6 py-6">
+        {schema.fields.map((f, i) => (
+          <div key={f.key} className={f.half ? 'col-span-2 sm:col-span-1' : 'col-span-2'}>
+            <label className="label">
+              {tr(f.label)}
+              {f.required && <span className="ms-0.5 text-bad">*</span>}
+            </label>
+            <FieldInput f={f} value={form[f.key]} set={(v) => set(f.key, v)} form={form} disabled={!canEdit} autoFocus={isNew && i === 0} onSubmit={save} />
+          </div>
+        ))}
+      </div>
+    </Sheet>
+  )
+}
+
+/** Job title: pick from the list, or (program manager) add a new one right here — e.g. APM. */
+function TitleField({ value, set, disabled }: { value: string; set: (v: unknown) => void; disabled?: boolean }) {
+  const { access, setSetting } = useStore()
+  const [adding, setAdding] = useState(false)
+  const [d, setD] = useState({ id: '', fa: '', en: '' })
+  const add = async () => {
+    const id = (d.id || d.en).trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
+    if (!id || !d.fa.trim()) return
+    const list = orgList('titles')
+    // a code that already exists is renamed; a new code is added
+    const item = { id, fa: d.fa.trim(), en: (d.en || d.fa).trim() }
+    await setSetting(ORG_KEYS.titles, JSON.stringify(list.some((x) => x.id === id) ? list.map((x) => (x.id === id ? item : x)) : [...list, item]))
+    set(id)
+    setAdding(false)
+    setD({ id: '', fa: '', en: '' })
+  }
+  return (
+    <div className="space-y-1.5">
+      <div className="flex gap-1.5">
+        <select className="input flex-1" disabled={disabled} value={value} onChange={(e) => set(e.target.value)}>
+          <option value="">—</option>
+          {[...Object.keys(JOB_TITLE_OPTIONS), ...(value && !JOB_TITLE_OPTIONS[value] ? [value] : [])].map((k) => (
+            <option key={k} value={k}>
+              {JOB_TITLE_OPTIONS[k] ? tr(JOB_TITLE_OPTIONS[k]) : k}
+            </option>
+          ))}
+        </select>
+        {access === 'super' && !disabled && (
+          <button type="button" className="btn-outline btn-sm h-11 shrink-0" onClick={() => setAdding((x) => !x)} title={L('سمت جدید', 'New title')}>
+            <Plus size={14} />
+          </button>
+        )}
+      </div>
+      {adding && (
+        <div className="flex flex-wrap gap-1.5 rounded-2xl border border-line p-2">
+          <input dir="ltr" className="input h-9 w-20 text-xs" placeholder="APM" value={d.id} onChange={(e) => setD({ ...d, id: e.target.value })} />
+          <input autoFocus className="input h-9 min-w-0 flex-1 text-xs" placeholder={L('دستیار مدیر محصول', 'Persian name')} value={d.fa} onChange={(e) => setD({ ...d, fa: e.target.value })} />
+          <input dir="ltr" className="input h-9 w-36 text-xs" placeholder="Assistant PM" value={d.en} onChange={(e) => setD({ ...d, en: e.target.value })} />
+          <button type="button" className="btn-primary btn-sm h-9" disabled={!d.fa.trim() || !(d.id || d.en).trim()} onClick={add}>
+            {L('افزودن سمت', 'Add title')}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
