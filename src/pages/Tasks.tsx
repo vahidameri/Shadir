@@ -2,7 +2,7 @@ import { assigneesOf, isAssignee, joinNames, leadAssignee } from '../lib/assigne
 import { useMemo, useState } from 'react'
 import { canPersonal } from '../lib/taskcfg'
 import { useSearchParams } from 'react-router-dom'
-import { Plus, ArrowUpDown, MessageSquare, Link2, Settings2, UserX, Check, XCircle, Rows3 } from 'lucide-react'
+import { Plus, ArrowUpDown, MessageSquare, Link2, Settings2, UserX, Check, XCircle, Rows3, Target, X } from 'lucide-react'
 import { can, isMine } from '../lib/access'
 import { fieldOn, taskCfg } from '../lib/taskcfg'
 import { TaskSettingsSheet } from '../components/TaskSettings'
@@ -65,6 +65,8 @@ export default function Tasks() {
   const track = get('track')
   const whose = get('whose')
   const area = get('area')
+  // ?kr=<id> = work on one key result; ?kr=none = work outside the OKRs
+  const kr = get('kr')
   const areas = taskCfg().areas
   const today = todayISO()
   const assignees = Array.from(new Set(db.Tasks.flatMap((t) => assigneesOf(t))))
@@ -85,6 +87,7 @@ export default function Tasks() {
       if (whose === 'mine' && !isAssignee(t, me)) return false
       if (whose === 'shared' && !(!isAssignee(t, me) && isMine(t, me))) return false
       if (area && t.area !== area) return false
+      if (kr && (kr === 'none' ? !!t.kr_id : t.kr_id !== kr)) return false
       if (q && !t.title.includes(q) && !t.description.includes(q) && !t.tags.includes(q)) return false
       return true
     })
@@ -97,7 +100,7 @@ export default function Tasks() {
       assigned: (a, b) => (a.assigned_at || '9999').localeCompare(b.assigned_at || '9999'),
     }
     return out.sort(cmp[sort])
-  }, [db, project, assignee, status, prio, due, q, sort, today, track, whose, area, me, sv, view])
+  }, [db, project, assignee, status, prio, due, q, sort, today, track, whose, area, kr, me, sv, view])
   const counts = useMemo(() => viewCounts(db.Tasks, me), [db.Tasks, me])
   // grouped list: one section per unit / person / status / flag / project
   const groups = useMemo(() => {
@@ -227,6 +230,14 @@ export default function Tasks() {
             )}
           </Toolbar>
         </div>
+
+        {kr && (
+          <div className="mb-3 flex items-center gap-2 rounded-2xl border border-line bg-surface px-4 py-2 text-sm">
+            <Target size={15} className="text-sub" />
+            {kr === 'none' ? L('فقط کارهای خارج از OKR', 'Only work outside the OKRs') : L(`فقط کارهای کی‌ریزالت «${db.KeyResults.find((k) => k.id === kr)?.title || kr}»`, `Only work on “${db.KeyResults.find((k) => k.id === kr)?.title || kr}”`)}
+            <button className="icon-btn ms-auto h-7 w-7" onClick={() => set('kr', '')} aria-label={L('حذف فیلتر', 'Clear filter')}><X size={14} /></button>
+          </div>
+        )}
 
         {leader && picked.size > 0 && view === 'list' && (
           <div className="sticky top-2 z-20 mb-3 flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-surface px-3 py-2 shadow-float">

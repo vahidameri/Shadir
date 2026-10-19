@@ -14,6 +14,8 @@ import Tasks from './pages/Tasks'
 import MizitoPage from './pages/Mizito'
 import Teams from './pages/Teams'
 import Overview from './pages/Overview'
+import OkrPage from './pages/Okr'
+import Resources from './pages/Resources'
 import FollowUps from './pages/FollowUps'
 import Risks from './pages/Risks'
 import CalendarPage from './pages/Calendar'
@@ -109,6 +111,8 @@ export default function App() {
                 <Route path="/calendar" element={<CalendarPage />} />
                 <Route path="/teams" element={<Teams />} />
                 <Route path="/overview" element={<Overview />} />
+                <Route path="/okr" element={<OkrPage />} />
+                <Route path="/resources" element={<Resources />} />
                 <Route path="/projects" element={<Projects />} />
                 <Route path="/projects/:id" element={<ProjectDetail />} />
                 <Route path="/risks" element={<Only rule="portfolio"><Risks /></Only>} />

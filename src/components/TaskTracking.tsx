@@ -4,7 +4,9 @@ import { Ban, CalendarClock, ExternalLink, Flag, Hourglass, MoonStar, Unlock, Us
 import type { HistoryRow, Task } from '../lib/types'
 import { useStore } from '../lib/store'
 import { useEditor } from './Editor'
-import { L, lbl } from '../lib/i18n'
+import { L, lbl, tr } from '../lib/i18n'
+import { CONF, krTitle } from '../lib/okr'
+import { optLabel, statusById } from '../lib/mizito'
 import { fa, fmtDate, fmtDayMonth } from '../lib/jalali'
 import { flagOf, taskCfg } from '../lib/taskcfg'
 import { blockedOn, signals } from '../lib/signals'
@@ -166,7 +168,7 @@ export function BlockerPanel({ t, patch }: { t: Task; patch: (p: Partial<Task>) 
 
 const FIELD: Record<string, [string, string]> = {
   title: ['عنوان', 'title'], description: ['توضیحات', 'description'], status: ['وضعیت', 'status'], priority: ['اولویت', 'priority'], assignee: ['مسئول', 'assignee'],
-  due_date: ['ددلاین', 'deadline'], assigned_at: ['تاریخ اساین', 'assign date'], flag: ['پرچم', 'flag'], track: ['تیم', 'team'], project_id: ['پروژه', 'project'],
+  due_date: ['ددلاین', 'deadline'], assigned_at: ['تاریخ اساین', 'assign date'], flag: ['پرچم', 'flag'], track: ['تیم', 'team'], project_id: ['محصول / پروژه', 'product / project'], kr_id: ['کی‌ریزالت', 'key result'], current: ['مقدار', 'value'], confidence: ['اطمینان', 'confidence'], target: ['هدف', 'target'], note: ['یادداشت', 'note'],
   blocked_reason: ['علت انسداد', 'blocker reason'], blocked_by: ['مسدودکننده', 'blocked by'], link: ['لینک', 'link'], requested_by: ['درخواست‌دهنده', 'requested by'],
   collaborators: ['همکاران', 'shared with'], watchers: ['ناظرها', 'watchers'], private: ['دیده‌شدن', 'visibility'], deadline: ['ددلاین دوم', 'second deadline'],
   subject: ['موضوع', 'subject'], person: ['طرف پیگیری', 'person'], channel: ['کانال', 'channel'], notes: ['یادداشت', 'notes'], owner: ['پیگیری‌کننده', 'owner'],
@@ -175,7 +177,9 @@ const FIELD: Record<string, [string, string]> = {
 /** A value from the log, as people read it. */
 function show(h: HistoryRow, v: string, projectName: (id: string) => string) {
   if (!v) return L('خالی', 'empty')
-  if (h.field === 'status') return h.entity === 'Tasks' ? statusLabel(v) : lbl(FOLLOWUP_STATUS, v as never)
+  if (h.field === 'status') return h.entity === 'Tasks' ? statusLabel(v) : h.entity === 'Mizito' ? optLabel(statusById(v)) || v : lbl(FOLLOWUP_STATUS, v as never)
+  if (h.field === 'confidence') return v in CONF ? tr(CONF[v as keyof typeof CONF].label) : v
+  if (h.field === 'kr_id') return krTitle(v) || v
   if (h.field === 'priority') return lbl(PRIORITY, v as never)
   if (h.field === 'flag') return flagOf(v) ? L(flagOf(v)!.fa, flagOf(v)!.en) : v
   if (h.field === 'track') return lbl(TRACK, v) || v

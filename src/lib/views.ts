@@ -16,9 +16,10 @@ export const CAL_LAYERS: Choice<CalLayer>[] = [
 ]
 
 export const DASH_KEY = 'dash.widgets'
-export type DashWidget = 'kpis' | 'teams' | 'status' | 'team_load' | 'mizito' | 'people' | 'upcoming' | 'blocked'
+export type DashWidget = 'kpis' | 'okr' | 'teams' | 'status' | 'team_load' | 'mizito' | 'people' | 'upcoming' | 'blocked'
 export const DASH_WIDGETS: Choice<DashWidget>[] = [
   { id: 'kpis', label: ['شاخص‌های کلیدی', 'Key numbers'] },
+  { id: 'okr', label: ['OKR فصل جاری', 'This quarter’s OKRs'] },
   { id: 'teams', label: ['وضعیت تیم‌ها', 'Team status'] },
   { id: 'status', label: ['تسک‌ها بر اساس وضعیت', 'Tasks by status'] },
   { id: 'team_load', label: ['معوق و مسدود هر تیم', 'Late & blocked per team'] },

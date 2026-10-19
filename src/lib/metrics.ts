@@ -1,7 +1,8 @@
-import type { DB, Health, Project, Task, Sprint, Risk } from './types'
+import type { DB, Health, Kpi, Project, Task, Sprint, Risk } from './types'
 import { closed, isBlocked } from './columns'
-import { daysBetween, daysFromToday, todayISO, addDays, fa } from './jalali'
+import { daysBetween, daysFromToday, todayISO, fa } from './jalali'
 import { L } from './i18n'
+import { krConfidence, krProgress, quarterOf } from './okr'
 
 interface HealthReason {
   level: Health
@@ -43,7 +44,11 @@ function timelineElapsed(p: Pick<Project, 'start_date' | 'end_date'>) {
   return Math.max(0, Math.min(100, (passed / total) * 100))
 }
 
+/** Always-on products have no end date: their health comes from work, risks, KPIs, OKRs and the weekly report. */
+export const isProduct = (p: Pick<Project, 'kind' | 'end_date'>) => p.kind === 'product' || (!p.kind && !p.end_date)
+
 export function projectMetrics(p: Project, db: DB): ProjectMetrics {
+  const product = isProduct(p)
   const ms = db.Milestones.filter((m) => m.project_id === p.id)
   const tasks = db.Tasks.filter((t) => t.project_id === p.id)
   const risks = db.Risks.filter((r) => r.project_id === p.id && r.status !== 'closed')
@@ -52,7 +57,11 @@ export function projectMetrics(p: Project, db: DB): ProjectMetrics {
   // Progress: manual value wins; otherwise weighted milestones; otherwise tasks.
   const raw = p.progress as unknown
   let progress = raw === '' || raw === null || raw === undefined ? NaN : Number(raw)
-  if (isNaN(progress)) {
+  if (product) {
+    // a product's progress = its key results this quarter (none = 0)
+    const ks = db.KeyResults.filter((k) => k.project_id === p.id && db.Objectives.some((o) => o.id === k.objective_id && o.quarter === quarterOf()))
+    progress = ks.length ? ks.reduce((a, k) => a + krProgress(k), 0) / ks.length : 0
+  } else if (isNaN(progress)) {
     const tw = ms.reduce((a, m) => a + (Number(m.weight) || 1), 0)
     if (tw > 0) progress = (ms.filter((m) => m.status === 'done').reduce((a, m) => a + (Number(m.weight) || 1), 0) / tw) * 100
     else if (tasks.length) progress = (tasks.filter((t) => t.status === 'done').length / tasks.length) * 100
@@ -60,10 +69,10 @@ export function projectMetrics(p: Project, db: DB): ProjectMetrics {
   }
   if (p.status === 'completed') progress = 100
 
-  const elapsed = timelineElapsed(p)
+  const elapsed = product ? 0 : timelineElapsed(p)
   const scheduleGap = progress - elapsed
   // no deadline yet = nothing to be late against
-  const daysLeft = p.end_date ? daysFromToday(p.end_date) : 9999
+  const daysLeft = p.end_date && !product ? daysFromToday(p.end_date) : 9999
 
   const overdueMs = ms.filter((m) => m.status !== 'done' && m.planned_date && daysFromToday(m.planned_date) < 0)
   const upcoming = ms
@@ -83,7 +92,20 @@ export function projectMetrics(p: Project, db: DB): ProjectMetrics {
   }
 
   const live = p.status === 'active' || p.status === 'planning'
-  if (live) {
+  if (live && product) {
+    const last = db.Updates.filter((u) => u.project_id === p.id).sort((a, b) => (a.week_date < b.week_date ? 1 : -1))[0]
+    if (!last || daysFromToday(last.week_date) < -14) add('amber', 10, L('گزارش وضعیت دو هفته است ثبت نشده', 'No status report in two weeks'))
+    else if (last.health === 'red') add('red', 35, L('گزارش وضعیت اخیر: قرمز', 'Latest status report: red'))
+    else if (last.health === 'amber') add('amber', 15, L('گزارش وضعیت اخیر: زرد', 'Latest status report: amber'))
+    const offKpi = db.Kpis.filter((k) => k.project_id === p.id && kpiOff(k)).length
+    if (offKpi) add('amber', 8 * Math.min(3, offKpi), L(`${fa(offKpi)} شاخص از هدف دور است`, `${offKpi} KPIs off target`))
+    const offKr = db.KeyResults.filter((k) => k.project_id === p.id && db.Objectives.some((o) => o.id === k.objective_id && o.quarter === quarterOf()) && krConfidence(k, quarterOf()) === 'off_track').length
+    if (offKr) add('amber', 12, L(`${fa(offKr)} نتیجه‌ی کلیدی عقب است`, `${offKr} key results off track`))
+    if (highRisks >= 2) add('red', 20, L(`${fa(highRisks)} ریسک با شدت بالا باز است`, `${highRisks} high-severity risks open`))
+    else if (highRisks === 1) add('amber', 10, L('یک ریسک با شدت بالا باز است', 'One high-severity risk open'))
+    if (blockedTasks >= 3) add('amber', 10, L(`${fa(blockedTasks)} تسک مسدود`, `${blockedTasks} blocked tasks`))
+    if (overdueTasks >= 5) add('amber', 10, L(`${fa(overdueTasks)} تسک عقب‌افتاده`, `${overdueTasks} overdue tasks`))
+  } else if (live) {
     if (scheduleGap <= -20) add('red', 35, L(`پیشرفت ${fa(Math.round(-scheduleGap))}٪ از زمان سپری‌شده عقب است`, `Progress is ${Math.round(-scheduleGap)}% behind elapsed time`))
     else if (scheduleGap <= -10) add('amber', 18, L(`پیشرفت ${fa(Math.round(-scheduleGap))}٪ از زمان سپری‌شده عقب است`, `Progress is ${Math.round(-scheduleGap)}% behind elapsed time`))
 
@@ -144,27 +166,8 @@ export function sprintDonePoints(s: Sprint, db: DB) {
   return ts.filter((t) => t.status === 'done').reduce((a, t) => a + (Number(t.points) || 0), 0)
 }
 
-export function sprintCommitted(s: Sprint, db: DB) {
-  const c = Number(s.committed_points)
-  if (c) return c
-  return sprintTasks(s, db).reduce((a, t) => a + (Number(t.points) || 0), 0)
-}
-
-/** Burndown built from task completion dates. */
-export function burndown(s: Sprint, db: DB) {
-  const committed = sprintCommitted(s, db)
-  const ts = sprintTasks(s, db)
-  const len = Math.max(1, daysBetween(s.start_date, s.end_date))
-  const today = todayISO()
-  const rows: { day: string; ideal: number; actual: number | null }[] = []
-  for (let i = 0; i <= len; i++) {
-    const day = addDays(s.start_date, i)
-    const doneBy = ts
-      .filter((t) => t.status === 'done' && t.completed_at && t.completed_at.slice(0, 10) <= day)
-      .reduce((a, t) => a + (Number(t.points) || 0), 0)
-    const useFallback = !ts.length
-    const actual = day > today ? null : useFallback ? committed - (Number(s.completed_points) || 0) * (i / len) : committed - doneBy
-    rows.push({ day, ideal: Math.round((committed * (1 - i / len)) * 10) / 10, actual })
-  }
-  return rows
+/** A KPI is off when its latest value is on the wrong side of its target. */
+export function kpiOff(k: Pick<Kpi, 'target' | 'current' | 'direction'>) {
+  if (k.target === '' || k.current === '' || k.target === undefined || k.current === undefined) return false
+  return k.direction === 'down' ? Number(k.current) > Number(k.target) : Number(k.current) < Number(k.target)
 }

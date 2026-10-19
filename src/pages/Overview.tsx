@@ -4,7 +4,8 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { AtSign, Ban, CalendarClock, MoonStar, Settings2 } from 'lucide-react'
 import { useStore } from '../lib/store'
-import { Band, Card, Empty, Overlap, StatStrip, StatusIcon, cx } from '../components/ui'
+import { Band, Card, Empty, Overlap, Progress, StatStrip, StatusIcon, cx } from '../components/ui'
+import { elapsed, quarterLabel, quarterOf, teamOkr } from '../lib/okr'
 import { L } from '../lib/i18n'
 import { useEditor } from '../components/Editor'
 import { daysFromToday, fa, fmtDayMonth, todayISO } from '../lib/jalali'
@@ -45,6 +46,33 @@ export default function Overview() {
 
   const widgets: Record<DashWidget, () => React.ReactNode> = {
     kpis: () => null, // shown in the band
+    okr: () => {
+      const qq = quarterOf()
+      const rows = d.teams.filter((t) => t.id).map((t) => ({ id: t.id, o: teamOkr(db, t.id, qq, t.tasks) }))
+      return (
+        <Card eyebrow={`OKR · ${quarterLabel(qq)}`} title={L('پیشرفت هدف‌های تیم‌ها', 'Team objectives')} action={<Link to="/okr" className="text-xs text-sub hover:text-ink">{L('همه', 'All')}</Link>}>
+          {rows.every((r) => !r.o.objectives.length) ? (
+            <Empty text={L('برای این فصل OKR تعریف نشده', 'No OKRs this quarter')} />
+          ) : (
+            <ul className="space-y-3">
+              {rows.map(({ id, o }) => (
+                <li key={id}>
+                  <div className="flex items-baseline justify-between gap-2 text-xs">
+                    <span>{teamName(id)}</span>
+                    <span className="text-sub num">
+                      {o.objectives.length ? `${fa(o.progress)}٪` : '—'}
+                      {o.conf.off_track > 0 && <b className="ms-2 font-medium text-bad">{fa(o.conf.off_track)} {L('عقب', 'off')}</b>}
+                      {o.conf.at_risk > 0 && <b className="ms-2 font-medium text-warn">{fa(o.conf.at_risk)} {L('در خطر', 'at risk')}</b>}
+                    </span>
+                  </div>
+                  <Progress value={o.progress} marker={elapsed(qq)} className="mt-1.5" />
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )
+    },
     teams: () => (
       <div className="grid gap-4 @xl:grid-cols-2 @3xl:grid-cols-3">
         {d.teams.filter((s) => s.id || s.tasks.length).map((s) => <TeamCard key={s.id || '-'} id={s.id} stats={s} compact />)}

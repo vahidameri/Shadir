@@ -10,6 +10,7 @@ import { stampTask } from './taskstamp'
 import { diffRows } from './history'
 import { readMzCfg, setMzCfg, stampMizito } from './mizito'
 import { readTeamCfg, setTeamCfg } from './teams'
+import { setKrTitles } from './okr'
 import { passFor } from './handoffs'
 import type { Task } from './types'
 import { NOTIFY_KEY, setNotifyOff } from './inbox'
@@ -74,7 +75,7 @@ const NUMERIC: Partial<Record<SheetName, string[]>> = {
 }
 
 function emptyDB(): DB {
-  return { Projects: [], Scope: [], Milestones: [], Sprints: [], Tasks: [], FollowUps: [], Risks: [], Team: [], Allocations: [], Updates: [], Comments: [], Deliverables: [], Meetings: [], Files: [], Config: [], Contracts: [], Handoffs: [], Deliveries: [], History: [], Contacts: [], Mizito: [], MizitoMentions: [] }
+  return { Projects: [], Scope: [], Milestones: [], Sprints: [], Tasks: [], FollowUps: [], Risks: [], Team: [], Allocations: [], Updates: [], Comments: [], Deliverables: [], Meetings: [], Files: [], Config: [], Contracts: [], Handoffs: [], Deliveries: [], History: [], Contacts: [], Mizito: [], MizitoMentions: [], Objectives: [], KeyResults: [], Kpis: [] }
 }
 
 // Sheets return numbers as numbers or strings, dates as ISO strings. Normalize once here.
@@ -223,6 +224,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setMzCfg(readMzCfg((k) => db.Config.find((r) => r.id === k)?.value))
     setTeamCfg(readTeamCfg((k) => db.Config.find((r) => r.id === k)?.value))
   }, [db.Config, db.Team])
+  useMemo(() => setKrTitles(db.KeyResults), [db.KeyResults])
   const shown = useMemo(() => {
     return mapDB(scopeDB(visibleDB(db, canonMe), canonMe, access), maps.toEn)
   }, [db, canonMe, access, maps])
@@ -421,7 +423,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [config, mode],
   )
 
-  const BULK_SHEETS: SheetName[] = ['Tasks', 'FollowUps', 'Mizito', 'MizitoMentions', 'Contacts', 'Team', 'Projects', 'History', 'Comments']
+  const BULK_SHEETS: SheetName[] = ['Tasks', 'FollowUps', 'Mizito', 'MizitoMentions', 'Contacts', 'Team', 'Projects', 'History', 'Comments', 'Allocations', 'Objectives', 'KeyResults', 'Kpis']
   const bulk = useCallback(
     async <S extends SheetName>(sheet: S, rows: Row<S>[]) => {
       if (!rows.length) return

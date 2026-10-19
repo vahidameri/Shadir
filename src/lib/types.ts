@@ -38,6 +38,8 @@ export interface Project {
   links?: string
   /** the team (department unit) the project sits under */
   team?: string
+  /** 'product' = always on (no end date, e.g. Kelasa); 'project' = has a start and an end ('' = project) */
+  kind?: 'product' | 'project' | ''
 }
 
 export interface ScopeItem {
@@ -83,6 +85,8 @@ export interface Task {
   id: string
   project_id: string
   sprint_id: string
+  /** the key result this task moves ('' = other work) */
+  kr_id?: string
   title: string
   description: string
   assignee: string
@@ -237,6 +241,8 @@ export interface Allocation {
   /** optional window; blank = open-ended */
   start_date: string
   end_date: string
+  /** planning quarter, e.g. 1405-Q3 ('' = every quarter) */
+  quarter?: string
 }
 
 export interface Update {
@@ -402,7 +408,7 @@ export interface MizitoMention {
 /** One change to a tracked row (field-level log). Written by the server; the app mirrors it locally. */
 export interface HistoryRow {
   id: string
-  entity: 'Tasks' | 'FollowUps' | 'Mizito'
+  entity: 'Tasks' | 'FollowUps' | 'Mizito' | 'KeyResults' | 'Kpis'
   entity_id: string
   /** the field that changed, or '_created' / '_deleted' */
   field: string
@@ -475,6 +481,59 @@ export interface DB {
   Contacts: Contact[]
   Mizito: MizitoItem[]
   MizitoMentions: MizitoMention[]
+  Objectives: Objective[]
+  KeyResults: KeyResult[]
+  Kpis: Kpi[]
+}
+
+/** A team's objective for one quarter (OKR). */
+export interface Objective {
+  id: string
+  team: string
+  /** e.g. 1405-Q3 */
+  quarter: string
+  title: string
+  description: string
+  owner: string
+  /** order inside the team */
+  sort: number
+  batch?: string
+}
+
+export type KrConfidence = 'on_track' | 'at_risk' | 'off_track' | ''
+/** A measurable result under an objective. kind: number | percent | done (yes/no). */
+export interface KeyResult {
+  id: string
+  objective_id: string
+  title: string
+  owner: string
+  kind: 'number' | 'percent' | 'done'
+  start: number
+  target: number
+  current: number
+  unit: string
+  /** set at each check-in; '' = judged from progress against the quarter's elapsed time */
+  confidence: KrConfidence
+  /** the product it is about, if any */
+  project_id: string
+  note: string
+  updated_at: string
+  batch?: string
+}
+
+/** A product's ongoing metric (KPI): latest value against a target. */
+export interface Kpi {
+  id: string
+  project_id: string
+  name: string
+  unit: string
+  /** 'up' = higher is better, 'down' = lower is better */
+  direction: 'up' | 'down'
+  target: number | ''
+  current: number | ''
+  previous: number | ''
+  updated_at: string
+  note: string
 }
 
 export type SheetName = keyof DB

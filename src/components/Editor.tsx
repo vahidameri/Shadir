@@ -19,8 +19,9 @@ import { DatePicker } from './DatePicker'
 import { ItemSheet } from './ItemSheet'
 import { useAuto } from '../lib/automations'
 import { can } from '../lib/access'
+import { addQuarter, quarterLabel, quarterOf, quarterOptions } from '../lib/okr'
 
-type FieldType = 'text' | 'textarea' | 'select' | 'multi' | 'date' | 'number' | 'project' | 'person' | 'people' | 'sprint' | 'member' | 'scale' | 'status' | 'area' | 'side' | 'title' | 'assignees' | 'flag' | 'tier' | 'mzstatus' | 'mzcat' | 'mzaction' | 'pprio'
+type FieldType = 'text' | 'textarea' | 'select' | 'multi' | 'date' | 'number' | 'project' | 'person' | 'people' | 'sprint' | 'member' | 'scale' | 'status' | 'area' | 'side' | 'title' | 'assignees' | 'flag' | 'tier' | 'mzstatus' | 'mzcat' | 'mzaction' | 'pprio' | 'kr' | 'quarter' | 'objective'
 interface Field {
   key: string
   label: T2
@@ -40,9 +41,9 @@ const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields: Field[
     fields: [
       { key: 'title', label: ['عنوان تسک', 'Task title'], type: 'text', required: true },
       { key: 'description', label: ['توضیحات', 'Description'], type: 'textarea' },
-      { key: 'project_id', label: ['پروژه', 'Project'], type: 'project', half: true },
+      { key: 'project_id', label: ['محصول / پروژه', 'Product / project'], type: 'project', half: true },
       { key: 'area', label: ['حوزه', 'Area'], type: 'area', half: true },
-      { key: 'sprint_id', label: ['اسپرینت', 'Sprint'], type: 'sprint', half: true },
+      { key: 'kr_id', label: ['کی‌ریزالت (OKR)', 'Key result (OKR)'], type: 'kr', half: true },
       { key: 'assignee', label: ['مسئول انجام (یک یا چند نفر)', 'Assignees (one or more)'], type: 'assignees' },
       { key: 'requested_by', label: ['درخواست‌دهنده', 'Requested by'], type: 'person', half: true },
       { key: 'assigned_at', label: ['تاریخ اساین', 'Assigned on'], type: 'date', half: true },
@@ -115,7 +116,7 @@ const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields: Field[
       { key: 'person', label: ['از چه کسی؟', 'With whom?'], type: 'person', half: true },
       { key: 'waiting_for', label: ['منتظر چه چیزی هستیم؟', 'What are we waiting for?'], type: 'text' },
       { key: 'channel', label: ['کانال', 'Channel'], type: 'select', options: CHANNEL, half: true },
-      { key: 'project_id', label: ['پروژه', 'Project'], type: 'project', half: true },
+      { key: 'project_id', label: ['محصول / پروژه', 'Product / project'], type: 'project', half: true },
       { key: 'due_date', label: ['پینگ بعدی', 'Next ping'], type: 'date', half: true },
       { key: 'status', label: ['وضعیت', 'Status'], type: 'select', options: FOLLOWUP_STATUS, half: true },
       { key: 'priority', label: ['اولویت', 'Priority'], type: 'select', options: PRIORITY, half: true },
@@ -128,10 +129,11 @@ const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields: Field[
     title: ['پروژه', 'Project'],
     prefix: 'P',
     fields: [
-      { key: 'name', label: ['نام پروژه', 'Project name'], type: 'text', required: true },
+      { key: 'name', label: ['نام', 'Name'], type: 'text', required: true },
+      { key: 'kind', label: ['نوع', 'Kind'], type: 'select', options: { product: ['محصول (همیشگی، مثل کلاسا)', 'Product (always on, e.g. Kelasa)'], project: ['پروژه (شروع و پایان دارد)', 'Project (has a start and an end)'] }, half: true },
       { key: 'team', label: ['تیم', 'Team'], type: 'side', half: true, required: true },
       { key: 'code', label: ['کد', 'Code'], type: 'text', half: true, placeholder: ['PRJ-XXX', 'PRJ-XXX'] },
-      { key: 'owner', label: ['مسئول پروژه', 'Project lead'], type: 'person', half: true },
+      { key: 'owner', label: ['مدیر محصول / مسئول', 'Product manager / lead'], type: 'person', half: true },
       { key: 'status', label: ['وضعیت', 'Status'], type: 'select', options: PROJECT_STATUS, half: true },
       { key: 'priority', label: ['اولویت', 'Priority'], type: 'select', options: PRIORITY, half: true },
       { key: 'phase', label: ['فاز فعلی', 'Current phase'], type: 'text', half: true },
@@ -139,10 +141,10 @@ const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields: Field[
       { key: 'end_date', label: ['ددلاین', 'Deadline'], type: 'date', half: true },
       { key: 'progress', label: ['پیشرفت دستی (٪؛ خالی = از تسک‌ها)', 'Manual progress (%; blank = from tasks)'], type: 'number', half: true },
       { key: 'health_override', label: ['سلامت دستی', 'Health override'], type: 'select', options: { '': ['خودکار', 'Automatic'], ...HEALTH }, half: true },
-      { key: 'objective', label: ['هدف', 'Objective'], type: 'text' },
+      { key: 'objective', label: ['چشم‌انداز / هدف', 'Vision / goal'], type: 'text' },
       { key: 'description', label: ['شرح', 'Description'], type: 'textarea' },
     ],
-    defaults: () => ({ team: '', status: 'active', priority: 'medium', start_date: todayISO(), progress: '', health_override: '', paused_at: '', pause_reason: '', delivery_day: '', last_delivery: '', archived: '', archived_at: '', client: '', liaison: '', liaison_contact: '', category: '' }),
+    defaults: () => ({ kind: 'product', team: '', status: 'active', priority: 'medium', start_date: todayISO(), progress: '', health_override: '', paused_at: '', pause_reason: '', delivery_day: '', last_delivery: '', archived: '', archived_at: '', client: '', liaison: '', liaison_contact: '', category: '' }),
   },
   Milestones: {
     title: ['مایلستون', 'Milestone'],
@@ -179,7 +181,7 @@ const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields: Field[
     fields: [
       { key: 'title', label: ['عنوان', 'Title'], type: 'text', required: true },
       { key: 'type', label: ['نوع', 'Type'], type: 'select', options: RISK_TYPE, half: true },
-      { key: 'project_id', label: ['پروژه', 'Project'], type: 'project', half: true },
+      { key: 'project_id', label: ['محصول / پروژه', 'Product / project'], type: 'project', half: true },
       { key: 'probability', label: ['احتمال', 'Probability'], type: 'scale', half: true },
       { key: 'impact', label: ['اثر', 'Impact'], type: 'scale', half: true },
       { key: 'owner', label: ['مالک', 'Owner'], type: 'person', half: true },
@@ -236,17 +238,61 @@ const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields: Field[
     ],
     defaults: () => ({ name_en: '', capacity: 100, photo: '', tasks_private: '', phone: '', access: 'member', active: 'true' }),
   },
+  Objectives: {
+    title: ['هدف (Objective)', 'Objective'],
+    prefix: 'O',
+    fields: [
+      { key: 'title', label: ['هدف', 'Objective'], type: 'text', required: true, placeholder: ['مثلاً «تجربه‌ی ثبت‌نام کلاسا را روان کنیم»', 'e.g. “Make Kelasa sign-up effortless”'] },
+      { key: 'team', label: ['تیم', 'Team'], type: 'side', half: true, required: true },
+      { key: 'quarter', label: ['فصل', 'Quarter'], type: 'quarter', half: true, required: true },
+      { key: 'owner', label: ['مسئول', 'Owner'], type: 'person', half: true },
+      { key: 'sort', label: ['ترتیب', 'Order'], type: 'number', half: true },
+      { key: 'description', label: ['چرا این هدف؟', 'Why this objective?'], type: 'textarea' },
+    ],
+    defaults: () => ({ quarter: quarterOf(), sort: 1, description: '' }),
+  },
+  KeyResults: {
+    title: ['کی‌ریزالت', 'Key result'],
+    prefix: 'KR',
+    fields: [
+      { key: 'title', label: ['نتیجه‌ی کلیدی', 'Key result'], type: 'text', required: true, placeholder: ['مثلاً «نرخ تکمیل ثبت‌نام از ۴۰٪ به ۶۰٪»', 'e.g. “Sign-up completion from 40% to 60%”'] },
+      { key: 'objective_id', label: ['زیر هدف', 'Under objective'], type: 'objective', required: true },
+      { key: 'kind', label: ['نوع سنجش', 'Measured as'], type: 'select', options: { number: ['عدد', 'Number'], percent: ['درصد', 'Percent'], done: ['انجام شد / نشد', 'Done / not done'] }, half: true },
+      { key: 'unit', label: ['واحد (برای عدد)', 'Unit (for numbers)'], type: 'text', half: true },
+      { key: 'start', label: ['مقدار شروع', 'Start value'], type: 'number', half: true },
+      { key: 'target', label: ['هدف', 'Target'], type: 'number', half: true, required: true },
+      { key: 'current', label: ['مقدار فعلی', 'Current value'], type: 'number', half: true },
+      { key: 'confidence', label: ['اطمینان', 'Confidence'], type: 'select', options: { '': ['خودکار (از پیشرفت و زمان)', 'Automatic (progress vs time)'], on_track: ['در مسیر', 'On track'], at_risk: ['در خطر', 'At risk'], off_track: ['عقب', 'Off track'] }, half: true },
+      { key: 'owner', label: ['مسئول', 'Owner'], type: 'person', half: true },
+      { key: 'project_id', label: ['محصول مرتبط', 'Related product'], type: 'project', half: true },
+      { key: 'note', label: ['یادداشت', 'Note'], type: 'textarea' },
+    ],
+    defaults: () => ({ kind: 'number', start: 0, current: 0, target: '', unit: '', confidence: '', project_id: '', note: '' }),
+  },
+  Kpis: {
+    title: ['شاخص (KPI)', 'KPI'],
+    prefix: 'K',
+    fields: [
+      { key: 'name', label: ['نام شاخص', 'KPI name'], type: 'text', required: true, placeholder: ['مثلاً «کاربر فعال هفتگی»', 'e.g. “Weekly active users”'] },
+      { key: 'project_id', label: ['محصول', 'Product'], type: 'project', half: true, required: true },
+      { key: 'unit', label: ['واحد', 'Unit'], type: 'text', half: true },
+      { key: 'direction', label: ['بهتر یعنی', 'Better is'], type: 'select', options: { up: ['بیشتر', 'Higher'], down: ['کمتر', 'Lower'] }, half: true },
+      { key: 'target', label: ['هدف', 'Target'], type: 'number', half: true },
+      { key: 'current', label: ['مقدار فعلی', 'Current value'], type: 'number', half: true },
+      { key: 'note', label: ['یادداشت', 'Note'], type: 'textarea' },
+    ],
+    defaults: () => ({ direction: 'up', target: '', current: '', previous: '', note: '' }),
+  },
   Allocations: {
     title: ['تخصیص منابع', 'Allocation'],
     prefix: 'A',
     fields: [
       { key: 'member_id', label: ['عضو', 'Member'], type: 'member', half: true, required: true },
       { key: 'project_id', label: ['پروژه', 'Project'], type: 'project', half: true, required: true },
-      { key: 'percent', label: ['درصد تخصیص', 'Allocation %'], type: 'number' },
-      { key: 'start_date', label: ['از تاریخ', 'From'], type: 'date', half: true },
-      { key: 'end_date', label: ['تا تاریخ', 'Until'], type: 'date', half: true },
+      { key: 'percent', label: ['درصد از وقت این فرد', 'Share of this person’s time (%)'], type: 'number', half: true },
+      { key: 'quarter', label: ['فصل', 'Quarter'], type: 'quarter', half: true },
     ],
-    defaults: () => ({ percent: 50, start_date: '', end_date: '' }),
+    defaults: () => ({ percent: 50, start_date: '', end_date: '', quarter: quarterOf() }),
   },
   Deliverables: {
     title: ['خروجی', 'Deliverable'],
@@ -272,7 +318,7 @@ const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields: Field[
       { key: 'title', label: ['عنوان', 'Title'], type: 'text', required: true },
       { key: 'series', label: ['نوع / سری', 'Series'], type: 'select', options: MEETING_SERIES, half: true },
       { key: 'purpose', label: ['برنامه‌ریزی برای', 'Planning for'], type: 'select', options: PLAN_PURPOSE, half: true },
-      { key: 'project_id', label: ['پروژه', 'Project'], type: 'project', half: true },
+      { key: 'project_id', label: ['محصول / پروژه', 'Product / project'], type: 'project', half: true },
       { key: 'date', label: ['تاریخ', 'Date'], type: 'date', half: true, required: true },
       { key: 'time', label: ['ساعت', 'Time'], type: 'text', half: true, placeholder: ['10:00', '10:00'] },
       { key: 'duration', label: ['مدت', 'Duration'], type: 'number', half: true },
@@ -503,6 +549,35 @@ function FieldInput({ f, value, set, form, disabled, autoFocus, onSubmit }: { f:
           ))}
         </select>
       )
+    case 'quarter':
+      return (
+        <select {...common} value={String(v)} onChange={(e) => set(e.target.value)}>
+          {f.key === 'quarter' && !f.required && <option value="">{L('همه‌ی فصل‌ها', 'Every quarter')}</option>}
+          {quarterOptions(db).map((q) => <option key={q} value={q}>{quarterLabel(q)}</option>)}
+        </select>
+      )
+    case 'objective':
+      return (
+        <select {...common} value={String(v)} onChange={(e) => set(e.target.value)}>
+          <option value="">—</option>
+          {[...db.Objectives].sort((a, b) => (a.quarter < b.quarter ? 1 : -1)).map((o) => <option key={o.id} value={o.id}>{`${quarterLabel(o.quarter)} · ${o.title}`}</option>)}
+        </select>
+      )
+    case 'kr': {
+      // key results of the current and next quarter, those of the task's team first
+      const qs = [quarterOf(), addQuarter(quarterOf(), 1), quarterOf(String(form.due_date || '') || undefined)]
+      const objs = db.Objectives.filter((o) => qs.includes(o.quarter) || db.KeyResults.some((k) => k.id === v && k.objective_id === o.id))
+      return (
+        <select {...common} value={String(v)} onChange={(e) => set(e.target.value)}>
+          <option value="">{L('— کار دیگر (خارج از OKR) —', '— Other work (outside OKRs) —')}</option>
+          {objs.map((o) => (
+            <optgroup key={o.id} label={`${o.title} · ${quarterLabel(o.quarter)}`}>
+              {db.KeyResults.filter((k) => k.objective_id === o.id).map((k) => <option key={k.id} value={k.id}>{k.title}</option>)}
+            </optgroup>
+          ))}
+        </select>
+      )
+    }
     case 'sprint': {
       const ss = db.Sprints.filter((s) => !form.project_id || s.project_id === form.project_id)
       return (
@@ -568,6 +643,9 @@ function EditorModal({ sheet, row, isNew, onClose }: { sheet: EditableSheet; row
   const schema =
     sheet === 'Meetings'
       ? { ...base, fields: base.fields.filter((f) => f.key !== 'purpose' || AGILE_SERIES.includes(String(form.series))) }
+      : sheet === 'Projects'
+      ? // a product is always on: no start, end or manual progress
+        { ...base, fields: base.fields.filter((f) => String(form.kind || 'project') !== 'product' || !['start_date', 'end_date', 'progress'].includes(f.key)) }
       : sheet !== 'Tasks'
       ? base
       : {

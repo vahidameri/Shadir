@@ -6,6 +6,7 @@ import { Attachments } from './Files'
 import { AtSign, Ban, Check, Clock, Copy, ExternalLink, FileText, Flame, Hourglass, Link2, MessageSquarePlus, MoonStar, Plus, Settings2, Trash2, UserRound, X } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { useEditor } from './Editor'
+import { SaveClose } from './SaveClose'
 import { Avatar, Card, MenuItem, Popover, Sheet, cx } from './ui'
 import { DatePicker } from './DatePicker'
 import { PersonPicker } from './pickers'
@@ -21,6 +22,18 @@ import {
 import type { MizitoItem, MizitoMention } from '../lib/types'
 
 const toDate = (s: string) => new Date(String(s).replace(' ', 'T'))
+/** When something happened in Mizito: a date and a time, stored as "YYYY-MM-DD HH:mm". */
+function StampPicker({ value, onChange, compact }: { value: string; onChange: (v: string) => void; compact?: boolean }) {
+  const [d, t] = [value.slice(0, 10), value.slice(11, 16) || '09:00']
+  return (
+    <span className="flex items-center gap-1.5">
+      <DatePicker compact={compact} value={d} onChange={(v) => v && onChange(`${v} ${t}`)} />
+      <input type="time" dir="ltr" value={t} onChange={(e) => e.target.value && onChange(`${d || todayISO()} ${e.target.value}`)} className={cx('input px-2 text-xs', compact ? 'h-8 w-[6.5rem]' : 'h-10 w-28')} />
+    </span>
+  )
+}
+const later = (a: string, b: string) => (a > b ? a : b)
+
 const chip = 'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[0.6875rem] leading-5'
 
 export function PBadge({ p, big }: { p: number; big?: boolean }) {
@@ -115,7 +128,7 @@ export function CaptureSheet({ onClose, onOpen, initialLink = '' }: { onClose: (
   const key = mzKeyOf(link)
   const existing = key ? db.Mizito.find((m) => m.mz_key === key) : undefined
   const leaders = db.Team.filter((m) => m.access === 'super' || m.access === 'exec').map((m) => m.name)
-  const [f, setF] = useState<Record<string, string>>({ title: '', asked_by: '', mentioned: leaders.find((n) => n !== me) || me, category: '', action: '', due_date: '', urgent: '', description: '', docs: '', note: '', status: '' })
+  const [f, setF] = useState<Record<string, string>>({ title: '', asked_by: '', mentioned: leaders.find((n) => n !== me) || me, category: '', action: '', due_date: '', urgent: '', description: '', docs: '', note: '', status: '', at: nowStampMz() })
   const set = (k: string, v: string) => setF((x) => ({ ...x, [k]: v }))
   const [saving, setSaving] = useState(false)
 
@@ -123,19 +136,20 @@ export function CaptureSheet({ onClose, onOpen, initialLink = '' }: { onClose: (
     setSaving(true)
     try {
       const now = nowStampMz()
+      const at = f.at || now
       if (existing) {
-        const mention: MizitoMention = { id: uid('MM'), item_id: existing.id, by: f.asked_by || existing.asked_by, at: now, note: f.note, status: f.status }
+        const mention: MizitoMention = { id: uid('MM'), item_id: existing.id, by: f.asked_by || existing.asked_by, at, note: f.note, status: f.status }
         await upsert('MizitoMentions', mention)
         // a new mention re-opens a closed item and restarts the SLA
         const status = f.status || (mzClosed(existing) ? firstMzStatus('open') : existing.status)
-        await upsert('Mizito', { ...existing, status, last_mention_at: now, last_mention_by: mention.by, urgent: f.urgent === '1' ? '1' : existing.urgent })
+        await upsert('Mizito', { ...existing, status, last_mention_at: later(existing.last_mention_at || '', at), last_mention_by: at >= (existing.last_mention_at || '') ? mention.by : existing.last_mention_by, urgent: f.urgent === '1' ? '1' : existing.urgent })
         toast(L('منشن به ترد همین مورد اضافه شد', 'Mention added to the thread'))
         onOpen(existing.id)
       } else {
         const id = uid('MZ')
         const row = {
           id, mz_key: key, link: link.trim(), title: f.title.trim(), description: f.description, docs: f.docs, asked_by: f.asked_by, mentioned: f.mentioned, category: f.category, action: f.action,
-          status: f.status || firstMzStatus('open'), priority_override: '', override_reason: '', urgent: f.urgent, assigned_to: '', due_date: f.due_date, received_at: now, last_mention_at: now,
+          status: f.status || firstMzStatus('open'), priority_override: '', override_reason: '', urgent: f.urgent, assigned_to: '', due_date: f.due_date, received_at: at, last_mention_at: at,
           last_mention_by: f.asked_by, outcome: '', notes: f.note, created_at: todayISO(), updated_at: now, closed_at: '',
         } as MizitoItem
         await upsert('Mizito', row)
@@ -204,6 +218,11 @@ export function CaptureSheet({ onClose, onOpen, initialLink = '' }: { onClose: (
             <input className="input h-10 w-full text-sm" value={f.title} onChange={(e) => set('title', e.target.value)} />
           </label>
         )}
+        <div className="block">
+          <span className="label">{L('زمان منشن در میزیتو', 'When it was mentioned in Mizito')}</span>
+          <StampPicker value={f.at} onChange={(v) => set('at', v)} />
+          <span className="mt-1 block text-[0.6875rem] text-sub">{L('SLA و «چند روز گذشته» از همین زمان حساب می‌شود، نه از زمان ثبت در مدار.', 'SLA and age count from this time, not from when it was logged in Madar.')}</span>
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block">
             <span className="label">{existing ? L('چه کسی دوباره منشن کرد', 'Who mentioned again') : L('چه کسی مطرح کرد / منشن کرد', 'Raised / mentioned by')}</span>
@@ -275,6 +294,7 @@ export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }
   const remind = useReminder()
   const [note, setNote] = useState('')
   const [by, setBy] = useState('')
+  const [at, setAt] = useState(nowStampMz)
   const [confirmDel, setConfirmDel] = useState(false)
   const thread = useMemo(() => {
     if (!m) return []
@@ -287,12 +307,13 @@ export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }
   const c = mzCfg()
   const patch = (p: Partial<MizitoItem>) => upsert('Mizito', { ...m, ...p })
   const addMention = async () => {
-    const now = nowStampMz()
     const who = by.trim() || m.asked_by
-    await upsert('MizitoMentions', { id: uid('MM'), item_id: m.id, by: who, at: now, note: note.trim(), status: '' })
-    await patch({ last_mention_at: now, last_mention_by: who, status: mzClosed(m) ? firstMzStatus('open') : m.status })
+    await upsert('MizitoMentions', { id: uid('MM'), item_id: m.id, by: who, at, note: note.trim(), status: '' })
+    const newest = at >= (m.last_mention_at || '')
+    await patch({ last_mention_at: later(m.last_mention_at || '', at), last_mention_by: newest ? who : m.last_mention_by, status: mzClosed(m) ? firstMzStatus('open') : m.status })
     setNote('')
     setBy('')
+    setAt(nowStampMz())
     toast(L('منشن ثبت شد', 'Mention logged'))
   }
   const docs = String(m.docs || '').split(/\n+/).map((x) => x.trim()).filter(Boolean)
@@ -323,8 +344,9 @@ export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }
       footer={
         canEdit && (
           <>
-            <span className="text-[0.6875rem] text-sub">{L('ثبت', 'Logged')} {fmtDate(m.received_at || m.created_at)}</span>
+            <span className="text-[0.6875rem] text-sub">{L('منشن در میزیتو', 'Mentioned in Mizito')} {fmtDate(m.received_at || m.created_at)} · {L('ثبت در مدار', 'logged in Madar')} {fmtDate(m.created_at)}</span>
             <div className="flex-1" />
+            <SaveClose onClose={onClose} />
             {confirmDel ? (
               <button className="btn-danger btn-sm" onClick={async () => { for (const x of mentionsOf(db, m.id)) await remove('MizitoMentions', x.id); await remove('Mizito', m.id); onClose() }}>{L('تأیید حذف', 'Confirm delete')}</button>
             ) : (
@@ -361,12 +383,17 @@ export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }
 
           {canEdit && (
             <div className="mt-4 flex flex-wrap gap-2">
-              {c.statuses.filter((x) => x.id !== m.status).map((x) => (
-                <button key={x.id} className={cx('btn-sm', x.cat === 'done' ? 'btn-primary' : 'btn-outline')} onClick={() => patch({ status: x.id })}>
-                  {x.cat === 'done' ? <Check size={14} /> : x.cat === 'blocked' ? <Ban size={14} /> : x.cat === 'waiting' ? <Clock size={14} /> : x.cat === 'cancelled' ? <X size={14} /> : null}
-                  {optLabel(x)}
-                </button>
-              ))}
+              <div role="radiogroup" aria-label={L('وضعیت', 'Status')} className="flex flex-wrap gap-1.5">
+                {c.statuses.map((x) => {
+                  const on = x.id === m.status
+                  return (
+                    <button key={x.id} role="radio" aria-checked={on} className={cx('btn-sm', on ? 'btn-primary' : 'btn-outline')} onClick={() => !on && patch({ status: x.id })}>
+                      {on ? <Check size={14} /> : x.cat === 'blocked' ? <Ban size={14} /> : x.cat === 'waiting' ? <Clock size={14} /> : x.cat === 'cancelled' ? <X size={14} /> : x.cat === 'done' ? <Check size={14} className="opacity-40" /> : null}
+                      {optLabel(x)}
+                    </button>
+                  )
+                })}
+              </div>
               <button className="btn-ghost btn-sm" onClick={() => remind(m)}>
                 <Copy size={14} /> {L('متن یادآوری', 'Reminder text')}
               </button>
@@ -414,7 +441,7 @@ export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }
             <ol className="relative space-y-4 border-s border-line ps-6">
               <li className="relative">
                 <span className="absolute -start-[37px] top-0"><Avatar name={m.asked_by || '?'} size="sm" ring /></span>
-                <div className="text-sm"><b className="font-medium">{m.asked_by || L('نامشخص', 'Unknown')}</b> <span className="text-sub">{L('مطرح کرد / منشن کرد', 'raised it')} · {fmtDate(m.received_at)}</span></div>
+                <div className="text-sm"><b className="font-medium">{m.asked_by || L('نامشخص', 'Unknown')}</b> <span className="text-sub">{L('مطرح کرد / منشن کرد', 'raised it')} · {fmtDate(m.received_at)} {m.received_at.slice(11, 16)}</span></div>
                 {m.notes && <div className="mt-1 whitespace-pre-wrap rounded-2xl rounded-ss-md bg-muted px-4 py-2 text-sm leading-7">{m.notes}</div>}
               </li>
               {thread.map((t) =>
@@ -422,7 +449,7 @@ export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }
                   <li key={t.x.id} className="relative">
                     <span className="absolute -start-[37px] top-0"><Avatar name={t.x.by || '?'} size="sm" ring /></span>
                     <div className="text-sm">
-                      <b className="font-medium">{t.x.by}</b> <span className="text-sub">{L('دوباره منشن کرد', 'mentioned again')} · {timeAgo(toDate(t.x.at))}</span>
+                      <b className="font-medium">{t.x.by}</b> <span className="text-sub">{L('دوباره منشن کرد', 'mentioned again')} · {fmtDate(t.x.at)} {t.x.at.slice(11, 16)} · {timeAgo(toDate(t.x.at))}</span>
                       {t.x.status && <span className="ms-2"><MzStatusChip id={t.x.status} /></span>}
                     </div>
                     {t.x.note && <div className="mt-1 whitespace-pre-wrap rounded-2xl rounded-ss-md bg-brand-soft/40 px-4 py-2 text-sm leading-7">{t.x.note}</div>}
@@ -441,6 +468,7 @@ export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }
                   <input list="mz-people2" value={by} onChange={(e) => setBy(e.target.value)} placeholder={L(`چه کسی؟ (${m.asked_by || ''})`, `Who? (${m.asked_by || ''})`)} className="input h-9 w-48 text-xs" />
                   <datalist id="mz-people2">{allPeople(db).map((p) => <option key={p} value={p} />)}</datalist>
                   <input value={note} onChange={(e) => setNote(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addMention()} placeholder={L('منشن تازه روی همین تسک؟ یادداشت…', 'A new mention on this task? Note…')} className="input h-9 min-w-[12rem] flex-1 text-xs" />
+                  <StampPicker compact value={at} onChange={setAt} />
                   <button className="btn-primary btn-sm h-9" onClick={addMention}>
                     <MessageSquarePlus size={14} /> {L('ثبت منشن', 'Log mention')}
                   </button>
@@ -501,7 +529,9 @@ export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }
             </Popover>
           ))}
           {prop(L('لینک', 'Link'), <input key={m.link} dir="ltr" disabled={!canEdit} defaultValue={m.link} onBlur={(e) => e.target.value.trim() !== m.link && patch({ link: e.target.value.trim() })} placeholder="https://mizito…" className="h-8 w-full rounded-full bg-transparent px-2.5 outline-none hover:bg-muted focus:bg-surface" />)}
-          {prop(L('ثبت', 'Logged'), <span className="text-sub">{fmtDate(m.received_at)} · {L(`${fa(s.ageDays)} روز پیش`, `${s.ageDays}d ago`)}</span>)}
+          {prop(L('منشن در میزیتو', 'Mentioned in Mizito'), canEdit ? <StampPicker compact value={m.received_at || ''} onChange={(v) => patch({ received_at: v, last_mention_at: later(m.last_mention_at || '', v) })} /> : <span className="text-sub">{fmtDate(m.received_at)}</span>)}
+          {prop(L('گذشته', 'Age'), <span className="text-sub">{L(`${fa(s.ageDays)} روز از منشن`, `${s.ageDays}d since the mention`)}</span>)}
+          {prop(L('ثبت در مدار', 'Logged in Madar'), <span className="text-sub">{fmtDate(m.created_at)}</span>)}
           {m.closed_at && prop(L('بسته شد', 'Closed'), <span className="text-sub">{fmtDayMonth(m.closed_at)}</span>)}
           {canEdit && (
             <div className="pt-4">

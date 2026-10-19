@@ -4,7 +4,7 @@ import { NavLink, useLocation, useNavigate, Link } from 'react-router-dom'
 import {
   Briefcase, ListChecks, Users, BellRing, ShieldAlert, Settings, Moon, Sun, Search, Plus, RefreshCw, Menu,
   Sparkles, CheckCircle2, AlertCircle, Bell, PanelLeftClose, PanelLeftOpen, Languages, Star, AtSign, Flag, Clock, CircleAlert, Ban, CalendarDays, Keyboard, CalendarRange, UserRound, LogOut, PackageCheck, Repeat,
-  LayoutDashboard,
+  LayoutDashboard, Target, Gauge,
 } from 'lucide-react'
 import { useStore, clearSnaps } from '../lib/store'
 import { useI18n, L } from '../lib/i18n'
@@ -104,7 +104,14 @@ export function Layout({ children }: { children: ReactNode }) {
         { to: '/tasks', label: L('تسک‌ها', 'Tasks'), icon: ListChecks, count: openTasks },
         { to: '/followups', label: L('پیگیری‌ها', 'Follow-ups'), icon: BellRing },
         ...(can.mizito(access) ? [{ to: '/mizito', label: L('میزیتو', 'Mizito'), icon: AtSign, badge: mzHot }] : []),
-        { to: '/teams', label: L('تیم‌ها و پروژه‌ها', 'Teams & projects'), icon: Users, count: db.Projects.filter((p) => p.status === 'active').length },
+        { to: '/teams', label: L('تیم‌ها و محصولات', 'Teams & products'), icon: Users, count: db.Projects.filter((p) => p.status === 'active').length },
+      ],
+    },
+    {
+      label: L('برنامه‌ریزی', 'Planning'),
+      links: [
+        { to: '/okr', label: L('OKR تیم‌ها', 'Team OKRs'), icon: Target },
+        { to: '/resources', label: L('توزیع منابع', 'Resources'), icon: Gauge },
       ],
     },
     ...(leader

@@ -2,41 +2,38 @@ import { isAssignee } from '../lib/assignees'
 import { closed } from '../lib/columns'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowRight, Pencil, Plus, Target, Send, Building2, Contact, User, Pause } from 'lucide-react'
+import { ArrowRight, Pencil, Plus, Target, Send, User, Pause, TrendingDown, TrendingUp, Minus, Infinity as Always, CalendarRange } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { useEditor, type EditableSheet } from '../components/Editor'
-import { Band, Card, Empty, HealthBadge, Overlap, Progress, StatStrip, Tabs, cx, healthText, Avatar, Chip, Segmented } from '../components/ui'
-import { projectMetrics, riskScore } from '../lib/metrics'
+import { Band, Card, Empty, HealthBadge, Overlap, Progress, StatStrip, Tabs, cx, healthText, Avatar, Chip, Segmented, Popover, HealthDot } from '../components/ui'
+import { isProduct, kpiOff, projectMetrics, riskScore } from '../lib/metrics'
 import { fa, fmtDate, relDays, timeAgo } from '../lib/jalali'
-import { PROJECT_STATUS, RISK_STATUS, RISK_TYPE, SCOPE_STATUS, SPRINT_STATUS, PRIORITY, JOB_TITLE } from '../lib/labels'
-import { L, lbl } from '../lib/i18n'
+import { PROJECT_STATUS, RISK_STATUS, RISK_TYPE, PRIORITY, JOB_TITLE } from '../lib/labels'
+import { L, lbl, tr } from '../lib/i18n'
 import { TaskRow, FollowUpRow, PinButton } from '../components/shared'
 import { PauseButton } from '../components/PauseButton'
 import { ArchiveButton } from '../components/ArchiveButton'
 import { ProjectLinks } from '../components/ProjectLinks'
-import { everyDay } from '../lib/cadence'
-import { DeliveredButton, DeliveryBadge } from '../components/DeliveryDay'
-import type { Project } from '../lib/types'
+import type { Kpi, Project } from '../lib/types'
 import { Archive } from 'lucide-react'
-import { ContractsList, NewContractButton } from '../components/Contracts'
-import { can } from '../lib/access'
 import { Attachments } from '../components/Files'
-import { BurndownChart, Kanban, MilestoneList, RiskMatrix, SprintHeader, UpdateCard, VelocityChart, riskTone, ActivityFeed, HealthTrend, RagStrip } from '../components/widgets'
+import { Kanban, RiskMatrix, UpdateCard, riskTone, ActivityFeed, HealthTrend } from '../components/widgets'
 import { buildActivity } from '../lib/activity'
-import { assess } from '../lib/rag'
 import { renderMentions, stampToDate } from '../components/ItemSheet'
 import { uid } from '../lib/api'
 import { todayISO } from '../lib/jalali'
 import { useComposer } from '../components/UpdateComposer'
-import { DeliverableRow, DeliveryEmpty } from '../components/delivery'
-import { deliverySummary, isClosed } from '../lib/delivery'
-import { memberWeek } from '../lib/capacity'
+import { capOf } from '../lib/capacity'
+import { teamName } from '../components/TeamParts'
+import { CONF, elapsed, fmtVal, krConfidence, krProgress, krWork, quarterLabel, quarterOf } from '../lib/okr'
+import { allocsIn } from './Resources'
+import { nowStamp } from '../lib/taskstamp'
 
-type Tab = 'overview' | 'scope' | 'milestones' | 'sprints' | 'tasks' | 'risks' | 'updates' | 'team' | 'delivery' | 'contracts'
+type Tab = 'overview' | 'tasks' | 'okr' | 'kpis' | 'resources' | 'risks' | 'updates'
 
 export default function ProjectDetail() {
   const { id } = useParams()
-  const { db, archived, canEdit, upsert, me, access } = useStore()
+  const { db, archived, canEdit, upsert, me } = useStore()
   const { open } = useEditor()
   const [tab, setTab] = useState<Tab>('overview')
   const { openComposer } = useComposer()
@@ -45,17 +42,20 @@ export default function ProjectDetail() {
   const p = db.Projects.find((x) => x.id === id)
   const gone = archived.find((x) => x.id === id)
   if (gone) return <ArchivedProject p={gone} />
-  if (!p) return <Empty text={L('پروژه پیدا نشد', 'Project not found')} />
+  if (!p) return <Empty text={L('محصول یا پروژه پیدا نشد', 'Product or project not found')} />
 
+  const product = isProduct(p)
+  const q = quarterOf()
   const m = projectMetrics(p, db)
-  const scope = db.Scope.filter((s) => s.project_id === p.id)
-  const ms = db.Milestones.filter((x) => x.project_id === p.id)
-  const sprints = db.Sprints.filter((s) => s.project_id === p.id).sort((a, b) => (a.start_date < b.start_date ? 1 : -1))
   const tasks = db.Tasks.filter((t) => t.project_id === p.id)
   const risks = db.Risks.filter((r) => r.project_id === p.id).sort((a, b) => riskScore(b) - riskScore(a))
   const updates = db.Updates.filter((u) => u.project_id === p.id).sort((a, b) => (a.week_date < b.week_date ? 1 : -1))
   const fus = db.FollowUps.filter((f) => f.project_id === p.id && f.status !== 'done')
-  const allocs = db.Allocations.filter((a) => a.project_id === p.id)
+  const allocs = allocsIn(db, q).filter((a) => a.project_id === p.id)
+  const fte = Math.round(allocs.reduce((s, a) => s + (Number(a.percent) || 0), 0) / 10) / 10
+  const kpis = db.Kpis.filter((k) => k.project_id === p.id)
+  const krs = db.KeyResults.filter((k) => k.project_id === p.id)
+  const krsNow = krs.filter((k) => db.Objectives.some((o) => o.id === k.objective_id && o.quarter === q))
   const notes = db.Comments.filter((c) => c.entity === 'Projects' && c.entity_id === p.id).sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
 
   const AddBtn = ({ sheet, label, extra }: { sheet: EditableSheet; label: string; extra?: Record<string, unknown> }) =>
@@ -78,27 +78,16 @@ export default function ProjectDetail() {
       <Band
         eyebrow={
           <>
-            <Link to="/projects" className="flex items-center gap-1 hover:text-white">
-              <ArrowRight size={12} className="ltr:rotate-180" /> {L('پروژه‌ها', 'Projects')}
+            <Link to="/teams" className="flex items-center gap-1 hover:text-white">
+              <ArrowRight size={12} className="ltr:rotate-180" /> {teamName(p.team || '')}
             </Link>
             <span className="opacity-40">/</span>
-            <span dir="ltr">{p.code}</span>
+            <span className="flex items-center gap-1">{product ? <><Always size={12} /> {L('محصول همیشگی', 'Always-on product')}</> : <><CalendarRange size={12} /> {L('پروژه', 'Project')}</>}</span>
             <span className="opacity-40">/</span>
             <span>{lbl(PROJECT_STATUS, p.status)}</span>
-            {p.phase && (
-              <>
-                <span className="opacity-40">/</span>
-                <span>{p.phase}</span>
-              </>
-            )}
           </>
         }
-        title={
-          <span className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
-            {p.name}
-            {everyDay(p) && <span className="rounded-full bg-white/10 px-3 py-1 align-middle text-sm font-medium text-white/85">{L(`روز تحویل: ${everyDay(p)}`, `Delivery day: ${everyDay(p)}`)}</span>}
-          </span>
-        }
+        title={p.name}
         sub={
           <>
             {p.status === 'on_hold' && (
@@ -121,7 +110,6 @@ export default function ProjectDetail() {
             <span className="rounded-full bg-white/10 p-0.5">
               <PinButton id={p.id} className="text-white/70 hover:bg-white/10" />
             </span>
-            <DeliveredButton p={p} dark />
             <PauseButton p={p} dark />
             <ArchiveButton p={p} dark />
             {canEdit && (
@@ -134,39 +122,29 @@ export default function ProjectDetail() {
       >
         <div className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-band-sub">
           <span className="flex items-center gap-2">
-            <User size={14} /> {L('مدیر محصول', 'PM')}: <span className="text-white">{p.owner}</span>
+            <User size={14} /> {L('مدیر محصول', 'PM')}: <span className="text-white">{p.owner || '—'}</span>
           </span>
-          {p.client && (
-            <span className="flex items-center gap-2">
-              <Building2 size={14} /> {L('کارفرما', 'Client')}: <span className="text-white">{p.client}</span>
+          {!product && (
+            <span className="num">
+              {fmtDate(p.start_date)} → {fmtDate(p.end_date)}
             </span>
           )}
-          {p.liaison && (
-            <span className="flex items-center gap-2">
-              <Contact size={14} /> {L('رابط پروژه', 'Liaison')}: <span className="text-white">{p.liaison}</span>
-              {p.liaison_contact && (
-                <a href={p.liaison_contact.includes('@') ? `mailto:${p.liaison_contact}` : `tel:${p.liaison_contact}`} className="text-white/70 underline-offset-2 hover:underline" dir="ltr">
-                  {p.liaison_contact}
-                </a>
-              )}
-            </span>
-          )}
-          <span className="num">
-            {fmtDate(p.start_date)} → {fmtDate(p.end_date)}
-          </span>
-          <DeliveryBadge p={p} dark />
         </div>
         <div className="-mt-3 mb-6">
           <ProjectLinks p={p} dark />
         </div>
         <StatStrip
           items={[
-            { label: L('پیشرفت', 'Progress'), value: `${fa(`${m.progress}%`)}`, tone: m.health },
-            { label: L('زمان سپری‌شده', 'Time elapsed'), value: `${fa(`${m.elapsed}%`)}` },
-            { label: m.daysLeft >= 0 ? L('تا ددلاین', 'To deadline') : L('از ددلاین گذشته', 'Past deadline'), value: p.end_date ? fa(Math.abs(m.daysLeft)) : '—', tone: m.daysLeft < 0 ? 'red' : undefined, sub: L('روز', 'days') },
-            { label: L('خروجی‌های باز', 'Open deliverables'), value: fa(deliverySummary(db, p.id).open.length), tone: deliverySummary(db, p.id).overdue.length ? 'red' : undefined, sub: L(`${fa(deliverySummary(db, p.id).overdue.length)} عقب‌افتاده`, `${deliverySummary(db, p.id).overdue.length} overdue`) },
+            { label: L('سلامت', 'Health'), value: fa(m.score), tone: m.health, sub: L('از ۱۰۰', 'of 100') },
+            product
+              ? { label: L(`OKR ${quarterLabel(q)}`, `OKRs ${quarterLabel(q)}`), value: krsNow.length ? `${fa(m.progress)}٪` : '—', sub: L(`${fa(krsNow.length)} نتیجه‌ی کلیدی`, `${krsNow.length} key results`) }
+              : { label: L('پیشرفت', 'Progress'), value: `${fa(m.progress)}٪`, tone: m.health, sub: L(`${fa(m.elapsed)}٪ از زمان`, `${m.elapsed}% of time`) },
+            product
+              ? { label: L('شاخص‌ها در هدف', 'KPIs on target'), value: kpis.length ? `${fa(kpis.filter((k) => !kpiOff(k)).length)}/${fa(kpis.length)}` : '—', tone: kpis.some(kpiOff) ? 'amber' : undefined }
+              : { label: m.daysLeft >= 0 ? L('تا ددلاین', 'To deadline') : L('از ددلاین گذشته', 'Past deadline'), value: p.end_date ? fa(Math.abs(m.daysLeft)) : '—', tone: m.daysLeft < 0 ? 'red' : undefined, sub: L('روز', 'days') },
             { label: L('تسک باز', 'Open tasks'), value: fa(m.openTasks), sub: L(`${fa(m.overdueTasks)} معوق · ${fa(m.blockedTasks)} مسدود`, `${m.overdueTasks} overdue · ${m.blockedTasks} blocked`) },
             { label: L('ریسک‌های باز', 'Open risks'), value: fa(m.openRisks), tone: m.highRisks ? 'red' : undefined, sub: L(`${fa(m.highRisks)} بحرانی`, `${m.highRisks} critical`) },
+            { label: L('نیرو در این فصل', 'People this quarter'), value: fa(fte), sub: L('نفر تمام‌وقت', 'FTE'), tone: allocs.length ? undefined : 'amber' },
           ]}
         />
       </Band>
@@ -180,14 +158,11 @@ export default function ProjectDetail() {
               tabs={[
                 { value: 'overview', label: L('خلاصه', 'Overview') },
                 { value: 'tasks', label: L('تسک‌ها', 'Tasks'), count: m.openTasks },
-                { value: 'delivery', label: L('برنامه‌ی تحویل', 'Delivery plan'), count: db.Deliverables.filter((d) => d.project_id === p.id && !isClosed(d)).length },
-                { value: 'milestones', label: L('مایلستون‌ها', 'Milestones'), count: ms.length },
-                { value: 'sprints', label: L('اسپرینت‌ها', 'Sprints'), count: sprints.length },
-                { value: 'scope', label: L('محدوده‌ی کار', 'Scope'), count: scope.length },
+                { value: 'okr', label: 'OKR', count: krsNow.length },
+                { value: 'kpis', label: L('شاخص‌ها (KPI)', 'KPIs'), count: kpis.length },
+                { value: 'resources', label: L('منابع', 'Resources'), count: allocs.length },
                 { value: 'risks', label: L('ریسک‌ها', 'Risks'), count: m.openRisks },
-                { value: 'updates', label: L('گزارش‌ها', 'Updates'), count: updates.length },
-                { value: 'team', label: L('تیم', 'Team'), count: allocs.length },
-                ...(can.contracts(access) ? [{ value: 'contracts' as Tab, label: L('قراردادها', 'Contracts'), count: db.Contracts.filter((c) => c.project_id === p.id).length }] : []),
+                { value: 'updates', label: L('گزارش وضعیت', 'Status reports'), count: updates.length },
               ]}
             />
           </div>
@@ -206,43 +181,45 @@ export default function ProjectDetail() {
                     <HealthBadge h={m.health} />
                   </div>
                 </div>
-                <div className="mb-4">
-                  <RagStrip a={assess(p, db)} />
-                </div>
-                <div className="mt-5">
-                  <div className="mb-1.5 flex justify-between text-[0.6875rem] text-sub">
-                    <span>{L('پیشرفت', 'Progress')} {fa(`${m.progress}%`)}</span>
-                    <span>{L(`${fa(m.elapsed)}٪ از زمان گذشته`, `${m.elapsed}% of time used`)}</span>
+                <ul className="space-y-2">
+                  {m.reasons.map((r) => (
+                    <li key={r.text} className="flex items-start gap-2 text-sm">
+                      <span className="mt-1.5"><HealthDot h={r.level} /></span> {r.text}
+                    </li>
+                  ))}
+                </ul>
+                {!product && (
+                  <div className="mt-5">
+                    <div className="mb-1.5 flex justify-between text-[0.6875rem] text-sub">
+                      <span>{L('پیشرفت', 'Progress')} {fa(`${m.progress}%`)}</span>
+                      <span>{L(`${fa(m.elapsed)}٪ از زمان گذشته`, `${m.elapsed}% of time used`)}</span>
+                    </div>
+                    <Progress value={m.progress} h={m.health} marker={m.elapsed} className="h-2" />
                   </div>
-                  <Progress value={m.progress} h={m.health} marker={m.elapsed} className="h-2" />
-                </div>
-              </Card>
-              <Card eyebrow={L('رودمپ', 'Roadmap')} title={L('مایلستون‌ها', 'Milestones')} action={<AddBtn sheet="Milestones" label={L('مایلستون', 'Milestone')} />}>
-                {ms.length ? <MilestoneList milestones={ms} compact /> : <Empty text={L('مایلستونی ثبت نشده', 'No milestones yet')} />}
-              </Card>
-              <div className="min-w-0 space-y-4">
-                {m.activeSprint && (
-                  <Card eyebrow={L('اسپرینت جاری', 'Current sprint')} title={<SprintHeader s={m.activeSprint} db={db} />}>
-                    <BurndownChart sprint={m.activeSprint} db={db} height={180} />
-                  </Card>
                 )}
-                <Card pad={false} eyebrow={L('دنبال کردن', 'Chasing')} title={L('پیگیری‌های باز', 'Open follow-ups')} action={<AddBtn sheet="FollowUps" label={L('پیگیری', 'Follow-up')} />}>
-                  <div className="px-2 pb-2">{fus.length ? fus.map((f) => <FollowUpRow key={f.id} f={f} compact />) : <Empty />}</div>
-                </Card>
-              </div>
+              </Card>
+              <Card eyebrow={L('شاخص‌ها', 'KPIs')} title={L('وضعیت شاخص‌های محصول', 'Product KPIs')} action={<AddBtn sheet="Kpis" label={L('شاخص', 'KPI')} />}>
+                {kpis.length ? <div className="space-y-1">{kpis.map((k) => <KpiRow key={k.id} k={k} compact />)}</div> : <Empty text={L('شاخصی تعریف نشده', 'No KPIs yet')} />}
+              </Card>
+              <Card eyebrow={`OKR · ${quarterLabel(q)}`} title={L('نتایج کلیدی مرتبط', 'Related key results')} action={<Link to="/okr" className="text-xs text-sub hover:text-ink">{L('همه‌ی OKRها', 'All OKRs')}</Link>}>
+                {krsNow.length ? <div className="space-y-3">{krsNow.map((k) => <KrMini key={k.id} id={k.id} />)}</div> : <Empty text={L('این فصل نتیجه‌ی کلیدی‌ای به این محصول وصل نیست', 'No key results linked this quarter')} />}
+              </Card>
               <div className="min-w-0 @xl:col-span-2">
                 {updates[0] ? (
                   <>
-                    <div className="eyebrow mb-2 px-1">{L('آخرین گزارش وضعیت', 'Latest status update')}</div>
+                    <div className="eyebrow mb-2 px-1">{L('آخرین گزارش وضعیت', 'Latest status report')}</div>
                     <UpdateCard u={updates[0]} />
                   </>
                 ) : (
                   <Card>
-                    <Empty text={L('هنوز گزارشی ثبت نشده', 'No updates yet')} action={<AddBtn sheet="Updates" label={L('گزارش هفتگی', 'Weekly update')} extra={{ author: p.owner, health: m.health }} />} />
+                    <Empty text={L('هنوز گزارش وضعیتی ثبت نشده', 'No status reports yet')} action={canEdit ? <button className="btn-outline btn-sm" onClick={() => openComposer({ projectId: p.id })}><Plus size={14} /> {L('گزارش هفتگی', 'Weekly report')}</button> : undefined} />
                   </Card>
                 )}
               </div>
-              <Card eyebrow={L('یادداشت‌ها', 'Notes')} title={L('گفتگوی پروژه', 'Project discussion')}>
+              <Card pad={false} eyebrow={L('دنبال کردن', 'Chasing')} title={L('پیگیری‌های باز', 'Open follow-ups')} action={<AddBtn sheet="FollowUps" label={L('پیگیری', 'Follow-up')} />}>
+                <div className="px-2 pb-2">{fus.length ? fus.map((f) => <FollowUpRow key={f.id} f={f} compact />) : <Empty />}</div>
+              </Card>
+              <Card eyebrow={L('یادداشت‌ها', 'Notes')} title={L('گفتگو', 'Discussion')}>
                 {canEdit && (
                   <div className="mb-4 flex items-end gap-2 rounded-2xl border border-line p-2 focus-within:border-ink/30">
                     <textarea
@@ -274,19 +251,16 @@ export default function ProjectDetail() {
                   ))}
                 </div>
               </Card>
-              <Card className="@xl:col-span-2" eyebrow={L('فعالیت', 'Activity')} title={L('آنچه اخیراً در این پروژه گذشت', 'What happened recently')}>
+              <Card className="@xl:col-span-2" eyebrow={L('فعالیت', 'Activity')} title={L('آنچه اخیراً گذشت', 'What happened recently')}>
                 <ActivityFeed items={buildActivity(db, p.id, 10)} showProject={false} />
               </Card>
-              <Card eyebrow={L('مشخصات', 'Key facts')} title={L('پروژه در یک نگاه', 'At a glance')}>
+              <Card eyebrow={L('مشخصات', 'Key facts')} title={L('در یک نگاه', 'At a glance')}>
                 <dl className="space-y-3 text-sm">
                   {[
-                    [L('دسته', 'Category'), p.category],
-                    [L('فاز', 'Phase'), p.phase],
+                    [L('تیم', 'Team'), teamName(p.team || '')],
+                    [L('نوع', 'Kind'), product ? L('محصول همیشگی', 'Always-on product') : L('پروژه', 'Project')],
                     [L('اولویت', 'Priority'), lbl(PRIORITY, p.priority)],
-                    [L('شروع', 'Start'), fmtDate(p.start_date, 'long')],
-                    [L('ددلاین', 'Deadline'), `${fmtDate(p.end_date, 'long')} · ${relDays(p.end_date)}`],
-                    [L('مایلستون بعدی', 'Next milestone'), m.nextMilestone ? `${m.nextMilestone.title} · ${relDays(m.nextMilestone.planned_date)}` : '—'],
-                    [L('اسپرینت جاری', 'Current sprint'), m.activeSprint ? m.activeSprint.name : '—'],
+                    ...(product ? [] : [[L('شروع', 'Start'), fmtDate(p.start_date, 'long')], [L('ددلاین', 'Deadline'), `${fmtDate(p.end_date, 'long')} · ${relDays(p.end_date)}`]]),
                   ].map(([k, v]) => (
                     <div key={k} className="flex items-start justify-between gap-4 border-b border-line pb-3 last:border-0 last:pb-0">
                       <dt className="shrink-0 text-sub">{k}</dt>
@@ -295,11 +269,11 @@ export default function ProjectDetail() {
                   ))}
                 </dl>
                 <div className="mt-5 flex items-center justify-between rounded-2xl bg-muted/60 px-4 py-3">
-                  <span className="text-xs text-sub">{L('روند سلامت (گزارش‌ها)', 'Health trend (updates)')}</span>
+                  <span className="text-xs text-sub">{L('روند گزارش‌های وضعیت', 'Status report trend')}</span>
                   <HealthTrend projectId={p.id} n={6} />
                 </div>
               </Card>
-              <Card className="@xl:col-span-3" eyebrow={L('فایل‌ها', 'Files')} title={L('اسناد پروژه', 'Project documents')}>
+              <Card className="@xl:col-span-3" eyebrow={L('فایل‌ها', 'Files')} title={L('اسناد', 'Documents')}>
                 <Attachments entity="Projects" id={p.id} />
               </Card>
             </div>
@@ -309,10 +283,10 @@ export default function ProjectDetail() {
             <>
               <div className="mb-3 flex items-center justify-between">
                 <Segmented value={taskView} onChange={setTaskView} options={[{ value: 'board', label: L('بورد', 'Board') }, { value: 'list', label: L('لیست', 'List') }]} />
-                <AddBtn sheet="Tasks" label={L('تسک', 'Task')} extra={{ sprint_id: m.activeSprint?.id || '' }} />
+                <AddBtn sheet="Tasks" label={L('تسک', 'Task')} />
               </div>
               {taskView === 'board' ? (
-                <Kanban tasks={tasks} defaults={{ project_id: p.id, sprint_id: m.activeSprint?.id || '' }} showProject={false} />
+                <Kanban tasks={tasks} defaults={{ project_id: p.id }} showProject={false} />
               ) : (
                 <Card pad={false}>
                   <div className="p-2">{tasks.length ? tasks.map((t) => <TaskRow key={t.id} t={t} showProject={false} />) : <Empty />}</div>
@@ -321,98 +295,27 @@ export default function ProjectDetail() {
             </>
           )}
 
-          {tab === 'milestones' && (
-            <Card eyebrow={L('رودمپ پروژه', 'Project roadmap')} title={L('مایلستون‌ها', 'Milestones')} action={<AddBtn sheet="Milestones" label={L('مایلستون', 'Milestone')} />}>
-              {ms.length ? (
-                <MilestoneList milestones={ms} />
+          {tab === 'okr' && (
+            <Card eyebrow="OKR" title={L('نتایج کلیدی مرتبط با این محصول', 'Key results about this product')} action={<Link to="/okr" className="btn-outline btn-sm">{L('صفحه‌ی OKR', 'OKR page')}</Link>}>
+              {krs.length ? (
+                <div className="space-y-4">
+                  {[...new Set(krs.map((k) => db.Objectives.find((o) => o.id === k.objective_id)?.quarter || ''))].sort().reverse().map((qq) => (
+                    <div key={qq}>
+                      <div className="eyebrow mb-2">{quarterLabel(qq)}</div>
+                      <div className="space-y-3">{krs.filter((k) => (db.Objectives.find((o) => o.id === k.objective_id)?.quarter || '') === qq).map((k) => <KrMini key={k.id} id={k.id} />)}</div>
+                    </div>
+                  ))}
+                </div>
               ) : (
-                <Empty text={L('مایلستونی ثبت نشده', 'No milestones yet')} />
+                <Empty text={L('هنوز نتیجه‌ی کلیدی‌ای به این محصول وصل نشده؛ در صفحه‌ی OKR هنگام تعریف کی‌ریزالت، محصول را انتخاب کنید.', 'No key results linked yet; pick this product when defining a key result on the OKR page.')} />
               )}
             </Card>
           )}
 
-          {tab === 'sprints' && (
-            <div className="space-y-4">
-              <div className="flex justify-end">
-                <AddBtn sheet="Sprints" label={L('اسپرینت جدید', 'New sprint')} />
-              </div>
-              {sprints.length === 0 && (
-                <Card>
-                  <Empty text={L('این پروژه اسپرینت ندارد', 'No sprints for this project')} />
-                </Card>
-              )}
-              {sprints.length > 1 && (
-                <Card eyebrow="Velocity" title={L('تعهد در برابر تحویل', 'Committed vs delivered')}>
-                  <VelocityChart sprints={sprints} db={db} />
-                </Card>
-              )}
-              <div className="grid gap-4 @lg:grid-cols-2">
-                {sprints.map((s) => (
-                  <Card
-                    key={s.id}
-                    title={<SprintHeader s={s} db={db} />}
-                    action={
-                      <span className="flex items-center gap-1">
-                        <Chip className={s.status === 'active' ? 'bg-ink text-surface' : ''}>{lbl(SPRINT_STATUS, s.status)}</Chip>
-                        {canEdit && (
-                          <button className="icon-btn h-8 w-8" onClick={() => open('Sprints', s as never)}>
-                            <Pencil size={13} />
-                          </button>
-                        )}
-                      </span>
-                    }
-                  >
-                    {s.status !== 'planned' ? <BurndownChart sprint={s} db={db} height={170} /> : <Empty text={L('هنوز شروع نشده', 'Not started')} />}
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {tab === 'scope' && (
-            <div className="grid gap-4 @lg:grid-cols-2">
-              {(['in', 'out'] as const).map((type) => (
-                <Card key={type} eyebrow={L('محدوده‌ی کار', 'Scope')} title={type === 'in' ? L('داخل محدوده‌ی کار', 'In scope') : L('خارج از محدوده‌ی کار', 'Out of scope')} action={<AddBtn sheet="Scope" label={L('آیتم', 'Item')} extra={{ type }} />}>
-                  <div className="space-y-2">
-                    {scope
-                      .filter((s) => s.type === type)
-                      .map((s) => (
-                        <button key={s.id} onClick={() => open('Scope', s as never)} className="w-full rounded-2xl border border-line p-3.5 text-start transition hover:border-line-strong">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className={cx('text-sm', s.status === 'removed' && 'text-sub line-through')}>{s.item}</span>
-                            <Chip className={cx(s.status === 'delivered' && 'bg-good/10 text-good', s.status === 'changed' && 'bg-warn/10 text-warn', s.status === 'in_progress' && 'bg-brand-soft/50 text-ink')}>{lbl(SCOPE_STATUS, s.status)}</Chip>
-                          </div>
-                          {s.change_note && (
-                            <div className="mt-1 text-xs text-sub">
-                              {s.change_note} · {fmtDate(s.date)}
-                            </div>
-                          )}
-                        </button>
-                      ))}
-                    {!scope.some((s) => s.type === type) && <Empty />}
-                  </div>
-                </Card>
-              ))}
-              <Card className="@lg:col-span-2" eyebrow="Change log" title={L('تغییرات محدوده‌ی کار', 'Scope changes')}>
-                {scope.filter((s) => s.status === 'changed' || s.status === 'removed').length === 0 ? (
-                  <Empty text={L('تغییری در محدوده‌ی کار ثبت نشده', 'No scope changes logged')} />
-                ) : (
-                  <div className="divide-y divide-line">
-                    {scope
-                      .filter((s) => s.status === 'changed' || s.status === 'removed')
-                      .sort((a, b) => (a.date < b.date ? 1 : -1))
-                      .map((s) => (
-                        <div key={s.id} className="flex flex-wrap items-center gap-3 py-3 text-sm">
-                          <span className="w-24 text-xs text-sub num">{fmtDate(s.date)}</span>
-                          <Chip className={s.status === 'removed' ? 'bg-bad/10 text-bad' : 'bg-warn/10 text-warn'}>{lbl(SCOPE_STATUS, s.status)}</Chip>
-                          <span className="font-medium">{s.item}</span>
-                          <span className="text-xs text-sub">— {s.change_note}</span>
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </Card>
-            </div>
+          {tab === 'kpis' && (
+            <Card eyebrow={L('شاخص‌ها', 'KPIs')} title={L('شاخص‌های همیشگی محصول', 'The product’s ongoing metrics')} action={<AddBtn sheet="Kpis" label={L('شاخص جدید', 'New KPI')} />}>
+              {kpis.length ? <div className="divide-y divide-line">{kpis.map((k) => <KpiRow key={k.id} k={k} />)}</div> : <Empty text={L('مثلاً «کاربر فعال هفتگی»، «نرخ تبدیل»، «تیکت پشتیبانی باز»', 'e.g. “Weekly active users”, “Conversion”, “Open support tickets”')} />}
+            </Card>
           )}
 
           {tab === 'risks' && (
@@ -444,19 +347,12 @@ export default function ProjectDetail() {
             </div>
           )}
 
-          {tab === 'delivery' && <ProjectDelivery projectId={p.id} />}
-          {tab === 'contracts' && can.contracts(access) && (
-            <Card pad={false} eyebrow={L('محرمانه', 'Confidential')} title={L('قراردادهای این پروژه', 'Contracts for this project')} action={<NewContractButton projectId={p.id} />}>
-              <ContractsList projectId={p.id} />
-            </Card>
-          )}
-
           {tab === 'updates' && (
             <div className="space-y-4">
               <div className="flex justify-end">
                 {canEdit && (
                   <button className="btn-primary btn-sm" onClick={() => openComposer({ projectId: p.id })}>
-                    <Plus size={14} /> {L('ثبت گزارش هفتگی', 'Submit weekly update')}
+                    <Plus size={14} /> {L('ثبت گزارش هفتگی', 'Submit weekly report')}
                   </button>
                 )}
               </div>
@@ -464,19 +360,19 @@ export default function ProjectDetail() {
                 updates.map((u) => <UpdateCard key={u.id} u={u} />)
               ) : (
                 <Card>
-                  <Empty text={L('هنوز گزارشی ثبت نشده', 'No updates yet')} />
+                  <Empty text={L('هنوز گزارشی ثبت نشده', 'No reports yet')} />
                 </Card>
               )}
             </div>
           )}
 
-          {tab === 'team' && (
-            <Card eyebrow={L('تیم', 'Team')} title={L('اعضا و درصد تخصیص', 'Members & allocation')} action={<AddBtn sheet="Allocations" label={L('تخصیص', 'Allocation')} />}>
+          {tab === 'resources' && (
+            <Card eyebrow={quarterLabel(q)} title={L('نیروها و سهم وقتشان', 'People and their share of time')} action={<span className="flex items-center gap-2"><Link to="/resources" className="text-xs text-sub hover:text-ink">{L('همه‌ی محصولات', 'All products')}</Link><AddBtn sheet="Allocations" label={L('تخصیص', 'Allocate')} extra={{ quarter: q }} /></span>}>
               <div className="grid gap-3 @sm:grid-cols-2 @lg:grid-cols-3">
                 {allocs.map((a) => {
                   const mem = db.Team.find((x) => x.id === a.member_id)
                   if (!mem) return null
-                  const total = memberWeek(db, mem).load
+                  const total = allocsIn(db, q).filter((x) => x.member_id === mem.id).reduce((s, x) => s + (Number(x.percent) || 0), 0)
                   const memTasks = tasks.filter((t) => isAssignee(t, mem.name) && !closed(t)).length
                   return (
                     <button key={a.id} onClick={() => open('Allocations', a as never)} className="flex items-center gap-3 rounded-2xl border border-line p-4 text-start transition hover:border-line-strong">
@@ -490,13 +386,17 @@ export default function ProjectDetail() {
                           <Progress value={Number(a.percent)} />
                           <span className="text-xs num">{fa(`${a.percent}%`)}</span>
                         </div>
-                        {total > 100 && <div className="mt-1 text-[0.6875rem] text-bad">{L(`بار کل این هفته ${fa(total)}٪ — بیش از ظرفیت`, `Total load this week ${total}% — over capacity`)}</div>}
+                        {total > capOf(mem) && <div className="mt-1 text-[0.6875rem] text-bad">{L(`جمع تخصیص این فرد ${fa(total)}٪ — بیش از ظرفیت`, `This person is at ${total}% — over capacity`)}</div>}
                       </div>
                     </button>
                   )
                 })}
-                {!allocs.length && <Empty />}
+                {!allocs.length && <Empty text={L('برای این فصل نیرویی تخصیص داده نشده', 'Nobody allocated this quarter')} />}
               </div>
+              {(() => {
+                const extra = [...new Set(tasks.filter((t) => !closed(t)).flatMap((t) => t.assignee.split(',').map((x) => x.trim()).filter(Boolean)))].filter((n) => !allocs.some((a) => db.Team.find((x) => x.id === a.member_id)?.name === n))
+                return extra.length ? <div className="mt-4 rounded-2xl bg-warn/[0.07] px-4 py-3 text-xs text-ink">{L(`تسک باز دارند ولی تخصیصی ندارند: ${extra.join('، ')}`, `Have open tasks but no allocation: ${extra.join(', ')}`)}</div> : null
+              })()}
             </Card>
           )}
         </div>
@@ -505,80 +405,94 @@ export default function ProjectDetail() {
   )
 }
 
-function ProjectDelivery({ projectId }: { projectId: string }) {
-  const { db, canEdit } = useStore()
+/** A KPI: latest value against target, its direction since the previous value, and a quick update. */
+function KpiRow({ k, compact }: { k: Kpi; compact?: boolean }) {
+  const { canEdit, upsert, toast } = useStore()
   const { open } = useEditor()
-  const sum = deliverySummary(db, projectId)
-  const list = [...sum.list].filter((d) => d.status !== 'dropped').sort((a, b) => (a.target_date < b.target_date ? -1 : 1))
-  const upcoming = list.filter((d) => !isClosed(d))
-  const done = list.filter((d) => d.status === 'delivered').reverse()
+  const off = kpiOff(k)
+  const cur = k.current === '' ? null : Number(k.current)
+  const prev = k.previous === '' || k.previous === undefined ? null : Number(k.previous)
+  const better = cur !== null && prev !== null && cur !== prev ? (k.direction === 'down' ? cur < prev : cur > prev) : null
+  const Trend = cur === null || prev === null || cur === prev ? Minus : cur > prev ? TrendingUp : TrendingDown
+  const [v, setV] = useState('')
+  const unit = k.unit ? ` ${k.unit}` : ''
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 @lg:grid-cols-4">
-        {[
-          [L('در پیش رو', 'Upcoming'), fa(upcoming.length), ''],
-          [L('عقب‌افتاده', 'Overdue'), fa(sum.overdue.length), sum.overdue.length ? 'text-bad' : ''],
-          [L('جابجا شده از تعهد', 'Moved from baseline'), fa(sum.slipped.length), sum.slipped.length ? 'text-warn' : ''],
-          [L('تحویل به‌موقع', 'On-time'), sum.onTimeRate === null ? '—' : `${fa(`${sum.onTimeRate}%`)}`, ''],
-        ].map(([l, v, c]) => (
-          <div key={l} className="card p-4">
-            <div className="text-[0.6875rem] text-sub">{l}</div>
-            <div className={cx('mt-1 text-2xl font-semibold num', c)}>{v}</div>
-          </div>
-        ))}
+    <div className={cx('flex items-center gap-3', compact ? 'py-1.5' : 'py-3')}>
+      <span className={cx('grid h-8 w-8 shrink-0 place-items-center rounded-xl', better === null ? 'bg-muted text-sub' : better ? 'bg-good/10 text-good' : 'bg-bad/10 text-bad')}><Trend size={15} /></span>
+      <div className="min-w-0 flex-1">
+        <button className="truncate text-start text-sm hover:underline" onClick={() => canEdit && open('Kpis', k as never)}>{k.name}</button>
+        {!compact && <div className="text-[0.6875rem] text-sub">{k.updated_at ? L(`به‌روزرسانی ${timeAgo(stampToDate(k.updated_at))}`, `updated ${timeAgo(stampToDate(k.updated_at))}`) : L('هنوز مقداری ثبت نشده', 'No value yet')}{prev !== null && L(` · قبلی ${fa(prev)}${unit}`, ` · previous ${prev}${unit}`)}</div>}
       </div>
-      <Card
-        pad={false}
-        eyebrow={L('برنامه', 'Plan')}
-        title={L('تحویل‌های پیش رو', 'Upcoming deliveries')}
-        action={
-          canEdit && (
-            <button className="btn-outline btn-sm" onClick={() => open('Deliverables', { project_id: projectId })}>
-              <Plus size={14} /> {L('خروجی', 'Deliverable')}
-            </button>
-          )
-        }
-      >
-        {upcoming.length ? (
-          <div className="divide-y divide-line border-t border-line">
-            {upcoming.map((d) => (
-              <DeliverableRow key={d.id} d={d} showProject={false} />
-            ))}
-          </div>
-        ) : (
-          <DeliveryEmpty />
-        )}
-      </Card>
-      {done.length > 0 && (
-        <Card pad={false} eyebrow={L('سابقه', 'History')} title={L('تحویل‌شده', 'Delivered')}>
-          <div className="divide-y divide-line border-t border-line">
-            {done.map((d) => (
-              <DeliverableRow key={d.id} d={d} showProject={false} />
-            ))}
-          </div>
-        </Card>
+      <div className="text-end">
+        <div className={cx('text-sm font-semibold num', off && 'text-bad')}>{cur === null ? '—' : `${fa(cur)}${unit}`}</div>
+        {k.target !== '' && <div className="text-[0.6875rem] text-sub num">{L('هدف', 'target')} {fa(Number(k.target))}{unit}</div>}
+      </div>
+      {canEdit && !compact && (
+        <Popover width={220} align="end" trigger={({ toggle }) => <button className="btn-outline btn-sm" onClick={toggle}>{L('مقدار جدید', 'New value')}</button>}>
+          {(close) => (
+            <div className="space-y-2 p-3">
+              <input dir="ltr" inputMode="decimal" autoFocus className="input h-9 w-full text-sm" value={v} onChange={(e) => setV(e.target.value)} placeholder={cur === null ? '' : String(cur)} />
+              <button
+                className="btn-primary btn-sm w-full"
+                onClick={async () => {
+                  const n = Number(v.replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))))
+                  if (!v.trim() || !Number.isFinite(n)) return
+                  await upsert('Kpis', { ...k, previous: k.current, current: n, updated_at: nowStamp() })
+                  toast(L('شاخص به‌روز شد', 'KPI updated'))
+                  setV('')
+                  close()
+                }}
+              >
+                {L('ثبت', 'Save')}
+              </button>
+            </div>
+          )}
+        </Popover>
       )}
     </div>
   )
 }
 
+/** A key result in one line: progress against the quarter, confidence, its work. */
+function KrMini({ id }: { id: string }) {
+  const { db } = useStore()
+  const k = db.KeyResults.find((x) => x.id === id)
+  const o = k && db.Objectives.find((x) => x.id === k.objective_id)
+  if (!k || !o) return null
+  const c = krConfidence(k, o.quarter)
+  const w = krWork(db, k.id)
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2 text-sm">
+        <span className="truncate">{k.title}</span>
+        <span className={cx('shrink-0 text-xs', CONF[c].tone)}>{tr(CONF[c].label)}</span>
+      </div>
+      <Progress value={krProgress(k)} marker={elapsed(o.quarter)} h={c === 'on_track' ? 'green' : c === 'at_risk' ? 'amber' : 'red'} className="mt-1.5" />
+      <div className="mt-1 flex justify-between text-[0.6875rem] text-sub">
+        <span>{teamName(o.team)} · {o.title}</span>
+        <Link to={`/tasks?v=all&kr=${k.id}`} className="hover:text-ink num">{k.kind === 'done' ? fmtVal(k, k.current) : L(`${fmtVal(k, k.current)} از ${fmtVal(k, k.target)}`, `${fmtVal(k, k.current)} / ${fmtVal(k, k.target)}`)} · {L(`${fa(w.open)} کار باز`, `${w.open} open`)}</Link>
+      </div>
+    </div>
+  )
+}
+
 /** A new project starts empty: say what's missing instead of pretending it's healthy. */
-function SetupPrompt({ p }: { p: import('../lib/types').Project }) {
+function SetupPrompt({ p }: { p: Project }) {
   const { db, canEdit } = useStore()
   const { open } = useEditor()
+  const product = isProduct(p)
   const steps = [
-    { done: !!p.owner, label: L('مدیر محصول پروژه', 'Project lead') },
-    { done: !!p.client, label: L('کارفرما و رابط', 'Client & liaison') },
-    { done: !!(p.start_date && p.end_date), label: L('تاریخ شروع و ددلاین', 'Start date & deadline') },
-    { done: db.Milestones.some((x) => x.project_id === p.id), label: L('مایلستون‌ها', 'Milestones'), sheet: 'Milestones' as const },
-    { done: db.Allocations.some((x) => x.project_id === p.id), label: L('تخصیص نفرات', 'People allocated'), sheet: 'Allocations' as const },
+    { done: !!p.owner, label: L('مدیر محصول', 'Product manager') },
+    { done: !!p.team, label: L('تیم', 'Team') },
+    ...(product ? [{ done: db.Kpis.some((x) => x.project_id === p.id), label: L('شاخص‌ها (KPI)', 'KPIs'), sheet: 'Kpis' as const }] : [{ done: !!(p.start_date && p.end_date), label: L('تاریخ شروع و ددلاین', 'Start date & deadline') }]),
+    { done: allocsIn(db, quarterOf()).some((x) => x.project_id === p.id), label: L('نیروی این فصل', 'People this quarter'), sheet: 'Allocations' as const },
   ]
   const left = steps.filter((x) => !x.done)
   if (!left.length) return null
   return (
     <div className="card mb-4 flex flex-wrap items-center gap-4 border-warn/30 bg-warn/[0.05] p-5">
       <div className="min-w-0 flex-1">
-        <div className="text-sm font-semibold">{L('اطلاعات پروژه کامل نیست', 'This project isn’t set up yet')}</div>
+        <div className="text-sm font-semibold">{L('اطلاعات کامل نیست', 'Not set up yet')}</div>
         <div className="mt-3 flex flex-wrap gap-2">
           {steps.map((x) => (
             <span key={x.label} className={cx('chip', x.done ? 'bg-good/10 text-good' : 'bg-surface text-ink ring-1 ring-line-strong')}>
@@ -589,18 +503,18 @@ function SetupPrompt({ p }: { p: import('../lib/types').Project }) {
       </div>
       {canEdit && (
         <div className="flex flex-wrap gap-2">
-          {(!p.owner || !p.client || !p.start_date || !p.end_date) && (
+          {(!p.owner || !p.team || (!product && (!p.start_date || !p.end_date))) && (
             <button className="btn-primary btn-sm" onClick={() => open('Projects', p as never)}>
               {L('تکمیل مشخصات', 'Complete details')}
             </button>
           )}
-          {left.some((x) => x.sheet === 'Milestones') && (
-            <button className="btn-outline btn-sm" onClick={() => open('Milestones', { project_id: p.id })}>
-              + {L('مایلستون', 'Milestone')}
+          {left.some((x) => x.sheet === 'Kpis') && (
+            <button className="btn-outline btn-sm" onClick={() => open('Kpis', { project_id: p.id })}>
+              + {L('شاخص', 'KPI')}
             </button>
           )}
           {left.some((x) => x.sheet === 'Allocations') && (
-            <button className="btn-outline btn-sm" onClick={() => open('Allocations', { project_id: p.id })}>
+            <button className="btn-outline btn-sm" onClick={() => open('Allocations', { project_id: p.id, quarter: quarterOf() })}>
               + {L('تخصیص', 'Allocate')}
             </button>
           )}
@@ -616,8 +530,8 @@ function ArchivedProject({ p }: { p: Project }) {
     <>
       <Band
         eyebrow={
-          <Link to="/projects" className="flex items-center gap-1 hover:text-white">
-            <ArrowRight size={12} className="ltr:rotate-180" /> {L('پروژه‌ها', 'Projects')}
+          <Link to="/teams" className="flex items-center gap-1 hover:text-white">
+            <ArrowRight size={12} className="ltr:rotate-180" /> {L('تیم‌ها و محصولات', 'Teams & products')}
           </Link>
         }
         title={p.name}
@@ -627,7 +541,7 @@ function ArchivedProject({ p }: { p: Project }) {
       <Overlap>
         <Card>
           <div className="flex items-center gap-3 text-sm text-sub">
-            <Archive size={18} /> {L('مدیر محصول پروژه', 'Lead')}: <b className="text-ink">{p.owner || '—'}</b> · <span dir="ltr">{p.code}</span> · {lbl(PROJECT_STATUS, p.status)}
+            <Archive size={18} /> {L('مدیر محصول', 'PM')}: <b className="text-ink">{p.owner || '—'}</b> · {teamName(p.team || '')} · {lbl(PROJECT_STATUS, p.status)}
           </div>
         </Card>
       </Overlap>

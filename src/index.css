@@ -350,14 +350,6 @@ select:focus-visible {
   }
 }
 
-/* Recharts: keep internals LTR */
-.recharts-wrapper {
-  direction: ltr;
-}
-.recharts-tooltip-wrapper {
-  direction: inherit;
-}
-
 @media print {
   .no-print {
     display: none !important;

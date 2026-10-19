@@ -22,6 +22,9 @@ import { CHANNEL, FOLLOWUP_STATUS } from '../lib/labels'
 import { Avatar, AvatarStack, Sheet, cx, Chip, MenuItem, Popover } from './ui'
 import { DatePicker } from './DatePicker'
 import { useEditor } from './Editor'
+import { SaveClose } from './SaveClose'
+import { addQuarter, quarterOf } from '../lib/okr'
+import { teamName } from './TeamParts'
 import { AssigneesPicker, ListPicker, PeoplePicker, PersonPicker, PriorityPicker, ProjectPicker, StatusPicker } from './pickers'
 import { TRACK, TRACKS, trackOf, depsOf, dependentsOf, depIds, sideSoft, autoTrack } from '../lib/tracks'
 import type { Track } from '../lib/types'
@@ -106,6 +109,7 @@ export function ItemSheet({ sheet, id, onClose }: { sheet: 'Tasks' | 'FollowUps'
                 <Mail size={14} /> {L('ارسال ایمیل', 'Send email')}
               </button>
             )}
+            <SaveClose onClose={onClose} />
             {confirmDel ? (
               <button className="btn-danger btn-sm" onClick={del}>
                 {L('تأیید حذف', 'Confirm delete')}
@@ -404,8 +408,11 @@ export function ItemSheet({ sheet, id, onClose }: { sheet: 'Tasks' | 'FollowUps'
                   {item.notify === 'off' ? L('خاموش', 'Off') : L('روشن', 'On')}
                 </button>
               </Prop>
-              <Prop label={L('پروژه', 'Project')}>
+              <Prop label={L('محصول / پروژه', 'Product / project')}>
                 <ProjectPicker value={item.project_id} onChange={(v) => patch({ project_id: v, sprint_id: '' })} />
+              </Prop>
+              <Prop label="OKR">
+                <KrPicker value={item.kr_id || ''} onChange={(v) => patch({ kr_id: v })} />
               </Prop>
               {fieldOn('sprint_id') && (
               <Prop label={L('اسپرینت', 'Sprint')}>
@@ -873,5 +880,22 @@ function Checklist({ value, onChange, title }: { value: string; onChange: (v: st
         </form>
       )}
     </div>
+  )
+}
+
+/** Which key result a task moves; empty = other work outside the OKRs. */
+function KrPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { db, canEdit } = useStore()
+  const qs = [quarterOf(), addQuarter(quarterOf(), 1)]
+  const objs = db.Objectives.filter((o) => qs.includes(o.quarter) || db.KeyResults.some((k) => k.id === value && k.objective_id === o.id))
+  return (
+    <select disabled={!canEdit} value={value} onChange={(e) => onChange(e.target.value)} className="h-8 w-full truncate rounded-full bg-transparent px-2 text-xs hover:bg-muted">
+      <option value="">{L('کار دیگر (خارج از OKR)', 'Other work (outside OKRs)')}</option>
+      {objs.map((o) => (
+        <optgroup key={o.id} label={`${teamName(o.team)} · ${o.title}`}>
+          {db.KeyResults.filter((k) => k.objective_id === o.id).map((k) => <option key={k.id} value={k.id}>{k.title}</option>)}
+        </optgroup>
+      ))}
+    </select>
   )
 }

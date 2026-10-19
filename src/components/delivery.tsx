@@ -1,4 +1,4 @@
-import { Check, CornerUpLeft, CalendarClock, Package } from 'lucide-react'
+import { Check, CornerUpLeft, CalendarClock } from 'lucide-react'
 import type { Deliverable } from '../lib/types'
 import { useStore } from '../lib/store'
 import { useEditor } from './Editor'
@@ -115,15 +115,6 @@ export function DeliverableRow({ d, showProject = true }: { d: Deliverable; show
           </span>
         )}
       </div>
-    </div>
-  )
-}
-
-export function DeliveryEmpty() {
-  return (
-    <div className="grid place-items-center gap-2 py-10 text-center text-sm text-sub">
-      <Package size={22} className="opacity-50" />
-      {L('خروجی برای این بازه ثبت نشده', 'Nothing planned in this window')}
     </div>
   )
 }

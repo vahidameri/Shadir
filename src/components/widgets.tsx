@@ -1,28 +1,24 @@
 import { assigneesOf } from '../lib/assignees'
 import { useState } from 'react'
-import { Area, Bar, BarChart, CartesianGrid, Line, ComposedChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from 'recharts'
-import { Check, Plus, MessageSquare, CheckCircle2, FileText, Flag, BellRing, Link2 } from 'lucide-react'
+import { Plus, MessageSquare, CheckCircle2, FileText, Flag, BellRing, Link2 } from 'lucide-react'
 import { trackOf, sideDot, waitingOn, TRACK } from '../lib/tracks'
 import type { Track } from '../lib/types'
-import type { DB, Risk, Sprint, Task, TaskStatus, Update, Milestone } from '../lib/types'
+import type { Risk, Task, TaskStatus, Update } from '../lib/types'
 import { useStore } from '../lib/store'
 import { useEditor } from './Editor'
 import { useComposer } from './UpdateComposer'
 import { Avatar, AvatarStack, Due, cx, HealthBadge, Chip, StatusIcon, PriorityIcon } from './ui'
-import { MILESTONE_STATUS, HEALTH } from '../lib/labels'
 import { COLUMNS_KEY, boardColumns, catOf, isClosed, readColumns, statusLabel, withColumn } from '../lib/columns'
 import { FlagMark, TaskSignals } from './TaskTracking'
 import { can } from '../lib/access'
 import type { Activity } from '../lib/activity'
 import { DIM, DIMS, type Assessment } from '../lib/rag'
-import { burndown, riskLevel, riskScore, sprintCommitted, sprintDonePoints } from '../lib/metrics'
-import { fa, fmtDayMonth, fmtDate, todayISO, daysFromToday, timeAgo, relDays } from '../lib/jalali'
-import { L, lbl, locale, tr } from '../lib/i18n'
+import { HEALTH } from '../lib/labels'
+import { riskLevel, riskScore } from '../lib/metrics'
+import { fa, fmtDate, daysFromToday, timeAgo } from '../lib/jalali'
+import { L, lbl, tr } from '../lib/i18n'
 import { useProjectName } from './shared'
 
-const tooltipStyle = { background: 'rgb(var(--surface))', border: '1px solid rgb(var(--line))', borderRadius: 14, fontSize: 12, boxShadow: '0 12px 32px -12px rgb(0 0 0 / .3)' }
-const axisTick = { fontSize: 11, fill: 'rgb(var(--sub))' }
-const rtl = () => locale.lang === 'fa'
 
 // ---------------- Kanban ----------------
 export function Kanban({ tasks, defaults, showProject = true }: { tasks: Task[]; defaults?: Partial<Task>; showProject?: boolean }) {
@@ -139,52 +135,6 @@ export function Kanban({ tasks, defaults, showProject = true }: { tasks: Task[];
   )
 }
 
-// ---------------- Sprint charts ----------------
-export function BurndownChart({ sprint, db, height = 224 }: { sprint: Sprint; db: DB; height?: number }) {
-  const data = burndown(sprint, db).map((r) => ({ ...r, label: fmtDayMonth(r.day) }))
-  return (
-    <div style={{ height }}>
-      <ResponsiveContainer>
-        <ComposedChart data={data} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
-          <defs>
-            <linearGradient id={`bd-${sprint.id}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="rgb(var(--brand))" stopOpacity={0.28} />
-              <stop offset="100%" stopColor="rgb(var(--brand))" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid vertical={false} stroke="rgb(var(--line))" />
-          <XAxis dataKey="label" tick={axisTick} axisLine={false} tickLine={false} interval="preserveStartEnd" reversed={rtl()} minTickGap={16} />
-          <YAxis tick={axisTick} tickFormatter={(v) => fa(v)} axisLine={false} tickLine={false} width={28} orientation={rtl() ? 'right' : 'left'} />
-          <Tooltip contentStyle={tooltipStyle} formatter={(v) => fa(String(v))} />
-          <Line dataKey="ideal" name={L('ایده‌آل', 'Ideal')} stroke="rgb(var(--sub))" strokeDasharray="4 4" dot={false} strokeWidth={1.5} />
-          <Area dataKey="actual" name={L('باقی‌مانده', 'Remaining')} stroke="rgb(var(--brand))" fill={`url(#bd-${sprint.id})`} strokeWidth={2.5} connectNulls={false} dot={false} />
-        </ComposedChart>
-      </ResponsiveContainer>
-    </div>
-  )
-}
-
-export function VelocityChart({ sprints, db }: { sprints: Sprint[]; db: DB }) {
-  const data = [...sprints]
-    .sort((a, b) => (a.start_date < b.start_date ? -1 : 1))
-    .map((s) => ({ name: s.name, c: sprintCommitted(s, db), d: sprintDonePoints(s, db) }))
-  return (
-    <div className="h-56">
-      <ResponsiveContainer>
-        <BarChart data={data} barGap={3} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
-          <CartesianGrid vertical={false} stroke="rgb(var(--line))" />
-          <XAxis dataKey="name" tick={axisTick} axisLine={false} tickLine={false} reversed={rtl()} />
-          <YAxis tick={axisTick} tickFormatter={(v) => fa(v)} axisLine={false} tickLine={false} width={28} orientation={rtl() ? 'right' : 'left'} />
-          <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'rgb(var(--muted))' }} formatter={(v) => fa(String(v))} />
-          <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" iconSize={8} />
-          <Bar dataKey="c" name={L('تعهد', 'Committed')} fill="rgb(var(--brand-soft))" radius={[8, 8, 0, 0]} />
-          <Bar dataKey="d" name={L('تحویل', 'Delivered')} fill="rgb(var(--brand))" radius={[8, 8, 0, 0]} />
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  )
-}
-
 // ---------------- Risk matrix ----------------
 const SCALE: [string, string][] = [['خیلی کم', 'Very low'], ['کم', 'Low'], ['متوسط', 'Medium'], ['زیاد', 'High'], ['خیلی زیاد', 'Very high']]
 const BAND = {
@@ -277,71 +227,6 @@ export function RiskMatrix({ risks, onPick, cell: active, onCell }: { risks: Ris
   )
 }
 
-// ---------------- Milestone timeline ----------------
-/** Milestones: one segment per milestone as a progress summary, then a clean table. */
-export function MilestoneList({ milestones, compact }: { milestones: Milestone[]; compact?: boolean }) {
-  const { open } = useEditor()
-  const { upsert, canEdit, toast } = useStore()
-  const today = todayISO()
-  const sorted = [...milestones].sort((a, b) => ((a.planned_date || '9') < (b.planned_date || '9') ? -1 : 1))
-  const state = (m: Milestone) => (m.status === 'done' ? 'done' : m.status === 'missed' || (m.planned_date && m.planned_date < today) ? 'late' : m.status === 'in_progress' ? 'active' : 'todo')
-  const seg = { done: 'bg-good', late: 'bg-bad', active: 'bg-brand dark:bg-brand-soft', todo: 'bg-line-strong' }
-  const chip = { done: 'bg-good/10 text-good', late: 'bg-bad/10 text-bad', active: 'bg-brand/10 text-brand dark:text-brand-soft', todo: 'bg-muted text-sub' }
-  const label = (m: Milestone) => (state(m) === 'late' && m.status !== 'missed' ? L('عقب‌افتاده', 'Overdue') : lbl(MILESTONE_STATUS, m.status))
-  const doneN = sorted.filter((m) => m.status === 'done').length
-  const next = sorted.find((m) => m.status !== 'done')
-  const complete = async (m: Milestone) => {
-    await upsert('Milestones', { ...m, status: 'done', actual_date: todayISO() })
-    toast(L('مایلستون انجام شد', 'Milestone completed'), 'ok', { label: L('بازگردانی', 'Undo'), run: () => upsert('Milestones', m) })
-  }
-  return (
-    <div>
-      <div className="mb-1.5 flex items-baseline justify-between gap-2 text-xs">
-        <span className="font-medium">{L(`${fa(doneN)} از ${fa(sorted.length)} انجام شد`, `${doneN} of ${sorted.length} done`)}</span>
-        {next && <span className="truncate text-sub">{L(`بعدی: ${next.title} · ${relDays(next.planned_date)}`, `Next: ${next.title} · ${relDays(next.planned_date)}`)}</span>}
-      </div>
-      <div className="mb-4 flex h-1.5 gap-1">
-        {sorted.map((m) => (
-          <span key={m.id} className={cx('flex-1 rounded-full', seg[state(m)])} title={m.title} />
-        ))}
-      </div>
-      <ul className="-mx-2 divide-y divide-line">
-        {sorted.map((m) => {
-          const st = state(m)
-          const slip = m.actual_date && m.planned_date ? daysFromToday(m.actual_date) - daysFromToday(m.planned_date) : 0
-          return (
-            <li key={m.id} className="group flex items-center gap-3 px-2 py-2.5">
-              <span className={cx('grid h-6 w-6 shrink-0 place-items-center rounded-full', st === 'done' ? 'bg-good text-white' : st === 'late' ? 'bg-bad/10 text-bad' : st === 'active' ? 'bg-brand/10 text-brand dark:text-brand-soft' : 'bg-muted text-sub')}>
-                {st === 'done' ? <Check size={13} strokeWidth={3} /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
-              </span>
-              <button onClick={() => open('Milestones', m as never)} className="min-w-0 flex-1 text-start">
-                <span className="block truncate text-sm font-medium group-hover:underline">{m.title}</span>
-                {!compact && <span className="block truncate text-[0.6875rem] text-sub">{m.owner || '—'}</span>}
-              </button>
-              <span className={cx('shrink-0 text-end text-xs num', compact ? 'w-20' : 'w-24')}>
-                <span className={cx('block', st === 'late' && 'font-semibold text-bad')}>{fmtDate(m.planned_date)}</span>
-                {m.actual_date ? (
-                  <span className={cx('block text-[0.625rem]', slip > 0 ? 'text-bad' : 'text-good')}>{slip > 0 ? L(`${fa(slip)} روز دیرتر`, `${slip}d late`) : L('به‌موقع', 'on time')}</span>
-                ) : (
-                  st !== 'done' && <span className="block text-[0.625rem] text-sub">{relDays(m.planned_date)}</span>
-                )}
-              </span>
-              {!compact && <span className={cx('hidden w-24 shrink-0 justify-center rounded-full px-2 py-0.5 text-center text-[0.6875rem] font-medium @sm:inline-flex', chip[st])}>{label(m)}</span>}
-              {canEdit && st !== 'done' ? (
-                <button className="icon-btn h-7 w-7 opacity-0 transition group-hover:opacity-100" title={L('انجام شد', 'Mark done')} onClick={() => complete(m)}>
-                  <Check size={14} />
-                </button>
-              ) : (
-                <span className="w-7" />
-              )}
-            </li>
-          )
-        })}
-      </ul>
-    </div>
-  )
-}
-
 export function UpdateCard({ u, showProject }: { u: Update; showProject?: boolean }) {
   const { openComposer } = useComposer()
   const pname = useProjectName()
@@ -377,26 +262,6 @@ export function UpdateCard({ u, showProject }: { u: Update; showProject?: boolea
           </div>
         ))}
       </div>
-    </div>
-  )
-}
-
-export function SprintHeader({ s, db }: { s: Sprint; db: DB }) {
-  const committed = sprintCommitted(s, db)
-  const done = sprintDonePoints(s, db)
-  const pct = committed ? Math.round((done / committed) * 100) : 0
-  const daysLeft = daysFromToday(s.end_date)
-  return (
-    <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm">
-      <span className="font-semibold">{s.name}</span>
-      <span className="text-xs text-sub num">
-        {fmtDayMonth(s.start_date)} — {fmtDayMonth(s.end_date)}
-      </span>
-      <span className="text-xs num">
-        <b>{fa(done)}</b>/{fa(committed)} SP · {fa(`${pct}%`)}
-      </span>
-      {s.status === 'active' && <span className={cx('text-xs', daysLeft < 0 ? 'text-bad' : 'text-sub')}>{daysLeft >= 0 ? L(`${fa(daysLeft)} روز مانده`, `${daysLeft}d left`) : L('پایان یافته', 'Ended')}</span>}
-      {s.goal && <span className="w-full text-xs text-sub">{s.goal}</span>}
     </div>
   )
 }

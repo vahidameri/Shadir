@@ -13,6 +13,8 @@ import { TRACK } from '../lib/tracks'
 import { projectMetrics } from '../lib/metrics'
 import { teamStats, type TeamStats } from '../lib/teams'
 import { closed } from '../lib/columns'
+import { isProduct } from '../lib/metrics'
+import { CONF, quarterLabel, quarterOf, teamOkr } from '../lib/okr'
 
 const CAT_ORDER: StatusCat[] = ['active', 'open', 'waiting', 'blocked', 'intake', 'done']
 // calm palette: shades of ink for work in motion, red only for blocked, green for done
@@ -103,13 +105,14 @@ export function TeamCard({ id, stats, compact }: { id: string; stats?: TeamStats
               {name(id)} <HealthDot h={s.health} pulse />
             </Link>
             <div className="mt-0.5 text-xs text-sub">
-              {L(`${fa(s.projects.length)} پروژه · ${fa(s.open)} تسک باز · ${fa(s.doneRecent)} انجام‌شده در ۲ هفته`, `${s.projects.length} projects · ${s.open} open · ${s.doneRecent} done in 2 weeks`)}
+              {L(`${fa(s.projects.length)} محصول/پروژه · ${fa(s.open)} تسک باز · ${fa(s.doneRecent)} انجام‌شده در ۲ هفته`, `${s.projects.length} projects · ${s.open} open · ${s.doneRecent} done in 2 weeks`)}
             </div>
           </div>
           <AvatarStack names={s.members} max={4} />
         </div>
 
         <CatBar by={s.byCat} legend={!compact} className="mt-4" />
+        <OkrLine id={id} tasks={s.tasks} />
 
         <div className="mt-3 grid grid-cols-2 gap-1 sm:grid-cols-4">
           {num(<CalendarClock size={13} />, s.late, L('معوق', 'late'), 'text-bad', `/tasks?track=${id}&v=late`)}
@@ -121,7 +124,7 @@ export function TeamCard({ id, stats, compact }: { id: string; stats?: TeamStats
         {!compact && (
           <div className="mt-4 border-t border-line pt-3">
             <div className="mb-2 flex items-center justify-between">
-              <span className="eyebrow">{L('پروژه‌ها', 'Projects')}</span>
+              <span className="eyebrow">{L('محصولات و پروژه‌ها', 'Products & projects')}</span>
               {canEdit && id && (
                 <button className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs text-sub hover:bg-muted hover:text-ink" onClick={() => open('Projects', { team: id })}>
                   <Plus size={12} /> {L('پروژه', 'Project')}
@@ -129,7 +132,7 @@ export function TeamCard({ id, stats, compact }: { id: string; stats?: TeamStats
               )}
             </div>
             {s.projects.length === 0 ? (
-              <div className="py-2 text-xs text-sub">{L('هنوز پروژه‌ای زیر این تیم نیست', 'No projects under this team yet')}</div>
+              <div className="py-2 text-xs text-sub">{L('هنوز محصول یا پروژه‌ای زیر این تیم نیست', 'No products or projects under this team yet')}</div>
             ) : (
               <ul className="space-y-1">
                 {s.projects.map((p) => {
@@ -149,7 +152,7 @@ export function TeamCard({ id, stats, compact }: { id: string; stats?: TeamStats
                           </span>
                         </span>
                         <Progress value={m.progress} h={m.health} />
-                        <span className="w-14 text-end text-[0.6875rem] text-sub">{p.end_date ? fmtDayMonth(p.end_date) : '—'}</span>
+                        <span className="w-14 text-end text-[0.6875rem] text-sub">{isProduct(p) ? L('همیشگی', 'always on') : p.end_date ? fmtDayMonth(p.end_date) : '—'}</span>
                       </Link>
                     </li>
                   )
@@ -160,6 +163,29 @@ export function TeamCard({ id, stats, compact }: { id: string; stats?: TeamStats
         )}
       </div>
     </div>
+  )
+}
+
+/** The team's OKRs this quarter in one line: progress, confidence, and open work outside them. */
+function OkrLine({ id, tasks }: { id: string; tasks: TeamStats['tasks'] }) {
+  const { db } = useStore()
+  if (!id) return null
+  const q = quarterOf()
+  const o = teamOkr(db, id, q, tasks)
+  return (
+    <Link to="/okr" className="mt-3 flex items-center gap-3 rounded-xl bg-muted/50 px-3 py-2 text-xs transition hover:bg-muted">
+      <span className="shrink-0 text-sub">OKR {quarterLabel(q)}</span>
+      {o.objectives.length ? (
+        <>
+          <Progress value={o.progress} className="flex-1" />
+          <b className="font-medium num">{fa(o.progress)}٪</b>
+          {(['at_risk', 'off_track'] as const).filter((c) => o.conf[c]).map((c) => <span key={c} className={CONF[c].tone}>{fa(o.conf[c])} {tr(CONF[c].label)}</span>)}
+          <span className="text-sub">· {L(`${fa(o.otherOpen)} کار خارج از OKR`, `${o.otherOpen} outside OKRs`)}</span>
+        </>
+      ) : (
+        <span className="text-sub">{L('هدفی برای این فصل تعریف نشده', 'No objectives this quarter')}</span>
+      )}
+    </Link>
   )
 }
 

@@ -18,14 +18,14 @@
  *   viewer — read only (leadership)
  */
 
-var MADAR_VERSION = '1.2.1'; // shown on the login page and by diagnose()
+var MADAR_VERSION = '1.3.0'; // shown on the login page and by diagnose()
 
 var SCHEMA = {
-  Projects: ['id', 'code', 'name', 'description', 'category', 'owner', 'client', 'liaison', 'liaison_contact', 'status', 'priority', 'phase', 'start_date', 'end_date', 'progress', 'health_override', 'objective', 'paused_at', 'pause_reason', 'delivery_day', 'last_delivery', 'archived', 'archived_at', 'links', 'team', 'batch'],
+  Projects: ['id', 'code', 'name', 'description', 'category', 'owner', 'client', 'liaison', 'liaison_contact', 'status', 'priority', 'phase', 'start_date', 'end_date', 'progress', 'health_override', 'objective', 'paused_at', 'pause_reason', 'delivery_day', 'last_delivery', 'archived', 'archived_at', 'links', 'team', 'kind', 'batch'],
   Scope: ['id', 'project_id', 'item', 'type', 'status', 'change_note', 'date'],
   Milestones: ['id', 'project_id', 'title', 'planned_date', 'actual_date', 'status', 'owner', 'weight'],
   Sprints: ['id', 'project_id', 'name', 'start_date', 'end_date', 'goal', 'committed_points', 'completed_points', 'status'],
-  Tasks: ['id', 'project_id', 'sprint_id', 'title', 'description', 'assignee', 'reporter', 'status', 'priority', 'due_date', 'points', 'tags', 'created_at', 'completed_at', 'track', 'depends_on', 'meeting_id', 'private', 'deadline', 'handoff_date', 'test_date', 'follow_date', 'area', 'collaborators', 'watchers', 'notify', 'start_date', 'estimate', 'checklist', 'assigned_at', 'flag', 'blocked_reason', 'blocked_by', 'blocked_since', 'updated_at', 'link', 'requested_by', 'ext_id', 'batch'],
+  Tasks: ['id', 'project_id', 'sprint_id', 'title', 'description', 'assignee', 'reporter', 'status', 'priority', 'due_date', 'points', 'tags', 'created_at', 'completed_at', 'track', 'depends_on', 'meeting_id', 'private', 'deadline', 'handoff_date', 'test_date', 'follow_date', 'area', 'collaborators', 'watchers', 'notify', 'start_date', 'estimate', 'checklist', 'assigned_at', 'flag', 'blocked_reason', 'blocked_by', 'blocked_since', 'updated_at', 'link', 'requested_by', 'kr_id', 'ext_id', 'batch'],
   // owner = who is chasing; follow-ups are personal
   FollowUps: ['id', 'project_id', 'subject', 'person', 'channel', 'due_date', 'status', 'priority', 'notes', 'created_at', 'done_at', 'owner', 'waiting_for', 'link', 'last_ping', 'ping_count', 'ext_id', 'batch'],
   Risks: ['id', 'project_id', 'title', 'type', 'probability', 'impact', 'owner', 'mitigation', 'status', 'due_date'],
@@ -36,7 +36,8 @@ var SCHEMA = {
   // username = sign-in name (blank = made from name_en, e.g. vahid.ameri); one shared team password
   Team: ['id', 'name', 'name_en', 'username', 'role', 'email', 'team', 'track', 'capacity', 'photo', 'tasks_private', 'phone', 'access', 'active', 'key', 'batch'],
   // start_date / end_date are optional; blank = open-ended
-  Allocations: ['id', 'member_id', 'project_id', 'percent', 'start_date', 'end_date'],
+  // quarter = planning quarter (e.g. 1405-Q3); blank = every quarter
+  Allocations: ['id', 'member_id', 'project_id', 'percent', 'start_date', 'end_date', 'quarter'],
   Updates: ['id', 'project_id', 'week_date', 'author', 'health', 'summary', 'done', 'next', 'blockers'],
   // Comments on tasks / follow-ups / projects. created_at is "YYYY-MM-DD HH:mm".
   Comments: ['id', 'entity', 'entity_id', 'author', 'body', 'created_at', 'batch'],
@@ -62,6 +63,11 @@ var SCHEMA = {
   // Mizito: one row per Mizito task the CPTO / PgM was mentioned on; re-mentions go to MizitoMentions
   Mizito: ['id', 'mz_key', 'link', 'title', 'description', 'docs', 'asked_by', 'mentioned', 'category', 'action', 'status', 'priority_override', 'override_reason', 'urgent', 'assigned_to', 'due_date', 'received_at', 'last_mention_at', 'last_mention_by', 'outcome', 'notes', 'created_at', 'updated_at', 'closed_at', 'ext_id', 'batch'],
   MizitoMentions: ['id', 'item_id', 'by', 'at', 'note', 'status', 'batch'],
+  // quarterly OKRs per team: objectives, and key results under them (kind: number | percent | done)
+  Objectives: ['id', 'team', 'quarter', 'title', 'description', 'owner', 'sort', 'batch'],
+  KeyResults: ['id', 'objective_id', 'title', 'owner', 'kind', 'start', 'target', 'current', 'unit', 'confidence', 'project_id', 'note', 'updated_at', 'batch'],
+  // product KPIs: latest value against a target; previous = the value before the last update
+  Kpis: ['id', 'project_id', 'name', 'unit', 'direction', 'target', 'current', 'previous', 'updated_at', 'note'],
 };
 
 var USERS_SHEET = 'Users';
@@ -781,9 +787,11 @@ function googleEmail_(token) {
 // --------------------------------------------------------------------------
 
 var HISTORY_FIELDS = {
-  Tasks: ['title', 'description', 'status', 'priority', 'assignee', 'due_date', 'assigned_at', 'flag', 'track', 'project_id', 'blocked_reason', 'blocked_by', 'link', 'requested_by', 'collaborators', 'watchers', 'private', 'deadline'],
+  Tasks: ['title', 'description', 'status', 'priority', 'assignee', 'due_date', 'assigned_at', 'flag', 'track', 'project_id', 'blocked_reason', 'blocked_by', 'link', 'requested_by', 'collaborators', 'watchers', 'private', 'deadline', 'kr_id'],
   FollowUps: ['subject', 'person', 'status', 'due_date', 'priority', 'channel', 'notes', 'project_id', 'owner', 'waiting_for', 'link'],
   Mizito: ['title', 'status', 'asked_by', 'mentioned', 'category', 'action', 'priority_override', 'urgent', 'assigned_to', 'due_date', 'outcome', 'link', 'description'],
+  KeyResults: ['current', 'confidence', 'target', 'title', 'owner', 'note'],
+  Kpis: ['current', 'target', 'name'],
 };
 
 function clip_(v) { return String(v === undefined || v === null ? '' : v).slice(0, 300); }
@@ -819,7 +827,7 @@ function historyRows_(rows, user) {
 // Every imported row carries a batch id, so a whole import can be taken back.
 // --------------------------------------------------------------------------
 
-var BULK_SHEETS = { Tasks: 1, FollowUps: 1, Mizito: 1, MizitoMentions: 1, Contacts: 1, Team: 1, Projects: 1, History: 1, Comments: 1 };
+var BULK_SHEETS = { Tasks: 1, FollowUps: 1, Mizito: 1, MizitoMentions: 1, Contacts: 1, Team: 1, Projects: 1, History: 1, Comments: 1, Allocations: 1, Objectives: 1, KeyResults: 1, Kpis: 1 };
 
 function bulk_(name, rows, user) {
   if (user.access !== 'super') throw new Error('فقط مدیر برنامه می‌تواند ایمپورت کند');
