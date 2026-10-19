@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { otpCall, setAccessToken, setSessionToken } from './api'
 
 export const GOOGLE_SCOPES = ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/calendar.events'].join(' ')
-const KEY = 'acg.gsession'
+const KEY = 'madar.gsession'
 
 export interface GSession {
   token: string
@@ -15,7 +15,7 @@ export interface GSession {
   /** 'otp' = signed in with an email code: no Google token (no personal calendar) */
   kind?: 'google' | 'otp'
 }
-const OTP_KEY = 'acg.otp'
+const OTP_KEY = 'madar.otp'
 function loadOtp(): GSession | null {
   try {
     const s = JSON.parse(localStorage.getItem(OTP_KEY) || 'null') as (GSession & { sid: string }) | null
@@ -167,7 +167,7 @@ export function GoogleProvider({ children }: { children: ReactNode }) {
         // chose Google before on this device → keep using it (token refreshes every 45 min)
         let viaGoogle = false
         try {
-          viaGoogle = localStorage.getItem('acg.auth') === 'google'
+          viaGoogle = localStorage.getItem('madar.auth') === 'google'
         } catch {}
         if (r.google && viaGoogle) {
           await adoptGoogle(r.google)
@@ -177,14 +177,14 @@ export function GoogleProvider({ children }: { children: ReactNode }) {
         const p = await pageParams()
         const used = (() => {
           try {
-            return sessionStorage.getItem('acg.otp.link')
+            return sessionStorage.getItem('madar.otp.link')
           } catch {
             return null
           }
         })()
         if (p.login && p.login !== used) {
           try {
-            sessionStorage.setItem('acg.otp.link', p.login)
+            sessionStorage.setItem('madar.otp.link', p.login)
           } catch {}
           try {
             adopt(await otpCall<{ session: string; email: string; exp: number }>(r.apiUrl, { action: 'otpLink', token: p.login }))
@@ -249,7 +249,7 @@ export function GoogleProvider({ children }: { children: ReactNode }) {
       const s: GSession = { token: tr.access_token!, exp: Date.now() + (tr.expires_in || 3600) * 1000, email: String(info.email || '').toLowerCase(), name: info.name || '', picture: info.picture || '' }
       try {
         sessionStorage.setItem(KEY, JSON.stringify(s))
-        localStorage.setItem('acg.ghint', s.email)
+        localStorage.setItem('madar.ghint', s.email)
       } catch {}
       setAccessToken(s.token)
       setSession(s)
@@ -277,14 +277,14 @@ export function GoogleProvider({ children }: { children: ReactNode }) {
   const continueWithGoogle = useCallback(async () => {
     if (!offer) return
     try {
-      localStorage.setItem('acg.auth', 'google')
+      localStorage.setItem('madar.auth', 'google')
     } catch {}
     await adoptGoogle(offer)
   }, [offer]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const signOut = useCallback(() => {
     try {
-      localStorage.removeItem('acg.auth')
+      localStorage.removeItem('madar.auth')
     } catch {}
     if (session?.kind === 'otp') {
       try {

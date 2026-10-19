@@ -25,11 +25,11 @@ import type { Access } from './types'
 import { setPhotos } from '../components/ui'
 
 // Demo edits are kept per language so switching language shows sample data in that language.
-const demoKey = () => `acg.demo.v6.${locale.lang}`
-const ME_KEY = 'acg.me'
+const demoKey = () => `madar.demo.v6.${locale.lang}`
+const ME_KEY = 'madar.me'
 // Last data received from the server, per signed-in account: the app opens instantly from it
 // and refreshes in the background. Cleared on sign-out.
-const snapKey = (who: string) => `acg.snap.${who.toLowerCase()}`
+const snapKey = (who: string) => `madar.snap.${who.toLowerCase()}`
 function loadSnap(who: string): { at: number; data: DB; role: Role; name: string } | null {
   if (!who) return null
   try {
@@ -47,14 +47,14 @@ function saveSnap(who: string, data: DB, role: Role, name: string) {
 }
 export function clearSnaps() {
   try {
-    Object.keys(localStorage).filter((k) => k.startsWith('acg.snap.')).forEach((k) => localStorage.removeItem(k))
+    Object.keys(localStorage).filter((k) => k.startsWith('madar.snap.')).forEach((k) => localStorage.removeItem(k))
   } catch {}
 }
 
 // translations were removed in 1.9; drop their old browser caches
 try {
-  localStorage.removeItem('acg.tr.en')
-  localStorage.removeItem('acg.tr.fa')
+  localStorage.removeItem('madar.tr.en')
+  localStorage.removeItem('madar.tr.fa')
 } catch {}
 
 const NUMERIC: Partial<Record<SheetName, string[]>> = {
@@ -164,7 +164,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [db, setDb] = useState<DB>(() => (mode === 'demo' ? loadDemo() : emptyDB()))
   const [role, setRole] = useState<Role>(mode === 'demo' ? 'admin' : 'viewer')
   const [remoteName, setRemoteName] = useState('')
-  /** Code.gs version reported by the server ('' = older than 1.10.1) */
+  /** Code.gs version reported by the server ('' = unknown) */
   const [serverVersion, setServerVersion] = useState('')
   const [meLocal, setMeLocal] = useState(() => {
     try {
@@ -298,8 +298,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (mode === 'demo') setDb(loadDemo())
       bump((n) => n + 1)
     }
-    window.addEventListener('acg-lang', h)
-    return () => window.removeEventListener('acg-lang', h)
+    window.addEventListener('madar-lang', h)
+    return () => window.removeEventListener('madar-lang', h)
   }, [mode])
 
   const setConfig = (c: Config) => {

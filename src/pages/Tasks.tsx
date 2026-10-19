@@ -32,7 +32,7 @@ export default function Tasks() {
   const pname = useProjectName()
   const [params, setParams] = useSearchParams()
   const leader = can.portfolio(access)
-  const [viewPref, setView] = usePref<'list' | 'board' | 'people'>('acg.tasks.view', 'list')
+  const [viewPref, setView] = usePref<'list' | 'board' | 'people'>('madar.tasks.view', 'list')
   const view = viewPref === 'people' && !leader ? 'list' : viewPref
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [settings, setSettings] = useState(false)

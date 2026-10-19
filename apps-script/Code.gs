@@ -1,5 +1,5 @@
 /**
- * ACG Atlas (اطلس) — Google Sheets backend (Apps Script Web App)
+ * Madar (مدار) — Google Sheets backend (Apps Script Web App)
  *
  * Setup:
  *   1. Create an empty Google Sheet → Extensions → Apps Script → paste this file.
@@ -12,13 +12,13 @@
  *
  * Security: people sign in with Google; the email is matched to the Team tab, whose `access`
  * column decides what they receive: super (program manager, everything + back office),
- * exec (CEO), head (heads of product/tech), member (only their own projects). Legacy roles:
+ * exec (the CPTO), head (unit leads), member (only their own work). Legacy roles:
  *   admin  — read + write + manage
  *   editor — read + write
  *   viewer — read only (leadership)
  */
 
-var ATLAS_VERSION = '1.12.2'; // shown on the login page and by diagnose()
+var MADAR_VERSION = '0.1.0'; // shown on the login page and by diagnose()
 
 var SCHEMA = {
   Projects: ['id', 'code', 'name', 'description', 'category', 'owner', 'client', 'liaison', 'liaison_contact', 'status', 'priority', 'phase', 'start_date', 'end_date', 'progress', 'health_override', 'objective', 'paused_at', 'pause_reason', 'delivery_day', 'last_delivery', 'archived', 'archived_at', 'links'],
@@ -69,7 +69,7 @@ function doGet(e) {
   // No action → serve the app itself (Index.html). Everything runs on Google: no other hosting.
   if (!e.parameter.action) {
     return HtmlService.createHtmlOutputFromFile('Index')
-      .setTitle('ACG Atlas')
+      .setTitle('Madar')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
   }
@@ -77,8 +77,8 @@ function doGet(e) {
     var user = auth_(e.parameter);
     var action = e.parameter.action || 'all';
     var me = { name: user.name, role: user.role, email: user.email, access: user.access };
-    if (action === 'all') return json_({ ok: true, user: me, data: readAll_(user), version: ATLAS_VERSION });
-    if (action === 'ping') return json_({ ok: true, user: me, version: ATLAS_VERSION });
+    if (action === 'all') return json_({ ok: true, user: me, data: readAll_(user), version: MADAR_VERSION });
+    if (action === 'ping') return json_({ ok: true, user: me, version: MADAR_VERSION });
     throw new Error('Unknown action: ' + action);
   } catch (err) {
     return json_({ ok: false, error: String(err.message || err) });
@@ -186,9 +186,9 @@ function otpSend_(id) {
     var url = (PropertiesService.getScriptProperties().getProperty('API_URL') || ScriptApp.getService().getUrl()) + '?login=' + link;
     MailApp.sendEmail({
       to: email,
-      subject: 'ورود به اطلس · کد ' + code,
+      subject: 'ورود به مدار · کد ' + code,
       htmlBody: '<div dir="rtl" style="font-family:Tahoma,sans-serif;line-height:1.9;color:#111">' + m.name + ' عزیز، سلام' +
-        '<div style="margin:18px 0"><a href="' + url + '" style="background:#111;color:#fff;text-decoration:none;padding:12px 28px;border-radius:12px;font-weight:700;display:inline-block">ورود به اطلس</a></div>' +
+        '<div style="margin:18px 0"><a href="' + url + '" style="background:#111;color:#fff;text-decoration:none;padding:12px 28px;border-radius:12px;font-weight:700;display:inline-block">ورود به مدار</a></div>' +
         'یا این کد را در صفحه‌ی ورود بزنید:' +
         '<div style="font:700 28px/1.4 monospace;letter-spacing:6px;margin:8px 0" dir="ltr">' + code + '</div>' +
         '<span style="color:#666;font-size:12px">لینک ۱۵ دقیقه و کد ۱۰ دقیقه اعتبار دارد. اگر شما درخواست نداده‌اید، این ایمیل را نادیده بگیرید.</span></div>',
@@ -232,7 +232,7 @@ function otpLink_(link) {
 // properties; 8 wrong tries lock that username for 10 minutes.
 // --------------------------------------------------------------------------
 
-var DEFAULT_TEAM_PASSWORD = 'Atlas@1405'; // change it in the back office (settings → team password)
+var DEFAULT_TEAM_PASSWORD = 'Madar@1405'; // change it in the back office (settings → team password)
 
 function usernameOf_(m) {
   var u = String(m.username || '').trim().toLowerCase();
@@ -670,13 +670,13 @@ function findRow_(sh, id) {
 function diagnose() {
   var props = PropertiesService.getScriptProperties();
   var url = props.getProperty('API_URL') || '';
-  Logger.log('نسخه‌ی Code.gs = ' + ATLAS_VERSION);
+  Logger.log('نسخه‌ی Code.gs = ' + MADAR_VERSION);
   Logger.log('API_URL = ' + (url || '(خالی — setApiUrl اجرا نشده)'));
   Logger.log('GOOGLE_CLIENT_ID = ' + (props.getProperty('GOOGLE_CLIENT_ID') || '(خالی)'));
-  // teammates only see "Continue with Google" when the Atlas Google link is saved in the back office
+  // teammates only see "Continue with Google" when the Madar Google link is saved in the back office
   var g = setting_('app.google_url', '');
   Logger.log('لینک ورود با گوگل (app.google_url) = ' + (g || '(خالی — تیم دکمه‌ی «ورود با گوگل» را نمی‌بیند؛ بک‌آفیس ← تنظیمات)'));
-  if (g && url && g.split('?')[0] === url.split('?')[0]) Logger.log('⚠ لینک ورود با گوگل همان لینک Atlas Team است؛ باید لینک انتشار Atlas Google باشد.');
+  if (g && url && g.split('?')[0] === url.split('?')[0]) Logger.log('⚠ لینک ورود با گوگل همان لینک Madar Team است؛ باید لینک انتشار Madar Google باشد.');
   if (!url) return;
   var show = function (label, res) {
     var t = res.getContentText();
@@ -757,7 +757,7 @@ function notifyMentions_(c, user) {
       if (m.email && m.name && String(c.body).indexOf('@' + m.name) !== -1) {
         MailApp.sendEmail({
           to: m.email,
-          subject: 'ACG Atlas · ' + user.name + ' mentioned you',
+          subject: 'Madar · ' + user.name + ' mentioned you',
           htmlBody: '<div dir="auto" style="font-family:Tahoma,sans-serif;line-height:1.8"><b>' + user.name + '</b>:<br>' + String(c.body).replace(/</g, '&lt;') + '</div>',
         });
       }
@@ -825,7 +825,7 @@ function setup() {
   bumpVersion_();
 }
 
-/** Adds a person from the editor: addUser('آتنا دهقان', 'athena@acg.com', 'member'). Easier: use the back office in the app. */
+/** Adds a person from the editor: addUser('نام', 'name@noyanet.com', 'member'). Easier: use the back office in the app. */
 function addUser(name, email, access) {
   var id = 'M-' + Utilities.getUuid().slice(0, 6);
   upsert_('Team', { id: id, name: name, email: email || '', access: access || 'member', active: 'true', capacity: 100 }, { name: 'editor' });
@@ -844,7 +844,7 @@ function safeAlert_(msg) {
 /** Adds a custom menu in the Sheet for non-technical users. */
 function onOpen() {
   SpreadsheetApp.getUi()
-    .createMenu('ACG Atlas')
+    .createMenu('Madar')
     .addItem('راه‌اندازی تب‌ها', 'setup')
     .addItem('عیب‌یابی اتصال', 'diagnose')
     .addItem('افزودن کاربر جدید…', 'promptAddUser')
@@ -904,16 +904,16 @@ function sendDailyDigest() {
   };
 
   var html = '<div dir="rtl" style="font-family:Tahoma,Vazirmatn,sans-serif;font-size:14px;line-height:1.8;color:#111">' +
-    '<h2 style="margin:0 0 8px">خلاصه‌ی امروز — اطلس ACG</h2>' +
+    '<h2 style="margin:0 0 8px">خلاصه‌ی امروز — مدار</h2>' +
     sec('پیگیری‌های امروز و معوق', '#e13748', fus.map(function (f) { return li('<b>' + f.subject + '</b> — ' + f.person + (f.project_id ? ' · ' + (pname[f.project_id] || '') : '') + ' · ' + f.due_date); })) +
     sec('تسک‌های امروز', '#4f46e5', todayTasks.map(function (t) { return li(t.title + ' — ' + t.assignee + (t.project_id ? ' · ' + (pname[t.project_id] || '') : '')); })) +
     sec('تسک‌های معوق', '#d98d06', overdueTasks.map(function (t) { return li(t.title + ' — ' + t.assignee + ' · سررسید ' + t.due_date); })) +
     sec('تسک‌های مسدود', '#e13748', blocked.map(function (t) { return li(t.title + ' — ' + t.assignee + (t.description ? ' · ' + t.description : '')); })) +
     sec('مایلستون‌های عقب‌افتاده', '#e13748', ms.map(function (m) { return li(m.title + ' · ' + (pname[m.project_id] || '') + ' · ' + m.planned_date); })) +
-    '<p style="color:#666;margin-top:24px;font-size:12px">این ایمیل به‌صورت خودکار از Google Sheet ACG ارسال شده است.</p></div>';
+    '<p style="color:#666;margin-top:24px;font-size:12px">این ایمیل به‌صورت خودکار از Google Sheet مدار ارسال شده است.</p></div>';
 
   var to = PropertiesService.getScriptProperties().getProperty('DIGEST_TO') || Session.getEffectiveUser().getEmail();
-  MailApp.sendEmail({ to: to, subject: 'ACG Atlas · خلاصه‌ی ' + today, htmlBody: html });
+  MailApp.sendEmail({ to: to, subject: 'Madar · خلاصه‌ی ' + today, htmlBody: html });
 }
 
 // --------------------------------------------------------------------------
@@ -980,17 +980,17 @@ function remindWeeklyUpdatesNow() {
       to: email[owner],
       subject: 'یادآوری گزارش هفتگی · ' + byOwner[owner].join('، '),
       htmlBody: '<div dir="rtl" style="font-family:Tahoma,sans-serif;line-height:1.9">' + owner + ' عزیز، سلام<br>گزارش هفتگی این پروژه‌ها هنوز ثبت نشده است: <b>' + byOwner[owner].join('، ') +
-        '</b><br>لطفاً پیش از جلسه‌ی هفتگی ACG از صفحه‌ی «گزارش هفتگی» ثبت کنید. ممنون 🙏</div>',
+        '</b><br>لطفاً پیش از ویکلی دپارتمان CPTO از صفحه‌ی «گزارش هفتگی» ثبت کنید. ممنون 🙏</div>',
     });
   });
   if (missing.length) {
     var to = PropertiesService.getScriptProperties().getProperty('DIGEST_TO') || Session.getEffectiveUser().getEmail();
-    MailApp.sendEmail({ to: to, subject: 'ACG Atlas · ' + missing.length + ' گزارش هفتگی ارسال نشده', htmlBody: '<div dir="rtl" style="font-family:Tahoma,sans-serif">' + missing.map(function (p) { return p.name + ' — ' + p.owner; }).join('<br>') + '</div>' });
+    MailApp.sendEmail({ to: to, subject: 'Madar · ' + missing.length + ' گزارش هفتگی ارسال نشده', htmlBody: '<div dir="rtl" style="font-family:Tahoma,sans-serif">' + missing.map(function (p) { return p.name + ' — ' + p.owner; }).join('<br>') + '</div>' });
   }
 }
 
 // --------------------------------------------------------------------------
-// Files — uploads go to one shared Drive folder ("ACG Atlas files"), indexed in the Files tab.
+// Files — uploads go to one shared Drive folder ("Madar files"), indexed in the Files tab.
 // Script property FILE_SHARING: 'link' (default, anyone with the link) or 'domain'.
 // --------------------------------------------------------------------------
 
@@ -1008,7 +1008,7 @@ function filesFolder_() {
   var props = PropertiesService.getScriptProperties();
   var id = props.getProperty('FOLDER_ID');
   if (id) return id;
-  var f = drive_('post', '/drive/v3/files', JSON.stringify({ name: 'ACG Atlas files', mimeType: 'application/vnd.google-apps.folder' }));
+  var f = drive_('post', '/drive/v3/files', JSON.stringify({ name: 'Madar files', mimeType: 'application/vnd.google-apps.folder' }));
   props.setProperty('FOLDER_ID', f.id);
   return f.id;
 }
@@ -1041,7 +1041,7 @@ function upload_(b, user) {
 
 // --------------------------------------------------------------------------
 // Google Calendar: every planned meeting lands in the calendar of whoever runs the deployment
-// (the program manager for "Atlas Team"), with a Meet link, and invites the attendees, the
+// (the program manager for "Madar Team"), with a Meet link, and invites the attendees, the
 // facilitator and the always-invited people (by default the program manager and the CEO).
 // --------------------------------------------------------------------------
 
@@ -1085,7 +1085,7 @@ function syncMeeting_(meetingId, user) {
   var agenda = agendaOf_(m, data);
   var description = (proj ? 'پروژه: ' + proj.name + '\n' : '') +
     (agenda.length ? '\nدستور جلسه:\n' + agenda.map(function (a) { return '• ' + a; }).join('\n') + '\n' : '') +
-    '\nاز اطلس ACG' + (appLink_() ? ' — ' + appLink_() + '#/meetings' : '');
+    '\nاز مدار' + (appLink_() ? ' — ' + appLink_() + '#/meetings' : '');
   var res = {
     summary: m.title, description: description,
     start: { dateTime: iso(start), timeZone: tz }, end: { dateTime: iso(end), timeZone: tz },
@@ -1096,7 +1096,7 @@ function syncMeeting_(meetingId, user) {
     try { ev = Calendar.Events.patch(res, 'primary', m.gcal_id, { sendUpdates: 'all' }); } catch (eMissing) { ev = null; }
   }
   if (!ev) {
-    if (!m.meet_url) res.conferenceData = { createRequest: { requestId: 'acg-' + m.id + '-' + Date.now(), conferenceSolutionKey: { type: 'hangoutsMeet' } } };
+    if (!m.meet_url) res.conferenceData = { createRequest: { requestId: 'madar-' + m.id + '-' + Date.now(), conferenceSolutionKey: { type: 'hangoutsMeet' } } };
     ev = Calendar.Events.insert(res, 'primary', { conferenceDataVersion: 1, sendUpdates: 'all' });
   }
   var url = ev.hangoutLink || m.meet_url || '';
@@ -1142,7 +1142,7 @@ function mailMinutes_(meetingId, user) {
     (actions.length ? '<h3>اکشن پلن</h3><table cellpadding="6" style="border-collapse:collapse">' + actions.map(function (t) {
       return '<tr><td style="border-bottom:1px solid #eee">' + esc(t.title) + '</td><td style="border-bottom:1px solid #eee"><b>' + esc(t.assignee) + '</b></td><td style="border-bottom:1px solid #eee;color:#666">' + (t.due_date || '') + '</td></tr>';
     }).join('') + '</table>' : '') +
-    '<p style="color:#888;font-size:12px;margin-top:20px">ارسال خودکار از اطلس ACG — ' + esc(user.name) + '</p></div>';
+    '<p style="color:#888;font-size:12px;margin-top:20px">ارسال خودکار از مدار — ' + esc(user.name) + '</p></div>';
   MailApp.sendEmail({ to: to.join(','), subject: 'صورت‌جلسه · ' + m.title + ' · ' + m.date, htmlBody: html });
   return { sent: to.length };
 }
@@ -1166,7 +1166,7 @@ function remindOverdueActions() {
     if (!email[who]) return;
     MailApp.sendEmail({
       to: email[who],
-      subject: 'اطلس ACG · ' + by[who].length + ' اقدام عقب‌افتاده',
+      subject: 'مدار · ' + by[who].length + ' اقدام عقب‌افتاده',
       htmlBody: '<div dir="rtl" style="font-family:Tahoma,sans-serif;line-height:1.9">' + who + ' عزیز، این اقدام‌های جلسات از سررسیدشان گذشته‌اند:<ul>' +
         by[who].map(function (t) { return '<li>' + String(t.title).replace(/</g, '&lt;') + ' — ' + t.due_date + '</li>'; }).join('') + '</ul></div>',
     });
@@ -1199,8 +1199,8 @@ function esc_(x) { return String(x || '').replace(/</g, '&lt;'); }
 function mailBox_(title, body) {
   var link = appLink_();
   return '<div dir="rtl" style="font-family:Tahoma,Vazirmatn,sans-serif;font-size:14px;line-height:1.9;color:#111">' + title + body +
-    (link ? '<p style="margin-top:18px"><a href="' + link + '" style="background:#16181d;color:#fff;padding:8px 18px;border-radius:999px;text-decoration:none">باز کردن اطلس</a></p>' : '') +
-    '<p style="color:#888;font-size:12px;margin-top:18px">ارسال خودکار از اطلس ACG</p></div>';
+    (link ? '<p style="margin-top:18px"><a href="' + link + '" style="background:#16181d;color:#fff;padding:8px 18px;border-radius:999px;text-decoration:none">باز کردن مدار</a></p>' : '') +
+    '<p style="color:#888;font-size:12px;margin-top:18px">ارسال خودکار از مدار</p></div>';
 }
 function archivedSet_(data) {
   var gone = {};
@@ -1230,7 +1230,7 @@ function mailAssigned_(before, row, user) {
   var line = function (k, v) { return v ? '<div><span style="color:#666">' + k + ':</span> ' + esc_(v) + '</div>' : ''; };
   MailApp.sendEmail({
     to: to,
-    subject: 'اطلس ACG · تسک جدید برای شما: ' + row.title,
+    subject: 'مدار · تسک جدید برای شما: ' + row.title,
     htmlBody: mailBox_('<h3 style="margin:0 0 8px">' + esc_(user.name) + ' این تسک را به شما سپرد</h3>',
       '<div style="font-size:16px;font-weight:bold">' + esc_(row.title) + '</div>' + line('پروژه', pname) + line('حوزه', row.area) + line('سررسید', row.due_date) +
       line('تحویل به پروداکت', row.handoff_date) + line('تست', row.test_date) + line('ددلاین', row.deadline) + (row.description ? '<p>' + esc_(row.description).replace(/\n/g, '<br>') + '</p>' : '')),
@@ -1253,7 +1253,7 @@ function mailTask_(id, user) {
   var line = function (k, v) { return v ? '<div><span style="color:#666">' + k + ':</span> ' + esc_(v) + '</div>' : ''; };
   MailApp.sendEmail({
     to: to.join(','),
-    subject: 'اطلس ACG · ' + t.title,
+    subject: 'مدار · ' + t.title,
     htmlBody: mailBox_('<h3 style="margin:0 0 8px">' + esc_(user.name) + ' این تسک را برای شما فرستاد</h3>',
       '<div style="font-size:16px;font-weight:bold">' + esc_(t.title) + '</div>' + line('پروژه', pname) + line('مسئول', assignees_(t).join('، ')) + line('سررسید', t.due_date) + line('ددلاین', t.deadline) +
       (t.description ? '<p>' + esc_(t.description).replace(/\n/g, '<br>') + '</p>' : '')),
@@ -1306,15 +1306,15 @@ function sendTaskAlerts() {
       var done = (p.last_delivery && String(p.last_delivery) >= ws) || (data.Deliveries || []).some(function (x) { return String(x.project_id) === String(p.id) && String(x.week) === ws; });
       if (done) return;
       var fake = { id: 'P' + p.id, title: 'تحویل هفتگی ' + p.name, assignee: p.owner, reporter: '', private: '' };
-      if (due === today) add(p.owner, fake, 'امروز روز تحویل هفتگی است — بعد از تحویل در اطلس «تحویل شد» را بزنید');
+      if (due === today) add(p.owner, fake, 'امروز روز تحویل هفتگی است — بعد از تحویل در مدار «تحویل شد» را بزنید');
       var grace = Number(setting_('delivery.grace', '0')) || 0;
       var lastDay = Utilities.formatDate(new Date(new Date(due + 'T12:00:00').getTime() + grace * 86400000), tz, 'yyyy-MM-dd');
       if (lastDay === yesterday) { add(p.owner, fake, '<span style="color:#e13748">تحویل دیروز ثبت نشده</span>'); missed.push(esc_(p.name) + ' — ' + esc_(p.owner || '—')); }
     });
-    if (missed.length && pm) MailApp.sendEmail({ to: pm, subject: 'اطلس ACG · ' + missed.length + ' تحویل هفتگی ثبت نشد', htmlBody: mailBox_('<h3 style="margin:0 0 8px">تحویل‌های دیروز که ثبت نشده‌اند</h3>', missed.join('<br>')) });
+    if (missed.length && pm) MailApp.sendEmail({ to: pm, subject: 'مدار · ' + missed.length + ' تحویل هفتگی ثبت نشد', htmlBody: mailBox_('<h3 style="margin:0 0 8px">تحویل‌های دیروز که ثبت نشده‌اند</h3>', missed.join('<br>')) });
   }
   Object.keys(box).forEach(function (who) {
-    MailApp.sendEmail({ to: email[who], subject: 'اطلس ACG · یادآوری‌های امروز (' + box[who].items.length + ')', htmlBody: mailBox_('<h3 style="margin:0 0 8px">' + esc_(who) + ' عزیز، صبح بخیر</h3>', '<ul style="padding-right:18px;margin:0">' + box[who].items.join('') + '</ul>') });
+    MailApp.sendEmail({ to: email[who], subject: 'مدار · یادآوری‌های امروز (' + box[who].items.length + ')', htmlBody: mailBox_('<h3 style="margin:0 0 8px">' + esc_(who) + ' عزیز، صبح بخیر</h3>', '<ul style="padding-right:18px;margin:0">' + box[who].items.join('') + '</ul>') });
   });
 }
 
@@ -1335,21 +1335,9 @@ function seedDemo() {
   };
   put('Team', [
     ['m1', 'وحید عامری', 'Vahid Ameri', 'pgm', '', 'super'],
-    ['m2', 'جلیل علیزاده', 'Jalil Alizadeh', 'ceo', '', 'exec'],
-    ['m3', 'وحید کیوانیان', 'Vahid Keyvanian', 'cto', 'tech', 'head'],
-    ['m4', 'مهرزاد گلی', 'Mehrzad Goli', 'cpo', 'product', 'head'],
-    ['m5', 'آتنا دهقان', 'Athena Dehghan', 'pm', 'product', 'member'],
-    ['m6', 'علی سرمیلی', 'Ali Sormeili', 'pm', 'product', 'member'],
-    ['m7', 'علی سالمه', 'Ali Salemeh', 'pm', 'product', 'member'],
-    ['m8', 'مهرسا دبیر', 'Mehrsa Dabir', 'pm', 'product', 'member'],
-    ['m9', 'بابک معروفی', 'Babak Maroufi', 'pm', 'product', 'member'],
-    ['m10', 'امین ظفری', 'Amin Zafari', 'pm', 'product', 'member'],
-    ['m11', 'هانیه منصورکیایی', 'Hanie Mansurkiae', 'pd', 'product', 'member'],
+    ['m2', 'جلیل علیزاده', 'Jalil Alizadeh', 'cpto', '', 'exec'],
   ].map(function (r) {
-    return { id: r[0], name: r[1], name_en: r[2], role: r[3], track: r[4], access: r[5], capacity: 100, active: 'true', tasks_private: r[5] === 'exec' ? '1' : '' };
-  }));
-  put('Projects', ['CX Orbit', 'Insight X Padida', 'Roo B Roo', 'Kadiner', 'HamAfza', 'Myca', 'malek', 'SimiPass', 'Ino School', 'AISN', 'Clarity Pass'].map(function (name, i) {
-    return { id: 'p' + (i + 1), code: name.replace(/[^A-Za-z]/g, '').slice(0, 4).toUpperCase(), name: name, status: 'active', priority: 'medium' };
+    return { id: r[0], name: r[1], name_en: r[2], role: r[3], track: r[4], access: r[5], capacity: 100, active: 'true', tasks_private: '' };
   }));
   fillUsernames_();
   bumpVersion_();

@@ -10,16 +10,13 @@ import { FollowUpRow, TaskRow, useProjectName } from '../components/shared'
 import { PersonPicker, ProjectPicker } from '../components/pickers'
 import { canPersonal, dueDaysFor, needsDue, needsProject } from '../lib/taskcfg'
 import { addDays, daysFromToday, fa, fmtDate, todayISO, daysBetween, firstName, greeting, fmtWeekday, dayNum } from '../lib/jalali'
-import { isTaskOverdue, projectMetrics, riskScore } from '../lib/metrics'
+import { isTaskOverdue, riskScore } from '../lib/metrics'
 import { uid } from '../lib/api'
 import { PRIORITY_ORDER } from '../lib/labels'
 import { L } from '../lib/i18n'
 import type { Task } from '../lib/types'
-import { useComposer } from '../components/UpdateComposer'
-import { inWeek, isWorkday, updateDue, weekStart } from '../lib/weeks'
-import { deliverySummary } from '../lib/delivery'
-import { overloaded } from '../lib/capacity'
-import { CalendarRange, PackageCheck, FileText, Gauge } from 'lucide-react'
+import { isWorkday } from '../lib/weeks'
+import { CalendarRange, Ban } from 'lucide-react'
 
 const byDue = (a: { due_date: string; priority?: string }, b: { due_date: string; priority?: string }) =>
   (a.due_date || '9999') < (b.due_date || '9999') ? -1 : (a.due_date || '9999') > (b.due_date || '9999') ? 1 : (PRIORITY_ORDER[a.priority as never] ?? 2) - (PRIORITY_ORDER[b.priority as never] ?? 2)
@@ -35,11 +32,9 @@ interface Suggestion {
 export default function MyDesk() {
   const { db, me, upsert, toast, canEdit, access } = useStore()
   const { open } = useEditor()
-  const { openComposer } = useComposer()
   const pname = useProjectName()
   const today = todayISO()
   const weekEnd = addDays(today, 7)
-  const ws = weekStart()
 
   // ---------- Quick capture ----------
   const [kind, setKind] = useState<'task' | 'followup'>('task')
@@ -106,32 +101,15 @@ export default function MyDesk() {
 
   const suggestions = useMemo<Suggestion[]>(() => {
     const out: Suggestion[] = []
-    db.Projects.filter((p) => p.status === 'active').forEach((p) => {
-      const reported = db.Updates.some((u) => u.project_id === p.id && inWeek(u.week_date, ws))
-      if (!reported && today > updateDue(ws))
-        out.push({
-          key: `upd-${p.id}`, tone: 'warn',
-          text: p.owner === me ? L(`گزارش هفتگی «${p.name}» را هنوز ثبت نکرده‌اید`, `You haven’t submitted the “${p.name}” weekly update`) : L(`«${p.name}» گزارش این هفته را نداده (${p.owner})`, `“${p.name}” hasn’t reported this week (${p.owner})`),
-          action: L('ثبت گزارش', 'Write update'), run: () => openComposer({ projectId: p.id }),
-        })
-      const m = projectMetrics(p, db)
-      const contact = p.liaison || p.client
-      if (m.health === 'red' && contact && !db.FollowUps.some((f) => f.project_id === p.id && f.status !== 'done' && f.person === contact))
-        out.push({
-          key: `esc-${p.id}`, tone: 'bad',
-          text: L(`«${p.name}» در خطر است و با رابط کارفرما (${contact}) پیگیری ثبت نشده`, `“${p.name}” is off track with no follow-up logged with the client liaison (${contact})`),
-          action: L('پیگیری با رابط', 'Follow up with liaison'),
-          run: () => open('FollowUps', { project_id: p.id, person: contact, subject: L(`بررسی وضعیت ${p.name} با کارفرما`, `Review ${p.name} with the client`), priority: 'high' }),
-        })
-    })
-    db.Milestones.filter((ms) => ms.status !== 'done' && daysFromToday(ms.planned_date) >= 0 && daysFromToday(ms.planned_date) <= 5).forEach((ms) => {
-      const n = db.Tasks.filter((t) => t.project_id === ms.project_id && t.status !== 'done' && t.due_date && t.due_date <= ms.planned_date).length
-      if (n)
-        out.push({
-          key: `ms-${ms.id}`, tone: 'warn',
-          text: L(`مایلستون «${ms.title}» ${fa(daysFromToday(ms.planned_date))} روز دیگر است و ${fa(n)} تسک باز دارد`, `Milestone “${ms.title}” is in ${daysFromToday(ms.planned_date)} days with ${n} open tasks`),
-          action: L('مشاهده', 'View'), run: () => (window.location.hash = `#/projects/${ms.project_id}`),
-        })
+    // a blocker nobody is chasing: offer the follow-up
+    db.Tasks.filter((t) => t.status === 'blocked' && !db.FollowUps.some((f) => f.status !== 'done' && f.subject.includes(t.title))).forEach((t) => {
+      const who = assigneesOf(t)[0] || ''
+      out.push({
+        key: `blk-${t.id}`, tone: 'bad',
+        text: L(`«${t.title}» مسدود است و کسی پیگیرش نیست`, `“${t.title}” is blocked and nobody is chasing it`),
+        action: L('ساخت پیگیری', 'Follow up'),
+        run: () => open('FollowUps', { project_id: t.project_id, person: who, subject: L(`رفع مانع: ${t.title}`, `Unblock: ${t.title}`), priority: 'high' }),
+      })
     })
     db.Risks.filter((r) => r.status !== 'closed' && riskScore(r) >= 15 && r.due_date && r.due_date < today).forEach((r) =>
       out.push({ key: `rk-${r.id}`, tone: 'bad', text: L(`مهلت اقدام برای ریسک «${r.title}» گذشته است`, `Action date passed for risk “${r.title}”`), action: L('به‌روزرسانی', 'Update'), run: () => open('Risks', r as never) }),
@@ -145,31 +123,16 @@ export default function MyDesk() {
           action: L('باز کردن', 'Open'), run: () => open('FollowUps', f as never),
         }),
       )
-    const ds = deliverySummary(db)
-    if (ds.overdue.length)
-      out.unshift({
-        key: 'dl-overdue', tone: 'bad',
-        text: L(`${fa(ds.overdue.length)} خروجی از تاریخش گذشته و هنوز تحویل نشده`, `${ds.overdue.length} deliverable(s) are past their date`),
-        action: L('برنامه‌ی تحویل', 'Delivery plan'), run: () => (window.location.hash = '#/plan'),
-      })
-    const over = overloaded(db, ws)
-    if (over.length)
-      out.push({
-        key: 'cap', tone: 'warn',
-        text: L(`${over.map((x) => x.m.name).join('، ')} این هفته بیش از ظرفیت ${over.length > 1 ? 'هستند' : 'است'}`, `${over.map((x) => x.m.name).join(', ')} over capacity this week`),
-        action: L('ظرفیت تیم', 'Capacity'), run: () => (window.location.hash = '#/team'),
-      })
     return out.slice(0, 8)
-  }, [db, today, open, fuWaiting, me, ws, openComposer])
+  }, [db, today, open, fuWaiting])
 
   // ---------- This week's rhythm ----------
   const nextMeeting = db.Meetings.filter((m) => m.status === 'scheduled' && m.date >= today && names(m.attendees).includes(me)).sort((a, b) => (a.date + a.time < b.date + b.time ? -1 : 1))[0]
-  const live = db.Projects.filter((p) => p.status === 'active')
-  const reported = live.filter((p) => db.Updates.some((u) => u.project_id === p.id && inWeek(u.week_date, ws))).length
-  const myUnreported = live.filter((p) => p.owner === me && !db.Updates.some((u) => u.project_id === p.id && inWeek(u.week_date, ws)))
-  const weekDel = db.Deliverables.filter((d) => inWeek(d.target_date, ws) && d.status !== 'dropped')
+  const scope = can.portfolio(access) ? db.Tasks : db.Tasks.filter((t) => isAssignee(t, me))
+  const lateAll = scope.filter((t) => isTaskOverdue(t))
+  const blockedAll = scope.filter((t) => t.status === 'blocked')
+  const fuDueAll = db.FollowUps.filter((f) => f.status !== 'done' && f.due_date && f.due_date <= today)
   const myActions = db.Tasks.filter((t) => t.meeting_id && isAssignee(t, me) && t.status !== 'done')
-  const overNow = overloaded(db, ws)
 
   const first = firstName(me)
   const hello = me ? L(`${greeting()}، ${first} جان`, `${greeting()}, ${first}`) : greeting()
@@ -260,30 +223,29 @@ export default function MyDesk() {
             sub={nextMeeting ? `${nextMeeting.date === today ? L('امروز', 'Today') : fmtWeekday(nextMeeting.date)} ${fa(nextMeeting.time)}${myActions.length ? L(` · ${fa(myActions.length)} اقدام باز شما`, ` · ${myActions.length} open actions`) : ''}` : L('جلسه‌ای در پیش نیست', 'Nothing scheduled')}
           />
           <RhythmTile
-            to="/updates"
-            icon={FileText}
-            label={L('گزارش‌های این هفته', 'This week’s updates')}
-            value={`${fa(reported)}/${fa(live.length)}`}
-            sub={myUnreported.length ? L(`${fa(myUnreported.length)} گزارش با شما`, `${myUnreported.length} due from you`) : L(`مهلت: ${fmtWeekday(updateDue(ws))}`, `Due ${fmtWeekday(updateDue(ws))}`)}
-            tone={reported < live.length && today > updateDue(ws) ? 'warn' : undefined}
+            to="/tasks?due=overdue"
+            icon={Hourglass}
+            label={L('تسک‌های معوق', 'Overdue tasks')}
+            value={fa(lateAll.length)}
+            sub={lateAll.length ? lateAll.slice(0, 2).map((t) => t.title).join(L('، ', ', ')) : L('هیچ تسکی عقب نیست', 'Nothing is late')}
+            tone={lateAll.length ? 'bad' : undefined}
           />
           <RhythmTile
-            to="/plan"
-            icon={PackageCheck}
-            label={L('تحویل‌های این هفته', 'Deliveries this week')}
-            value={fa(weekDel.length)}
-            sub={L(`${fa(weekDel.filter((d) => d.status === 'delivered').length)} تحویل شد`, `${weekDel.filter((d) => d.status === 'delivered').length} delivered`)}
+            to="/tasks?status=blocked"
+            icon={Ban}
+            label={L('مسدود (Blocker)', 'Blocked')}
+            value={fa(blockedAll.length)}
+            sub={blockedAll.length ? blockedAll.slice(0, 2).map((t) => t.title).join(L('، ', ', ')) : L('مانعی ثبت نشده', 'No blockers')}
+            tone={blockedAll.length ? 'warn' : undefined}
           />
-          {can.portfolio(access) && (
           <RhythmTile
-            to="/team"
-            icon={Gauge}
-            label={L('بیش از ظرفیت', 'Over capacity')}
-            value={fa(overNow.length)}
-            sub={overNow.length ? overNow.map((x) => firstName(x.m.name)).join(L('، ', ', ')) : L('همه در ظرفیت', 'Everyone within capacity')}
-            tone={overNow.length ? 'bad' : undefined}
+            to="/followups"
+            icon={BellRing}
+            label={L('پیگیری‌های سررسید', 'Follow-ups due')}
+            value={fa(fuDueAll.length)}
+            sub={fuDueAll.length ? fuDueAll.slice(0, 2).map((f) => f.person).filter(Boolean).join(L('، ', ', ')) : L('پیگیری عقب‌افتاده‌ای نیست', 'All caught up')}
+            tone={fuDueAll.some((f) => f.due_date < today) ? 'warn' : undefined}
           />
-          )}
         </div>
 
         <div className="grid gap-4 @lg:grid-cols-5">
@@ -463,7 +425,7 @@ export default function MyDesk() {
 
 const names = (s: string) => String(s || '').split(',').map((x) => x.trim()).filter(Boolean)
 
-function RhythmTile({ to, icon: Icon, label, value, sub, tone }: { to: string; icon: typeof FileText; label: string; value: string; sub: string; tone?: 'bad' | 'warn' }) {
+function RhythmTile({ to, icon: Icon, label, value, sub, tone }: { to: string; icon: typeof Ban; label: string; value: string; sub: string; tone?: 'bad' | 'warn' }) {
   return (
     <Link to={to} className="card card-hover group flex min-w-0 flex-col gap-1 p-4">
       <span className="flex items-center gap-1.5 text-[0.6875rem] text-sub">

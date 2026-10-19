@@ -127,7 +127,7 @@ export function OrgPage({ admin }: { admin: boolean }) {
   )
 }
 
-/** The glossary: rename Atlas's main words; every label follows. */
+/** The glossary: rename Madar's main words; every label follows. */
 export function TermsCard({ admin }: { admin: boolean }) {
   const { setSetting } = useStore()
   const o = termOverrides()
@@ -141,7 +141,7 @@ export function TermsCard({ admin }: { admin: boolean }) {
   }
   return (
     <Card eyebrow={<span className="flex items-center gap-1.5"><BookA size={12} /> {L('فرهنگ اصطلاحات', 'Glossary')}</span>} title={L('اسم مفاهیم اصلی', 'The names of the main ideas')}>
-      <p className="mb-3 text-xs leading-6 text-sub">{L('هر کلمه را این‌جا عوض کنید، در کل اطلس (منوها، عنوان‌ها، دکمه‌ها) عوض می‌شود. خالی بگذارید تا پیش‌فرض بماند.', 'Rename a word here and it changes across Atlas (menus, titles, buttons). Leave blank to keep the default.')}</p>
+      <p className="mb-3 text-xs leading-6 text-sub">{L('هر کلمه را این‌جا عوض کنید، در کل مدار (منوها، عنوان‌ها، دکمه‌ها) عوض می‌شود. خالی بگذارید تا پیش‌فرض بماند.', 'Rename a word here and it changes across Madar (menus, titles, buttons). Leave blank to keep the default.')}</p>
       <ul className="divide-y divide-line">
         {TERMS.map((t) => (
           <li key={t.id} className="grid items-center gap-2 py-2 sm:grid-cols-[9rem_1fr_1fr]">

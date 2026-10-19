@@ -86,7 +86,7 @@ export default function CalendarPage() {
   const Prev = locale.lang === 'fa' ? ChevronRight : ChevronLeft
   const Next = locale.lang === 'fa' ? ChevronLeft : ChevronRight
   const selItems = itemsOn(sel)
-  const pcode = (id: string) => db.Projects.find((p) => p.id === id)?.code.replace('ACG-', '') || ''
+  const pcode = (id: string) => db.Projects.find((p) => p.id === id)?.code.replace(/^PRJ-/, '') || ''
   const people = Array.from(new Set(db.Tasks.flatMap((t) => assigneesOf(t))))
 
   return (

@@ -6,10 +6,10 @@ import type { T2 } from './i18n'
 import { isTaskOverdue } from './metrics'
 import { addDays, todayISO } from './jalali'
 
-// The sides (product, design, tech by default) come from the back office (lib/org.ts fills these in place).
-export const TRACKS: Track[] = ['product', 'design', 'tech']
-export const TRACK: Record<string, T2> = { product: ['پروداکت', 'Product'], design: ['دیزاین', 'Design'], tech: ['تک', 'Tech'] }
-export const SIDE_COLOR: Record<string, string> = { product: '#8a1c3c', design: '#7c3aed', tech: '#1d6f8a' }
+// The units of the department come from the back office (lib/org.ts fills these in place).
+export const TRACKS: Track[] = ['product', 'crm_ops', 'data', 'tech']
+export const TRACK: Record<string, T2> = { product: ['مدیران محصول', 'Product managers'], crm_ops: ['CRM و عملیات', 'CRM & operations'], data: ['داده', 'Data'], tech: ['فنی', 'Tech'] }
+export const SIDE_COLOR: Record<string, string> = { product: '#e8650a', crm_ops: '#1f7a76', data: '#5b5bd6', tech: '#2f6f9f' }
 export const sideColor = (t: string) => SIDE_COLOR[t] || '#6b7180'
 /** Inline styles for a side's dot and soft chip (the colour is a setting, so no fixed classes). */
 export const sideDot = (t: string) => ({ background: sideColor(t) })

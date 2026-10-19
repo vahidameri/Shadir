@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { NavLink, useLocation, useNavigate, Link } from 'react-router-dom'
 import {
-  LayoutGrid, Briefcase, ListChecks, BellRing, ShieldAlert, FileText, Settings, Moon, Sun, Search, Plus, RefreshCw, Menu,
-  Sparkles, CheckCircle2, AlertCircle, Bell, PanelLeftClose, PanelLeftOpen, Languages, Star, AtSign, Flag, Clock, CircleAlert, Ban, CalendarDays, Keyboard, PackageCheck, CalendarRange, Gauge, UserRound, LogOut,
-  Binoculars, Repeat, Map, Zap, Target, FileSignature, Send,
+  Briefcase, ListChecks, BellRing, ShieldAlert, Settings, Moon, Sun, Search, Plus, RefreshCw, Menu,
+  Sparkles, CheckCircle2, AlertCircle, Bell, PanelLeftClose, PanelLeftOpen, Languages, Star, AtSign, Flag, Clock, CircleAlert, Ban, CalendarDays, Keyboard, CalendarRange, UserRound, LogOut, PackageCheck, Repeat,
 } from 'lucide-react'
 import { useStore, clearSnaps } from '../lib/store'
 import { useI18n, L } from '../lib/i18n'
@@ -12,31 +11,26 @@ import { buildInbox, type InboxItem } from '../lib/inbox'
 import { projectMetrics } from '../lib/metrics'
 import { useEditor } from './Editor'
 import { cx, Avatar, HealthDot, Popover, MenuItem } from './ui'
-import { fa, fmtDayMonth, todayISO as todayISOStr } from '../lib/jalali'
-import { inWeek, updateDue, weekStart } from '../lib/weeks'
-import { overloaded } from '../lib/capacity'
-import { isLate, tracking } from '../lib/radar'
-import { needsAttention, weekState } from '../lib/cadence'
+import { fa, fmtDayMonth } from '../lib/jalali'
 import { useGoogle } from '../lib/google'
 import { APP_NAME, VERSION } from '../lib/brand'
 import { hubOf, type Hub } from './HubNav'
 import { can } from '../lib/access'
-import { isPlanning } from '../lib/planning'
 import { ACCESS, JOB_TITLE } from '../lib/labels'
 import { CommandPalette } from './CommandPalette'
-import { AcgMark } from './Brand'
+import { NoyanMark } from './Brand'
 import { lbl } from '../lib/i18n'
 
 export function Layout({ children }: { children: ReactNode }) {
   const { db, me, setMe, mode, loading, error, refresh, lastSync, toasts, canEdit, dismissToast, config, setConfig, access, serverVersion, setting } = useStore()
   const { signOut } = useGoogle()
-  const [, setEntered] = usePref<boolean>('acg.entered', false)
+  const [, setEntered] = usePref<boolean>('madar.entered', false)
   const myMember = db.Team.find((m) => m.name === me)
   const leader = can.portfolio(access)
   const { lang, setLang } = useI18n()
   const { open } = useEditor()
   const { pins } = usePins()
-  const [collapsed, setCollapsed] = usePref('acg.sidebar.collapsed', false)
+  const [collapsed, setCollapsed] = usePref('madar.sidebar.collapsed', false)
   const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'))
   const [nav, setNav] = useState(false)
   const [palette, setPalette] = useState(false)
@@ -81,69 +75,42 @@ export function Layout({ children }: { children: ReactNode }) {
     setDark(d)
     document.documentElement.classList.toggle('dark', d)
     try {
-      localStorage.setItem('acg.theme', d ? 'dark' : 'light')
+      localStorage.setItem('madar.theme', d ? 'dark' : 'light')
     } catch {}
   }
 
   const inbox = useMemo(() => buildInbox(db, me), [db, me])
   const myCount = inbox.filter((i) => i.kind !== 'milestone' && i.kind !== 'risk' && i.kind !== 'blocked').length
 
-  const ws = weekStart()
-  const updatesMissing = todayISOStr() > updateDue(ws)
-    ? db.Projects.filter((p) => p.status === 'active' && !db.Updates.some((u) => u.project_id === p.id && inWeek(u.week_date, ws))).length
-    : 0
-  const overCap = overloaded(db, ws).length
-  const radarLate = leader ? db.Tasks.filter((t) => tracking(t, me) && isLate(t)).length + db.Projects.filter((p) => needsAttention(weekState(p, db))).length : 0
-
-  // agile layout: my work → planning → doing → watching
+  // Madar: my work → tracking → watching → back office
   const openTasks = db.Tasks.filter((t) => t.status !== 'done').length
-  const nextPlans = db.Meetings.filter((m) => isPlanning(m) && m.status === 'scheduled' && m.date >= todayISOStr()).length
-  const groups: { label: string; links: { to: string; label: string; icon: typeof LayoutGrid; badge?: number; count?: number; hub?: Hub }[] }[] = [
+  const groups: { label: string; links: { to: string; label: string; icon: typeof ListChecks; badge?: number; count?: number; hub?: Hub }[] }[] = [
     {
       label: L('کار من', 'My work'),
       links: [
-        { to: '/my', label: L('خانه', 'Home'), icon: Sparkles, badge: myCount },
+        { to: '/my', label: L('میز کار', 'My desk'), icon: Sparkles, badge: myCount },
         { to: '/calendar', label: L('تقویم', 'Calendar'), icon: CalendarDays },
         { to: '/meetings', label: L('جلسات', 'Meetings'), icon: CalendarRange },
       ],
     },
     {
-      label: L('برنامه‌ریزی', 'Planning'),
+      label: L('پیگیری', 'Tracking'),
       links: [
-        ...(leader ? [{ to: '/roadmap', label: L('رودمپ', 'Roadmap'), icon: Map }] : []),
-        { to: '/sprints', label: L('اسپرینت‌ها', 'Sprints'), icon: Zap },
-        { to: '/planning', label: L('جلسات برنامه‌ریزی', 'Planning sessions'), icon: Target, count: nextPlans },
-        { to: '/plan', label: L('برنامه‌ی تحویل', 'Delivery plan'), icon: PackageCheck },
-      ],
-    },
-    {
-      label: L('اجرا', 'Delivery'),
-      links: [
-        { to: '/projects', label: leader ? L('پروژه‌ها', 'Projects') : L('پروژه‌های من', 'My projects'), icon: Briefcase, count: db.Projects.filter((p) => p.status === 'active').length },
-        { to: '/tasks', label: L('تسک‌ها', 'Tasks'), icon: ListChecks, count: openTasks },
+        { to: '/tasks', label: L('تسک‌ها', 'Tasks'), icon: ListChecks, count: openTasks, hub: 'work' as Hub },
         { to: '/followups', label: L('پیگیری‌ها', 'Follow-ups'), icon: BellRing },
-        ...(leader ? [{ to: '/teams', label: L('واحدها و تحویل‌ها', 'Units & hand-offs'), icon: Repeat }] : []),
+        { to: '/projects', label: L('پروژه‌ها', 'Projects'), icon: Briefcase, count: db.Projects.filter((p) => p.status === 'active').length },
       ],
     },
-    {
-      label: L('پایش', 'Watching'),
-      links: [
-        ...(leader ? [{ to: '/lookout', label: L('دیده‌بان', 'Lookout'), icon: Binoculars, badge: radarLate, hub: 'lookout' as Hub }] : []),
-        { to: '/updates', label: L('گزارش‌های هفتگی', 'Weekly updates'), icon: FileText, badge: updatesMissing },
-        ...(can.backoffice(access) ? [{ to: '/telegram', label: L('به‌روزرسانی از تلگرام', 'Update from Telegram'), icon: Send }] : []),
-        ...(leader ? [
-          { to: '/team', label: L('ظرفیت و منابع', 'Capacity & resourcing'), icon: Gauge, badge: overCap },
-          { to: '/risks', label: L('ریسک‌ها و تصمیم‌ها', 'Risks & decisions'), icon: ShieldAlert },
-        ] : []),
-      ],
-    },
-    ...(can.contracts(access)
+    ...(leader
+      ? [{
+          label: L('پایش', 'Watching'),
+          links: [{ to: '/risks', label: L('ریسک‌ها و تصمیم‌ها', 'Risks & decisions'), icon: ShieldAlert }],
+        }]
+      : []),
+    ...(can.backoffice(access)
       ? [{
           label: L('مدیریت', 'Admin'),
-          links: [
-            { to: '/contracts', label: L('قراردادها', 'Contracts'), icon: FileSignature },
-            ...(can.backoffice(access) ? [{ to: '/admin', label: L('بک‌آفیس', 'Back office'), icon: Settings }] : []),
-          ],
+          links: [{ to: '/admin', label: L('بک‌آفیس', 'Back office'), icon: Settings }],
         }]
       : []),
   ]
@@ -164,11 +131,11 @@ export function Layout({ children }: { children: ReactNode }) {
     <aside className={cx('flex h-full flex-col bg-band text-on-band transition-[width] duration-300', wide ? 'w-64' : 'w-[4.5rem]')}>
       <div className={cx('flex h-16 shrink-0 items-center border-b border-band-line', wide ? 'gap-3 px-5' : 'justify-center')}>
         <Link to="/" className="flex items-center gap-3">
-          <AcgMark className="h-7 text-white" />
+          <NoyanMark className="h-7 w-7 shrink-0" />
           {wide && (
             <div className="leading-tight">
               <div className="text-sm font-semibold tracking-tight">{APP_NAME()}</div>
-              <div className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-band-sub">ACG · Atlas</div>
+              <div className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-band-sub">Noyan · Madar</div>
             </div>
           )}
         </Link>
@@ -185,7 +152,7 @@ export function Layout({ children }: { children: ReactNode }) {
                   end={l.to === '/'}
                   title={!wide ? l.label : undefined}
                   className={({ isActive: a }) => {
-                    const isActive = a || (!!l.hub && hubOf(loc.pathname) === l.hub) || (l.to === '/team' && loc.pathname.startsWith('/people'))
+                    const isActive = a || (!!l.hub && hubOf(loc.pathname) === l.hub) || false
                     return cx(
                       'group relative flex h-10 items-center gap-3 rounded-xl text-sm transition',
                       wide ? 'px-3' : 'justify-center',
@@ -194,7 +161,7 @@ export function Layout({ children }: { children: ReactNode }) {
                   }}
                 >
                   {({ isActive: a }) => {
-                    const isActive = a || (!!l.hub && hubOf(loc.pathname) === l.hub) || (l.to === '/team' && loc.pathname.startsWith('/people'))
+                    const isActive = a || (!!l.hub && hubOf(loc.pathname) === l.hub) || false
                     return (
                     <>
                       {isActive && <span className="absolute inset-y-2 start-0 w-[3px] rounded-full bg-brand-soft" />}
@@ -237,7 +204,7 @@ export function Layout({ children }: { children: ReactNode }) {
           width={260}
           trigger={({ toggle }) => (
             <button onClick={toggle} className={cx('flex w-full items-center gap-3 rounded-xl p-2 text-start transition hover:bg-white/[0.06]', !wide && 'justify-center')}>
-              <Avatar name={me || 'ACG'} size="md" />
+              <Avatar name={me || 'Madar'} size="md" />
               {wide && (
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium">{me || L('مهمان', 'Guest')}</div>
@@ -361,9 +328,8 @@ export function Layout({ children }: { children: ReactNode }) {
                   [
                     ['Tasks', L('تسک', 'Task'), 'N', ListChecks],
                     ['FollowUps', L('پیگیری', 'Follow-up'), 'F', BellRing],
-                    ['Updates', L('گزارش هفتگی', 'Weekly update'), '', FileText],
+                    ['Meetings', L('جلسه', 'Meeting'), '', CalendarRange],
                     ['Risks', L('ریسک / تصمیم', 'Risk / decision'), '', ShieldAlert],
-                    ['Milestones', L('مایلستون', 'Milestone'), '', Flag],
                     ['Projects', L('پروژه', 'Project'), '', Briefcase],
                   ] as const
                 ).map(([s, l, k, Icon]) => (
@@ -388,14 +354,14 @@ export function Layout({ children }: { children: ReactNode }) {
         {mode === 'live' && lastSync && can.backoffice(access) && serverVersion !== VERSION && (
           <div className="bg-warn px-4 py-2 text-center text-xs text-white no-print">
             {L(
-              `نسخه‌ی صفحه ${VERSION} است ولی سرور (Code.gs) ${serverVersion || 'قدیمی‌تر از 1.10.1'} — Code.gs را جایگزین کنید و در Manage deployments برای Atlas Team «New version» بزنید.`,
-              `This page is ${VERSION} but the server (Code.gs) is ${serverVersion || 'older than 1.10.1'} — replace Code.gs and create a New version of Atlas Team in Manage deployments.`,
+              `نسخه‌ی صفحه ${VERSION} است ولی سرور (Code.gs) ${serverVersion || 'قدیمی‌تر'} — Code.gs را جایگزین کنید و در Manage deployments برای Madar Team «New version» بزنید.`,
+              `This page is ${VERSION} but the server (Code.gs) is ${serverVersion || 'older'} — replace Code.gs and create a New version of Madar Team in Manage deployments.`,
             )}
           </div>
         )}
         {mode === 'live' && lastSync && can.backoffice(access) && !setting('app.google_url', '') && (
           <div className="flex flex-wrap items-center justify-center gap-x-3 bg-warn px-4 py-2 text-center text-xs text-white no-print">
-            {L('ورود با گوگل برای تیم فعال نیست: لینک انتشار «Atlas Google» هنوز در تنظیمات ثبت نشده و فعلاً فقط خود شما این دکمه را می‌بینید.', 'Google sign-in is off for the team: the “Atlas Google” deployment link is not saved (only you see the button).')}
+            {L('ورود با گوگل برای تیم فعال نیست: لینک انتشار «Madar Google» هنوز در تنظیمات ثبت نشده و فعلاً فقط خود شما این دکمه را می‌بینید.', 'Google sign-in is off for the team: the “Madar Google” deployment link is not saved (only you see the button).')}
             <Link to="/settings" className="font-semibold underline">{L('ذخیره‌ی لینک', 'Save the link')}</Link>
           </div>
         )}
@@ -437,13 +403,13 @@ export function Layout({ children }: { children: ReactNode }) {
 const kindIcon = { mention: AtSign, overdue: Clock, followup: BellRing, milestone: Flag, risk: CircleAlert, blocked: Ban, assigned: UserRound, remind: Bell, deadline: Flag, delivery: PackageCheck, handoff: Repeat }
 
 function InboxButton({ items }: { items: InboxItem[] }) {
-  const [read, setRead] = usePref<string[]>('acg.inbox.read', [])
+  const [read, setRead] = usePref<string[]>('madar.inbox.read', [])
   const { open } = useEditor()
   const { db } = useStore()
   const navigate = useNavigate()
   const unread = items.filter((i) => !read.includes(i.id))
   // a new notification pops up once, inside the app
-  const [seen, setSeen] = usePref<string[]>('acg.inbox.seen', [])
+  const [seen, setSeen] = usePref<string[]>('madar.inbox.seen', [])
   const { toast } = useStore()
   useEffect(() => {
     const fresh = unread.filter((i) => !seen.includes(i.id))

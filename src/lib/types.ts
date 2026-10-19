@@ -122,7 +122,7 @@ export interface Task {
 }
 
 /** a side from the settings: product, design, tech by default */
-export type Track = 'product' | 'design' | 'tech' | (string & {})
+export type Track = 'product' | 'crm_ops' | 'data' | 'tech' | (string & {})
 
 export type FollowUpStatus = 'open' | 'waiting' | 'done'
 
@@ -238,7 +238,7 @@ export interface Deliverable {
 }
 
 /** a meeting series from the settings (portfolio, product, design, tech, project, one_on_one, other by default) */
-export type MeetingSeries = 'portfolio' | 'product' | 'design' | 'tech' | 'project' | 'planning' | 'one_on_one' | 'other' | (string & {})
+export type MeetingSeries = 'portfolio' | 'unit' | 'one_on_one' | 'adhoc' | 'external' | 'planning' | 'other' | (string & {})
 
 export interface Meeting {
   id: string

@@ -1,4 +1,4 @@
-// The glossary: the words Atlas uses for its main ideas. The program manager renames any of them
+// The glossary: the words Madar uses for its main ideas. The program manager renames any of them
 // in the back office (Config "terms", JSON {id: {fa, en}}); every label follows (see i18n setTermSwaps).
 import { setTermSwaps, type T2 } from './i18n'
 
@@ -11,21 +11,13 @@ export interface Term {
 }
 
 export const TERMS: Term[] = [
-  { id: 'company', word: ['ACG', 'ACG'], hint: ['نام کل مجموعه (نمای کلی، جلسه‌ی هفتگی اصلی)', 'The whole company (overview, main weekly)'] },
-  { id: 'project', word: ['پروژه', 'Project'], hint: ['هر کار مستقل با کارفرما، تیم و ددلاین', 'An engagement with a client, team and deadline'] },
+  { id: 'company', word: ['CPTO', 'CPTO'], hint: ['نام کل دپارتمان (نمای کلی، جلسه‌ی هفتگی اصلی)', 'The whole department (overview, main weekly)'] },
+  { id: 'project', word: ['پروژه', 'Project'], hint: ['پروژه یا اینیشیتیو که وظیفه‌ها به آن وصل می‌شوند', 'A project or initiative tasks belong to'] },
   { id: 'task', word: ['تسک', 'Task'], hint: ['کوچک‌ترین واحد کار', 'The smallest piece of work'] },
-  { id: 'milestone', word: ['مایلستون', 'Milestone'], hint: ['نقطه‌ی کلیدی پروژه که پیشرفت با آن سنجیده می‌شود', 'A key point that measures progress'] },
-  { id: 'sprint', word: ['اسپرینت', 'Sprint'], hint: ['دوره‌ی کاری کوتاه (معمولاً دو هفته)', 'A short work cycle (usually two weeks)'] },
-  { id: 'backlog', word: ['بک‌لاگ', 'Backlog'], hint: ['کارهایی که هنوز در اسپرینتی نیستند', 'Work not yet in a sprint'] },
-  { id: 'scope', word: ['محدوده‌ی کار', 'Scope'], hint: ['آنچه داخل یا خارج قرارداد است', 'What is in or out of the agreement'] },
-  { id: 'deliverable', word: ['خروجی', 'Deliverable'], hint: ['چیزی که در تاریخی مشخص تحویل می‌شود', 'Something handed over on a date'] },
   { id: 'followup', word: ['پیگیری', 'Follow-up'], hint: ['موضوعی که از کسی دنبال می‌کنید', 'Something you chase with someone'] },
   { id: 'risk', word: ['ریسک', 'Risk'], hint: ['اتفاقی که ممکن است برنامه را به هم بزند', 'Something that could derail the plan'] },
-  { id: 'points', word: ['امتیاز', 'Point'], hint: ['اندازه‌ی کار (استوری‌پوینت)', 'Size of work (story points)'] },
   { id: 'deadline', word: ['ددلاین', 'Deadline'], hint: ['آخرین مهلت', 'The final due date'] },
-  { id: 'unit', word: ['واحد', 'Unit'], hint: ['پروداکت، دیزاین، تک — که کار را به هم تحویل می‌دهند', 'Product, design, tech — they hand work to each other'] },
-  { id: 'lookout', word: ['دیده‌بان', 'Lookout'], hint: ['داشبورد مدیرعامل، مدیر برنامه و هدها', 'The leadership dashboard'] },
-  { id: 'update', word: ['گزارش هفتگی', 'Weekly update'], hint: ['گزارش وضعیت هر پروژه در هفته', 'Each project’s status report for the week'] },
+  { id: 'unit', word: ['واحد', 'Unit'], hint: ['لاین‌ها، مدیران محصول، CRM و عملیات، داده و…', 'Lines, product managers, CRM & ops, data, …'] },
 ]
 
 export const TERMS_KEY = 'terms'

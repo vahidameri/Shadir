@@ -265,11 +265,11 @@ function GoogleLinkField() {
     : !/^https:\/\/script\.google\.com\/(a\/[^/]+\/)?macros\/s\/[\w-]+\/exec$/.test(base(url))
       ? L('این لینک انتشار Apps Script نیست. باید شبیه https://script.google.com/macros/s/…/exec باشد (لینک‌هایی که به /dev ختم می‌شوند فقط برای خود شما کار می‌کنند).', 'Not an Apps Script deployment link. It should look like https://script.google.com/macros/s/…/exec (links ending in /dev only work for you).')
       : g.apiUrl && base(url) === base(g.apiUrl)
-        ? L('این همان لینک Atlas Team است. لینک انتشار دوم، «Atlas Google» (Execute as: User accessing) را بگذارید.', 'This is the Atlas Team link. Use the second deployment, “Atlas Google” (Execute as: User accessing).')
+        ? L('این همان لینک Madar Team است. لینک انتشار دوم، «Madar Google» (Execute as: User accessing) را بگذارید.', 'This is the Madar Team link. Use the second deployment, “Madar Google” (Execute as: User accessing).')
         : ''
   return (
     <div>
-      <div className="label">{L('لینک ورود با گوگل (Atlas Google)', 'Google sign-in link (Atlas Google)')}</div>
+      <div className="label">{L('لینک ورود با گوگل (Madar Google)', 'Google sign-in link (Madar Google)')}</div>
       <div className="flex gap-2">
         <input className="input h-10 flex-1 text-xs" dir="ltr" placeholder="https://script.google.com/macros/s/…/exec" value={v} onChange={(e) => setV(e.target.value)} />
         <button className="btn-outline h-10 px-4 text-xs" disabled={url === saved || !!problem} onClick={() => setSetting('app.google_url', url)}>
@@ -282,7 +282,7 @@ function GoogleLinkField() {
         <p className="mt-1.5 text-[0.6875rem] leading-5 text-sub">
           {saved
             ? L('ذخیره شده؛ همه‌ی اعضا در صفحه‌ی ورود دکمه‌ی «ورود با حساب گوگل» را می‌بینند.', 'Saved; everyone sees “Continue with Google” on the sign-in page.')
-            : L('تا این لینک ذخیره نشود، فقط خود شما (صاحب اسکریپت) دکمه‌ی ورود با گوگل را می‌بینید. لینک را از Deploy ← Manage deployments ← Atlas Google ← Web app URL بردارید.', 'Until this is saved only you (the script owner) see Google sign-in. Copy it from Deploy → Manage deployments → Atlas Google → Web app URL.')}
+            : L('تا این لینک ذخیره نشود، فقط خود شما (صاحب اسکریپت) دکمه‌ی ورود با گوگل را می‌بینید. لینک را از Deploy ← Manage deployments ← Madar Google ← Web app URL بردارید.', 'Until this is saved only you (the script owner) see Google sign-in. Copy it from Deploy → Manage deployments → Madar Google → Web app URL.')}
         </p>
       )}
     </div>

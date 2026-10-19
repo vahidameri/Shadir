@@ -40,7 +40,7 @@ export function Card({
   )
 }
 
-/** ACG-style black band with grid texture; page content overlaps its bottom edge. */
+/** Deep-teal band with grid texture; page content overlaps its bottom edge. */
 export function Band({ eyebrow, title, sub, actions, children, nav }: { eyebrow?: ReactNode; title: ReactNode; sub?: ReactNode; actions?: ReactNode; children?: ReactNode; nav?: ReactNode }) {
   return (
     <div className="band -mx-4 @sm:-mx-6 @lg:-mx-8 px-4 @sm:px-6 @lg:px-8 pt-9 pb-24 no-print">
@@ -64,7 +64,7 @@ export function Overlap({ children, className }: { children: ReactNode; classNam
   return <div className={cx('relative z-10 mx-auto -mt-16 max-w-[90rem] stagger', className)}>{children}</div>
 }
 
-/** ACG stats strip: big numbers separated by hairlines. */
+/** CPTO stats strip: big numbers separated by hairlines. */
 export function StatStrip({ items }: { items: { label: ReactNode; value: ReactNode; tone?: Health | 'muted'; sub?: ReactNode }[] }) {
   return (
     <div className="grid grid-cols-2 border-t border-band-line @sm:grid-cols-3 @lg:grid-cols-6">

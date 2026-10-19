@@ -23,6 +23,7 @@ export default {
         brand: c('brand'),
         'brand-soft': c('brand-soft'),
         wine: c('wine'),
+        accent: c('wine'),
         good: c('good'),
         warn: c('warn'),
         bad: c('bad'),

@@ -24,7 +24,7 @@ export interface AutomationDef {
 export const AUTOMATIONS: AutomationDef[] = [
   { id: 'gcal_import', where: 'app', icon: CalendarSync, title: ['آوردن ایونت‌های مرتبط تقویم گوگل', 'Bring in related Google Calendar events'], desc: ['ایونتی که نام پروژه را دارد یا دو نفر از تیم در آن هستند، خودکار به «جلسات» اضافه می‌شود.', 'Events that name a project or include two or more teammates are added to Meetings.'] },
   { id: 'gcal_create', where: 'app', icon: CalendarPlus, title: ['ثبت جلسه‌ها در تقویم گوگل با لینک Meet', 'Put meetings on Google Calendar with a Meet link'], desc: ['حاضران، برگزارکننده و همیشه مدیر برنامه و مدیرعامل دعوت می‌شوند؛ جابجایی یا لغو جلسه در تقویم هم اعمال می‌شود.', 'Attendees, the facilitator and always the program manager and CEO are invited; moves and cancellations follow.'] },
-  { id: 'next_meeting', where: 'app', icon: Repeat, title: ['ساخت جلسه‌ی هفته‌ی بعد پس از بستن جلسه‌ی هفتگی', 'Schedule next week after a weekly is closed'], desc: ['برای همه‌ی جلسه‌های هفتگی (ACG، پروداکت، دیزاین، تک، پروژه).', 'For every weekly series (ACG, product, design, tech, project).'] },
+  { id: 'next_meeting', where: 'app', icon: Repeat, title: ['ساخت جلسه‌ی هفته‌ی بعد پس از بستن جلسه‌ی هفتگی', 'Schedule next week after a weekly is closed'], desc: ['برای همه‌ی جلسه‌های هفتگی (CPTO، پروداکت، دیزاین، تک، پروژه).', 'For every weekly series (CPTO, product, design, tech, project).'] },
   { id: 'minutes_mail', where: 'server', icon: Mail, title: ['ایمیل صورت‌جلسه و اکشن‌پلن به حاضران', 'Email minutes & action plan to attendees'], desc: ['وقتی جلسه «برگزار شد» زده می‌شود.', 'When a meeting is marked held.'] },
   { id: 'blocked_followup', where: 'app', icon: Unlock, title: ['پیگیری برای تسکی که بیش از ۳ روز مسدود مانده', 'Follow-up for tasks blocked over 3 days'], desc: ['با مسئول تسک، در پیگیری‌های مدیر برنامه.', 'With the assignee, on the program manager’s follow-ups.'] },
   { id: 'pause_shift', where: 'app', icon: PauseCircle, title: ['جابجایی ددلاین بعد از ادامه‌ی پروژه‌ی متوقف', 'Shift dates when a paused project resumes'], desc: ['ددلاین، مایلستون‌ها و تحویل‌های باز به اندازه‌ی روزهای توقف جلو می‌روند.', 'Deadline, milestones and open deliverables move by the paused days.'] },
@@ -181,7 +181,7 @@ export function AutomationProvider({ children }: { children: ReactNode }) {
           await upsert('Meetings', { ...m, gcal_id: '' })
           return fire(L('رویداد تقویم لغو شد (نمایشی)', 'Calendar event cancelled (demo)'))
         }
-        await upsert('Meetings', { ...m, gcal_id: m.gcal_id || `g-${m.id}`, meet_url: m.meet_url || `https://meet.google.com/acg-${m.id.slice(-6)}` })
+        await upsert('Meetings', { ...m, gcal_id: m.gcal_id || `g-${m.id}`, meet_url: m.meet_url || `https://meet.google.com/mdr-${m.id.slice(-6)}` })
         return fire(before?.gcal_id
           ? L('رویداد تقویم به‌روز شد (نمایشی)', 'Calendar event updated (demo)')
           : L(`در تقویم ثبت شد و ${fa(people.length)} نفر دعوت شدند (نمایشی)`, `Added to the calendar, ${people.length} invited (demo)`))

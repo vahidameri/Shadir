@@ -9,22 +9,9 @@ type Tab = { to: string; label: string; lead?: boolean }
 // Related pages share one sidebar entry and switch with these tabs on the band.
 // `lead` tabs are for leadership only (they are hidden for everyone else).
 export const HUBS = {
-  lookout: (): Tab[] => [
-    { to: '/lookout', label: L('دیده‌بان', 'Lookout'), lead: true },
-    { to: '/', label: L('وضعیت ACG', 'ACG status'), lead: true },
-    { to: '/pulse', label: L('برد وضعیت', 'Status board'), lead: true },
-    { to: '/report', label: L('گزارش مدیریتی', 'Exec report'), lead: true },
-  ],
-  plan: (): Tab[] => [
-    { to: '/roadmap', label: L('رودمپ', 'Roadmap'), lead: true },
-    { to: '/sprints', label: L('اسپرینت‌ها', 'Sprints') },
-    { to: '/planning', label: L('جلسات برنامه‌ریزی', 'Planning sessions') },
-    { to: '/plan', label: L('برنامه‌ی تحویل', 'Delivery plan') },
-  ],
   work: (): Tab[] => [
     { to: '/tasks', label: L('تسک‌ها', 'Tasks') },
     { to: '/followups', label: L('پیگیری‌ها', 'Follow-ups') },
-    { to: '/teams', label: L('واحدها و تحویل‌ها', 'Units & hand-offs'), lead: true },
   ],
 }
 export type Hub = keyof typeof HUBS

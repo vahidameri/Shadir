@@ -68,7 +68,7 @@ export async function createEvent(token: string, m: Meeting, emails: string[], d
     start: { dateTime: start.toISOString() },
     end: { dateTime: end.toISOString() },
     attendees: emails.map((email) => ({ email })),
-    conferenceData: m.meet_url ? undefined : { createRequest: { requestId: `acg-${m.id}`, conferenceSolutionKey: { type: 'hangoutsMeet' } } },
+    conferenceData: m.meet_url ? undefined : { createRequest: { requestId: `madar-${m.id}`, conferenceSolutionKey: { type: 'hangoutsMeet' } } },
   }
   const r = await fetch(`${API}?conferenceDataVersion=1&sendUpdates=all`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   if (!r.ok) throw new Error(`Calendar ${r.status}`)
@@ -93,12 +93,11 @@ export function relate(e: GEvent, db: DB): Relation {
 
 export function seriesFor(e: GEvent, r: Relation): MeetingSeries {
   const t = e.title.toLowerCase()
-  if (/weekly|ویکلی|هفتگی/.test(t) && /portfolio|ACG/.test(t)) return 'portfolio'
-  if (/design|دیزاین|طراحی/.test(t)) return 'design'
-  if (/product|پروداکت/.test(t)) return 'product'
-  if (/tech|تک/.test(t)) return 'tech'
-  if (r.projectId) return 'project'
-  if (r.members.length === 2 || /1:1|۱:۱|one.on.one/.test(t)) return 'one_on_one'
+  if (/weekly|ویکلی|هفتگی/.test(t) && /cpto|دپارتمان/.test(t)) return 'portfolio'
+  if (/weekly|ویکلی|هفتگی/.test(t)) return 'unit'
+  if (r.members.length === 2 || /1:1|۱:۱|one.on.one|وان.?آن.?وان/.test(t)) return 'one_on_one'
+  if (r.members.length < e.attendees.length) return 'external'
+  if (r.projectId || r.members.length > 2) return 'adhoc'
   return 'other'
 }
 

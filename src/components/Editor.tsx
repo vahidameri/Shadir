@@ -83,7 +83,7 @@ export const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields:
     prefix: 'P',
     fields: [
       { key: 'name', label: ['نام پروژه', 'Project name'], type: 'text', required: true },
-      { key: 'code', label: ['کد', 'Code'], type: 'text', half: true, placeholder: ['ACG-XXX', 'ACG-XXX'] },
+      { key: 'code', label: ['کد', 'Code'], type: 'text', half: true, placeholder: ['PRJ-XXX', 'PRJ-XXX'] },
       { key: 'category', label: ['دسته', 'Category'], type: 'text', half: true },
       { key: 'description', label: ['شرح', 'Description'], type: 'textarea' },
       { key: 'objective', label: ['هدف کسب‌وکاری', 'Business objective'], type: 'text' },

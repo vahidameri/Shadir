@@ -28,7 +28,7 @@ export async function otpCall<T = Record<string, unknown>>(apiUrl: string, body:
   return json as T
 }
 
-const CFG_KEY = 'acg.config'
+const CFG_KEY = 'madar.config'
 
 export function loadConfig(): Config {
   try {
@@ -65,7 +65,7 @@ async function readJson(res: Response) {
     // show what actually answered, so the misconfiguration is obvious
     const title = (text.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1] || '').trim()
     const where = res.url.replace(/[?#].*$/, '')
-    throw new Error(`آدرس داده به‌جای داده یک صفحه برگرداند (${res.status}${title ? ` · ${title}` : ''}). انتشار «Atlas Team» باید Web app با Execute as: Me و Who has access: Anyone باشد و API_URL همان آدرس باشد.\n${where}`)
+    throw new Error(`آدرس داده به‌جای داده یک صفحه برگرداند (${res.status}${title ? ` · ${title}` : ''}). انتشار «Madar Team» باید Web app با Execute as: Me و Who has access: Anyone باشد و API_URL همان آدرس باشد.\n${where}`)
   }
   return JSON.parse(text)
 }

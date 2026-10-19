@@ -10,8 +10,8 @@ export type T2 = readonly [string, string]
 // without threading a hook everywhere. The provider keeps it in sync and re-renders.
 export const locale: { lang: Lang; cal: Calendar } = (() => {
   try {
-    const lang = (localStorage.getItem('acg.lang') as Lang) || 'fa'
-    return { lang, cal: (localStorage.getItem('acg.cal') as Calendar) || (lang === 'fa' ? 'jalali' : 'gregorian') }
+    const lang = (localStorage.getItem('madar.lang') as Lang) || 'fa'
+    return { lang, cal: (localStorage.getItem('madar.cal') as Calendar) || (lang === 'fa' ? 'jalali' : 'gregorian') }
   } catch {
     return { lang: 'fa' as Lang, cal: 'jalali' as Calendar }
   }
@@ -63,8 +63,8 @@ function read<T extends string>(k: string, d: T): T {
 }
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>(() => read('acg.lang', 'fa'))
-  const [cal, setCalState] = useState<Calendar>(() => read('acg.cal', lang === 'fa' ? 'jalali' : 'gregorian'))
+  const [lang, setLangState] = useState<Lang>(() => read('madar.lang', 'fa'))
+  const [cal, setCalState] = useState<Calendar>(() => read('madar.cal', lang === 'fa' ? 'jalali' : 'gregorian'))
   locale.lang = lang
   locale.cal = cal
   const dir = lang === 'fa' ? 'rtl' : 'ltr'
@@ -80,17 +80,17 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     const c: Calendar = l === 'fa' ? 'jalali' : 'gregorian'
     setCalState(c)
     try {
-      localStorage.setItem('acg.lang', l)
-      localStorage.setItem('acg.cal', c)
+      localStorage.setItem('madar.lang', l)
+      localStorage.setItem('madar.cal', c)
     } catch {}
     locale.lang = l
     locale.cal = c
-    window.dispatchEvent(new CustomEvent('acg-lang', { detail: l }))
+    window.dispatchEvent(new CustomEvent('madar-lang', { detail: l }))
   }, [])
   const setCal = useCallback((c: Calendar) => {
     setCalState(c)
     try {
-      localStorage.setItem('acg.cal', c)
+      localStorage.setItem('madar.cal', c)
     } catch {}
   }, [])
 

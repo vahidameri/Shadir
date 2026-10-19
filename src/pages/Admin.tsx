@@ -6,7 +6,6 @@ import { useEditor } from '../components/Editor'
 import { Band, Card, Overlap, Segmented, StatStrip, Avatar, cx } from '../components/ui'
 import { PauseButton } from '../components/PauseButton'
 import Settings from './Settings'
-import { TelegramImport } from '../components/TelegramImport'
 import { OrgPage } from '../components/OrgSettings'
 import { L, lbl } from '../lib/i18n'
 import { ACCESS, PROJECT_STATUS, JOB_TITLE, TEAM_NAMES, teamCodes, usernameOf } from '../lib/labels'
@@ -14,7 +13,7 @@ import { capOf, memberWeek } from '../lib/capacity'
 import { fa } from '../lib/jalali'
 import type { Access } from '../lib/types'
 
-type Tab = 'people' | 'org' | 'projects' | 'telegram' | 'settings'
+type Tab = 'people' | 'org' | 'projects' | 'settings'
 
 /** Back office — the program manager's control room: people & access, organisation, projects, settings.
  *  Contracts have their own page (/contracts) for the program manager and the CEO. */
@@ -37,7 +36,6 @@ export default function Admin({ initial = 'people' }: { initial?: Tab }) {
                 { value: 'people', label: L('افراد و دسترسی', 'People & access') },
                 { value: 'org', label: L('سمت‌ها و سازمان', 'Titles & organisation') },
                 { value: 'projects', label: L('پروژه‌ها', 'Projects') },
-                { value: 'telegram', label: L('تلگرام', 'Telegram') },
                 { value: 'settings', label: L('تنظیمات', 'Settings') },
               ]}
             />
@@ -72,7 +70,6 @@ export default function Admin({ initial = 'people' }: { initial?: Tab }) {
         {tab === 'people' && <People />}
         {tab === 'projects' && <ProjectsAdmin />}
         {tab === 'org' && <OrgPage admin={access === 'super'} />}
-        {tab === 'telegram' && <TelegramImport />}
         {tab === 'settings' && <Settings embedded />}
       </Overlap>
     </>

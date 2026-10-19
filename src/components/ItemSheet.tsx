@@ -96,7 +96,7 @@ export function ItemSheet({ sheet, id, onClose }: { sheet: 'Tasks' | 'FollowUps'
                     .then(() => toast(L('ایمیل برای افراد تسک ارسال شد', 'Emailed to everyone on the task')))
                     .catch((e) => toast(String(e instanceof Error ? e.message : e), 'err'))
                 }
-                title={L('فقط وقتی لازم است — اعلان‌ها خودشان داخل اطلس می‌آیند', 'Only when needed — notifications already arrive in Atlas')}
+                title={L('فقط وقتی لازم است — اعلان‌ها خودشان داخل مدار می‌آیند', 'Only when needed — notifications already arrive in Madar')}
               >
                 <Mail size={14} /> {L('ارسال ایمیل', 'Send email')}
               </button>

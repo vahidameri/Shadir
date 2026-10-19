@@ -105,13 +105,12 @@ export const CONFIDENCE: Record<Deliverable['confidence'], T2> = {
 }
 /** Meeting series — names are editable in the back office (Config org.series). */
 export const MEETING_SERIES: Record<MeetingSeries, T2> = {
-  portfolio: ['جلسه‌ی هفتگی ACG', 'ACG weekly'],
-  product: ['جلسه‌ی هفتگی پروداکت', 'Product weekly'],
-  design: ['جلسه‌ی هفتگی دیزاین', 'Design weekly'],
-  tech: ['جلسه‌ی هفتگی تک', 'Tech weekly'],
-  project: ['جلسه‌ی هفتگی پروژه', 'Project weekly'],
+  portfolio: ['ویکلی دپارتمان CPTO', 'CPTO department weekly'],
+  unit: ['ویکلی لاین / تیم', 'Line / team weekly'],
+  one_on_one: ['وان‌آن‌وان', 'One-on-one'],
+  adhoc: ['جلسه‌ی موردی / بین‌تیمی', 'Ad-hoc / cross-team'],
+  external: ['جلسه با واحدها و سازمان‌های دیگر', 'With other units & organisations'],
   planning: ['جلسه‌ی برنامه‌ریزی', 'Planning session'],
-  one_on_one: ['جلسه‌ی یک‌به‌یک', 'One-on-one'],
   other: ['سایر جلسات', 'Other meetings'],
 }
 /** Planning sessions are held once, for a purpose, not copied every week ('demo' and 'retro' are kept
@@ -125,8 +124,8 @@ export const PLAN_PURPOSE: Record<string, T2> = {
   release: ['انتشار و تحویل', 'Release'],
   other: ['سایر', 'Other'],
 }
-/** Series that repeat every week (everything except planning sessions, one-on-ones and other meetings). */
-export const isWeeklySeries = (s: string) => !!s && s !== 'one_on_one' && s !== 'other' && !AGILE_SERIES.includes(s)
+/** Series that repeat every week (everything except planning sessions, one-on-ones, ad-hoc, external and other meetings). */
+export const isWeeklySeries = (s: string) => !!s && !['one_on_one', 'adhoc', 'external', 'other'].includes(s) && !AGILE_SERIES.includes(s)
 export const MEETING_STATUS: Record<Meeting['status'], T2> = {
   scheduled: ['برنامه‌ریزی‌شده', 'Scheduled'],
   held: ['برگزار شد', 'Held'],
@@ -135,18 +134,19 @@ export const MEETING_STATUS: Record<Meeting['status'], T2> = {
 
 /** Job titles (Team.role). Stored as the code; old free-text titles are mapped by jobCode. */
 export const JOB_TITLE: Record<string, T2> = {
-  ceo: ['مدیرعامل', 'CEO'],
-  cpo: ['مدیر ارشد محصول', 'CPO'],
-  cto: ['مدیر ارشد فناوری', 'CTO'],
+  cpto: ['مدیر ارشد محصول و فناوری', 'CPTO'],
   pgm: ['مدیر برنامه', 'Program Manager'],
+  line: ['مدیر لاین', 'Line Manager'],
   pm: ['مدیر محصول', 'Product Manager'],
-  apm: ['دستیار مدیر محصول', 'Assistant Product Manager'],
+  lead: ['سرپرست تیم', 'Team Lead'],
+  data: ['تحلیلگر داده', 'Data Analyst'],
+  eng: ['مهندس نرم‌افزار', 'Software Engineer'],
   pd: ['طراح محصول', 'Product Designer'],
-  gd: ['گرافیست', 'Graphic Designer'],
+  spec: ['کارشناس', 'Specialist'],
 }
 const LEGACY_TITLE: Record<string, string> = {
-  'مدیرعامل': 'ceo', 'هد پروداکت': 'cpo', 'هد تک': 'cto', 'مدیر برنامه': 'pgm', 'پروداکت منیجر': 'pm', 'پروداکت دیزاینر': 'pd', 'گرافیست': 'gd', 'دستیار مدیر محصول': 'apm',
-  'head of product': 'cpo', 'head of tech': 'cto', 'program manager': 'pgm', 'product manager': 'pm', 'product designer': 'pd', 'graphic designer': 'gd',
+  'مدیر برنامه': 'pgm', 'پروداکت منیجر': 'pm', 'مدیر محصول': 'pm', 'پروداکت دیزاینر': 'pd',
+  'program manager': 'pgm', 'pgm': 'pgm', 'product manager': 'pm', 'product designer': 'pd', 'cpto': 'cpto',
 }
 /** Title options with their code visible, e.g. "مدیرعامل · CEO". */
 export const JOB_TITLE_OPTIONS: Record<string, T2> = Object.fromEntries(
@@ -160,22 +160,26 @@ export const jobCode = (role: string) => {
 
 /** Teams (Team.team, comma-separated — a person can be in several). */
 export const TEAM_NAMES: Record<string, T2> = {
-  leadership: ['لیدرشیپ', 'Leadership'],
+  leadership: ['مدیریت دپارتمان', 'Department leadership'],
   pmo: ['PMO', 'PMO'],
-  product: ['پروداکت', 'Product'],
-  tech: ['تک', 'Tech'],
+  product: ['محصول', 'Product'],
+  crm_ops: ['CRM و عملیات', 'CRM & operations'],
+  data: ['داده', 'Data'],
+  tech: ['فنی', 'Tech'],
 }
-const LEGACY_TEAM: Record<string, string> = { 'لیدرشیپ': 'leadership', 'مدیریت': 'leadership', 'تک': 'tech', 'پروداکت': 'product', 'محصول': 'product', 'فناوری': 'tech' }
-/** Team codes for a person; blank = derived from the title (CEO/CPO/CTO → leadership) and track. */
+const LEGACY_TEAM: Record<string, string> = { 'مدیریت': 'leadership', 'فنی': 'tech', 'پروداکت': 'product', 'محصول': 'product', 'فناوری': 'tech', 'داده': 'data' }
+/** Team codes for a person; blank = derived from the title (CPTO → leadership) and unit. */
 export function teamCodes(team: string, role = '', track = ''): string[] {
   const list = String(team || '').split(/[,،]/).map((x) => x.trim()).filter(Boolean).map((x) => LEGACY_TEAM[x] || x.toLowerCase())
   if (list.length) return [...new Set(list)]
   const r = jobCode(role)
   const out: string[] = []
-  if (r === 'ceo' || r === 'cpo' || r === 'cto') out.push('leadership')
+  if (r === 'cpto') out.push('leadership')
   if (r === 'pgm') out.push('pmo')
-  if (r === 'cpo' || r === 'pm' || r === 'apm' || r === 'pd' || r === 'gd' || track === 'product') out.push('product')
-  if (r === 'cto' || track === 'tech') out.push('tech')
+  if (r === 'line' || r === 'pm' || r === 'pd' || track === 'product') out.push('product')
+  if (r === 'data' || track === 'data') out.push('data')
+  if (r === 'eng' || track === 'tech') out.push('tech')
+  if (track === 'crm_ops') out.push('crm_ops')
   return [...new Set(out)]
 }
 
@@ -188,8 +192,8 @@ export function usernameOf(m: { username?: string; name_en?: string; email?: str
 }
 
 export const ACCESS: Record<string, T2> = {
-  super: ['دسترسی کامل + بک‌آفیس', 'Full access + back office'],
-  exec: ['مدیرعامل · همه‌چیز', 'CEO · everything'],
+  super: ['مدیر برنامه · همه‌چیز + بک‌آفیس', 'Program manager · everything + back office'],
+  exec: ['CPTO · همه‌چیز', 'CPTO · everything'],
   head: ['هد · نمای کل', 'Head · company-wide view'],
   member: ['عضو · پروژه‌های خودش', 'Member · own projects'],
 }

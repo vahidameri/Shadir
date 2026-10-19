@@ -1,7 +1,7 @@
 // The organisation, set by the program manager in the back office (Config tab, JSON lists):
 //   org.titles — job titles (code, Persian, English)
 //   org.teams  — teams a person can belong to
-//   org.sides  — the working sides that hand work to each other (default: product, design, tech)
+//   org.sides  — the department's units (lines, product managers, CRM & ops, data, …)
 //   org.plans  — what a planning session can be for (demo, roadmap, sprint, …)
 // The label maps used across the app are updated in place, so every page follows the settings.
 import { ACCESS, JOB_TITLE, JOB_TITLE_OPTIONS, MEETING_SERIES, PLAN_PURPOSE, TEAM_NAMES } from './labels'
@@ -32,12 +32,14 @@ export const ORG_DEFAULT: Record<OrgKind, OrgItem[]> = {
     { id: 'docs', fa: 'مستندات / درایو', en: 'Docs / Drive' },
     { id: 'prd', fa: 'PRD', en: 'PRD' },
     { id: 'board', fa: 'بورد کار', en: 'Work board' },
-    { id: 'chat', fa: 'گروه تلگرام', en: 'Telegram group' },
+    { id: 'mizito', fa: 'میزیتو', en: 'Mizito' },
+    { id: 'chat', fa: 'گروه پیام‌رسان', en: 'Chat group' },
   ],
   sides: [
-    { id: 'product', fa: 'پروداکت', en: 'Product', color: '#8a1c3c' },
-    { id: 'design', fa: 'دیزاین', en: 'Design', color: '#7c3aed' },
-    { id: 'tech', fa: 'تک', en: 'Tech', color: '#1d6f8a' },
+    { id: 'product', fa: 'مدیران محصول', en: 'Product managers', color: '#e8650a' },
+    { id: 'crm_ops', fa: 'CRM و عملیات', en: 'CRM & operations', color: '#1f7a76' },
+    { id: 'data', fa: 'داده', en: 'Data', color: '#5b5bd6' },
+    { id: 'tech', fa: 'فنی', en: 'Tech', color: '#2f6f9f' },
   ],
 }
 
@@ -88,6 +90,6 @@ export function applyOrg(get: (k: string) => string | undefined) {
   refill(TRACK as Record<string, T2>, cur.sides)
   TRACKS.splice(0, TRACKS.length, ...cur.sides.map((s) => s.id))
   for (const k of Object.keys(SIDE_COLOR)) delete SIDE_COLOR[k]
-  const palette = ['#8a1c3c', '#7c3aed', '#1d6f8a', '#b45309', '#15803d', '#be185d']
+  const palette = ['#e8650a', '#1f7a76', '#5b5bd6', '#2f6f9f', '#b45309', '#be185d', '#15803d', '#7c3aed']
   cur.sides.forEach((s, i) => (SIDE_COLOR[s.id] = s.color || palette[i % palette.length]))
 }

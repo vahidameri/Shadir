@@ -51,7 +51,7 @@ export default function Weekly() {
   const { open } = useEditor()
   const today = todayISO()
   const [ws, setWs] = useState(weekStart())
-  const [view, setView] = usePref<'week' | 'actions'>('acg.meetings.view', 'week')
+  const [view, setView] = usePref<'week' | 'actions'>('madar.meetings.view', 'week')
   const meetings = db.Meetings.filter((m) => inWeek(m.date, ws)).sort(byWhen)
   const pick = () => (meetings.find((m) => m.date >= today && m.status !== 'cancelled') || meetings[meetings.length - 1])?.id || ''
   const [sel, setSel] = useState(pick)
@@ -398,10 +398,10 @@ function buildAgenda(m: Meeting, db: DB, open: ReturnType<typeof useEditor>['ope
 
   const capSection = (t: Track | ''): AgendaSection => {
     const over = overloaded(db, ws).filter((x) => !t || x.m.track === t)
-    const items: AgendaItem[] = over.map(({ m: mem, w }) => ({ key: mem.id, primary: mem.name, secondary: L(`${fa(w.load)}٪ این هفته`, `${w.load}% this week`), tone: 'red', to: '/team' }))
+    const items: AgendaItem[] = over.map(({ m: mem, w }) => ({ key: mem.id, primary: mem.name, secondary: L(`${fa(w.load)}٪ این هفته`, `${w.load}% this week`), tone: 'red', to: `/people/${mem.id}` }))
     ;(t ? [t] : TRACKS).forEach((tt) => {
       const hit = weeksFrom(addDays(ws, 7), 8).map((w) => trackWeek(db, tt, w)).find((x) => x.load > 100)
-      if (hit) items.push({ key: 'f' + tt, primary: L(`تیم ${lbl(TRACK, tt)} از ${weekRel(hit.ws)} به ${fa(hit.load)}٪ می‌رسد`, `${lbl(TRACK, tt)} hits ${hit.load}% ${weekRel(hit.ws).toLowerCase()}`), secondary: weekLabel(hit.ws), tone: 'amber', to: '/team' })
+      if (hit) items.push({ key: 'f' + tt, primary: L(`تیم ${lbl(TRACK, tt)} از ${weekRel(hit.ws)} به ${fa(hit.load)}٪ می‌رسد`, `${lbl(TRACK, tt)} hits ${hit.load}% ${weekRel(hit.ws).toLowerCase()}`), secondary: weekLabel(hit.ws), tone: 'amber', to: '/tasks' })
     })
     return { icon: Users, title: L('ظرفیت و فشار کاری', 'Capacity & load'), items, empty: L('ظرفیت مشکلی ندارد', 'Capacity is fine') }
   }
@@ -449,7 +449,7 @@ function buildAgenda(m: Meeting, db: DB, open: ReturnType<typeof useEditor>['ope
         icon: Workflow,
         title: L('تحویل‌ها و هماهنگی با واحدهای دیگر', 'Hand-offs with the other units'),
         items: [
-          ...hs.slice(0, 6).map((h) => ({ key: 'h' + h.id, primary: h.title, secondary: `${L(`از ${lbl(TRACK, h.from_side)} به ${lbl(TRACK, h.to_side)}`, `${lbl(TRACK, h.from_side)} to ${lbl(TRACK, h.to_side)}`)} · ${isReturn(h) ? L('برگشت', 'returned') : L('تحویل', 'handed over')}${Number(h.round) > 1 ? L(` · دور ${fa(h.round)}`, ` · round ${h.round}`) : ''}`, tone: (isReturn(h) ? 'red' : 'green') as Health, to: '/teams' })),
+          ...hs.slice(0, 6).map((h) => ({ key: 'h' + h.id, primary: h.title, secondary: `${L(`از ${lbl(TRACK, h.from_side)} به ${lbl(TRACK, h.to_side)}`, `${lbl(TRACK, h.from_side)} to ${lbl(TRACK, h.to_side)}`)} · ${isReturn(h) ? L('برگشت', 'returned') : L('تحویل', 'handed over')}${Number(h.round) > 1 ? L(` · دور ${fa(h.round)}`, ` · round ${h.round}`) : ''}`, tone: (isReturn(h) ? 'red' : 'green') as Health, to: '/tasks' })),
           ...owed.slice(0, 4).map((t) => ({ key: 'o' + t.id, primary: t.title, secondary: L(`${pname(t.project_id)} · ${owedTo(t)} منتظر این است`, `${pname(t.project_id)} · ${owedTo(t)} waiting on this`), tone: 'amber' as Health, onClick: () => open('Tasks', t as never) })),
           ...waiting.slice(0, 4).map((t) => ({ key: 'w' + t.id, primary: t.title, secondary: L(`${pname(t.project_id)} · ${sideOf(t)} منتظر ${waitsOn(t)}`, `${pname(t.project_id)} · waiting on ${waitsOn(t)}`), tone: 'red' as Health, onClick: () => open('Tasks', t as never) })),
         ],

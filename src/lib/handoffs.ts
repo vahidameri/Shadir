@@ -1,5 +1,5 @@
 // Hand-offs between units are read from the assignments: when a task's (lead) assignee changes from a
-// person in one unit to a person in another, Atlas logs a pass. Going to a unit the task has already
+// person in one unit to a person in another, Madar logs a pass. Going to a unit the task has already
 // been in counts as a return (رفت و برگشت), and each pass between the same two units is a new round.
 // Handoff.status: 'sent' = forward pass, 'returned' = back to an earlier unit.
 import type { DB, Handoff, Task } from './types'

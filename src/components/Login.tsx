@@ -4,7 +4,7 @@ import { ArrowRight, Eye, EyeOff, KeyRound, Loader, User } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { useGoogle } from '../lib/google'
 import { useI18n, L, lbl } from '../lib/i18n'
-import { AcgMark } from './Brand'
+import { MarkDraw, NoyanMark } from './Brand'
 import { VERSION } from '../lib/brand'
 import { cx } from './ui'
 
@@ -34,7 +34,7 @@ export function Login({ onEnter }: { onEnter: () => void }) {
     try {
       if (g.hosted) {
         if (!g.session) await g.signIn('')
-      } else await g.signIn(config.googleClientId || '', { hint: localStorage.getItem('acg.ghint') || undefined })
+      } else await g.signIn(config.googleClientId || '', { hint: localStorage.getItem('madar.ghint') || undefined })
       onEnter()
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
@@ -45,7 +45,7 @@ export function Login({ onEnter }: { onEnter: () => void }) {
   // username + team password (public link, no Google account needed)
   const [username, setUsername] = useState(() => {
     try {
-      return localStorage.getItem('acg.pw.user') || ''
+      return localStorage.getItem('madar.pw.user') || ''
     } catch {
       return ''
     }
@@ -89,7 +89,7 @@ export function Login({ onEnter }: { onEnter: () => void }) {
     try {
       await g.passwordLogin(username.trim(), password)
       try {
-        localStorage.setItem('acg.pw.user', username.trim())
+        localStorage.setItem('madar.pw.user', username.trim())
       } catch {}
       onEnter()
     } catch (e) {
@@ -115,8 +115,8 @@ export function Login({ onEnter }: { onEnter: () => void }) {
       <div className="relative z-10 flex min-h-full flex-col">
         <header className="flex items-center justify-between px-6 py-5 sm:px-10">
           <div className="flex items-center gap-3">
-            <AcgMark className="h-7 text-white" />
-            <span className="font-mono text-[0.6875rem] uppercase tracking-[0.25em] text-white/50">ACG · Atlas</span>
+            <NoyanMark className="h-7 w-7" />
+            <span className="font-mono text-[0.6875rem] uppercase tracking-[0.25em] text-white/50">Noyan · Madar</span>
           </div>
           <div className="glass flex rounded-full p-0.5">
             {(['fa', 'en'] as const).map((l) => (
@@ -128,31 +128,22 @@ export function Login({ onEnter }: { onEnter: () => void }) {
         </header>
 
         <main className="mx-auto grid w-full max-w-6xl flex-1 items-center gap-6 px-5 pb-8 sm:gap-10 sm:px-6 lg:grid-cols-[1.1fr_1fr] lg:gap-16 lg:px-10">
-          {/* hero: the A draws itself inside its orbits */}
+          {/* hero: the Noyan frame draws itself inside its orbits (madar = orbit) */}
           <section className="flex flex-col items-center text-center">
-            <div className="acg-loader hero-mark relative mx-auto h-44 w-44 sm:h-64 sm:w-64 lg:h-80 lg:w-80">
+            <div className="hero-mark relative mx-auto h-44 w-44 sm:h-64 sm:w-64 lg:h-80 lg:w-80">
               <span className="mark-glow" />
               <span className="orb orb-outer"><i /></span>
               <span className="orb orb-mid"><i /></span>
               <span className="orb orb-inner"><i /></span>
-              <svg viewBox="300 150 564 604" className="absolute inset-0 m-auto h-[40%] w-[40%] overflow-visible">
-                <defs>
-                  <linearGradient id="acg-a-grad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0" stopColor="#ffffff" />
-                    <stop offset="1" stopColor="#c3d0e8" />
-                  </linearGradient>
-                </defs>
-                <path className="acg-a" pathLength={1} d="M581.5 166 L316 736.5 L383.5 736.5 L582 311 L779.5 736.5 L847.5 736.5 Z" fill="url(#acg-a-grad)" stroke="#fff" strokeWidth={9} strokeLinejoin="round" />
-                <circle className="acg-dot" cx="587" cy="706.5" r="29" fill="#f5b31b" />
-              </svg>
+              <MarkDraw className="absolute inset-0 m-auto h-[40%] w-[40%] overflow-visible" />
             </div>
-            <h2 className="display hero-title mt-5 text-5xl leading-none sm:text-7xl lg:text-8xl">{L('اطلس', 'Atlas')}</h2>
-            <p className="hero-sub mt-3 text-sm text-white/60 sm:text-lg">{L('اطلس پروژه‌های ACG', 'The ACG engagement atlas')}</p>
+            <h2 className="display hero-title mt-5 text-5xl leading-none sm:text-7xl lg:text-8xl">{L('مدار', 'Madar')}</h2>
+            <p className="hero-sub mt-3 text-sm text-white/60 sm:text-lg">{L('مدار محصول و فناوری نویان', 'Noyan product & technology, in one orbit')}</p>
           </section>
 
           {/* the form, on glass */}
           <section className="login-card light-card mx-auto w-full max-w-md rounded-[2rem] p-7 text-[#16181d] sm:p-9">
-            <h1 className="text-2xl font-semibold tracking-tight">{L('ورود به اطلس', 'Sign in to Atlas')}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">{L('ورود به مدار', 'Sign in to Madar')}</h1>
             <p className="mt-1.5 text-sm text-[#6b7180]">{L('خوش آمدید', 'Welcome back')}</p>
 
             {g.otp ? (
@@ -281,11 +272,8 @@ export function Login({ onEnter }: { onEnter: () => void }) {
         </main>
 
         <footer className="flex items-center justify-between px-6 pb-5 text-[0.6875rem] text-white/35 sm:px-10">
-          <span>Antwerp Consulting Group</span>
+          <span>{L('فن‌آوری شبکه آموزش دانش نویان', 'Noyan Knowledge Education Network Technology')}</span>
           <span className="flex items-center gap-4" dir="ltr">
-            <a href="https://joinacg.com" target="_blank" rel="noreferrer" className="font-mono uppercase tracking-[0.18em] transition hover:text-white">
-              joinacg.com
-            </a>
             <span className="font-mono">v{VERSION}</span>
           </span>
         </footer>

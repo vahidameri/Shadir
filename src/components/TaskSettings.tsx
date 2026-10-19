@@ -265,7 +265,7 @@ export function NotifyCard({ admin }: { admin: boolean }) {
   const { setSetting } = useStore()
   const off = notifyOff()
   return (
-    <Card eyebrow={<span className="flex items-center gap-1.5"><Bell size={12} /> {L('اعلان‌ها', 'Notifications')}</span>} title={L('اعلان‌های داخل اطلس', 'Notifications inside Atlas')}>
+    <Card eyebrow={<span className="flex items-center gap-1.5"><Bell size={12} /> {L('اعلان‌ها', 'Notifications')}</span>} title={L('اعلان‌های داخل مدار', 'Notifications inside Madar')}>
       <p className="mb-3 text-xs leading-6 text-sub">{L('اعلان‌ها داخل اپ (زنگوله‌ی بالا و پیام کوتاه) می‌آیند. ایمیل فقط برای مواردی می‌رود که در «اتوماسیون‌ها» روشن کنید، یا با دکمه‌ی «ارسال ایمیل» در هر تسک.', 'Notifications arrive in the app (the bell and a short pop-up). Email goes only for what you switch on under Automations, or with “Send email” on a task.')}</p>
       <div className="space-y-2.5">
         {NOTIFY_KINDS.map((k) => (
