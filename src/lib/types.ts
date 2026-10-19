@@ -36,6 +36,8 @@ export interface Project {
   archived_at?: string
   /** links (stage, production, Figma…) as JSON: [{ type, url, label }] */
   links?: string
+  /** the team (department unit) the project sits under */
+  team?: string
 }
 
 export interface ScopeItem {
@@ -303,7 +305,7 @@ export interface Meeting {
 
 export interface FileRef {
   id: string
-  entity: 'Meetings' | 'Projects' | 'Tasks' | 'Team' | 'Deliverables' | 'Contracts'
+  entity: 'Meetings' | 'Projects' | 'Tasks' | 'Team' | 'Deliverables' | 'Contracts' | 'Mizito'
   entity_id: string
   name: string
   mime: string

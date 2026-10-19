@@ -9,6 +9,7 @@ import { setDeliveryCfg } from './cadence'
 import { stampTask } from './taskstamp'
 import { diffRows } from './history'
 import { readMzCfg, setMzCfg, stampMizito } from './mizito'
+import { readTeamCfg, setTeamCfg } from './teams'
 import { passFor } from './handoffs'
 import type { Task } from './types'
 import { NOTIFY_KEY, setNotifyOff } from './inbox'
@@ -220,6 +221,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setTaskCfg(readTaskCfg((k) => db.Config.find((r) => r.id === k)?.value, db.Team))
     setColumns(readColumns(db.Config.find((r) => r.id === COLUMNS_KEY)?.value))
     setMzCfg(readMzCfg((k) => db.Config.find((r) => r.id === k)?.value))
+    setTeamCfg(readTeamCfg((k) => db.Config.find((r) => r.id === k)?.value))
   }, [db.Config, db.Team])
   const shown = useMemo(() => {
     return mapDB(scopeDB(visibleDB(db, canonMe), canonMe, access), maps.toEn)
@@ -321,6 +323,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const prev = dbRef.current
       const list = prev[sheet] as Row<S>[]
       if (sheet === 'Mizito') row = stampMizito(list.find((r) => r.id === row.id) as unknown as MizitoItem | undefined, row as unknown as MizitoItem) as unknown as Row<S>
+      if (sheet === 'Tasks' && !(row as unknown as Task).track && (row as unknown as Task).project_id) {
+        const team = prev.Projects.find((p) => p.id === (row as unknown as Task).project_id)?.team
+        if (team) row = { ...row, track: team } as Row<S>
+      }
       if (sheet === 'Tasks') row = stampTask(list.find((r) => r.id === row.id) as unknown as Task | undefined, row as unknown as Task) as unknown as Row<S>
       const old = list.find((r) => r.id === row.id)
       const exists = !!old

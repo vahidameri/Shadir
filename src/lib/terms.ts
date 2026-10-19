@@ -17,7 +17,7 @@ export const TERMS: Term[] = [
   { id: 'followup', word: ['پیگیری', 'Follow-up'], hint: ['موضوعی که از کسی دنبال می‌کنید', 'Something you chase with someone'] },
   { id: 'risk', word: ['ریسک', 'Risk'], hint: ['اتفاقی که ممکن است برنامه را به هم بزند', 'Something that could derail the plan'] },
   { id: 'deadline', word: ['ددلاین', 'Deadline'], hint: ['آخرین مهلت', 'The final due date'] },
-  { id: 'unit', word: ['واحد', 'Unit'], hint: ['لاین‌ها، مدیران محصول، CRM و عملیات، داده و…', 'Lines, product managers, CRM & ops, data, …'] },
+  { id: 'unit', word: ['تیم', 'Team'], hint: ['تیم یک تسک یا فرد (لاین‌ها، مدیران محصول، CRM و عملیات، داده و…)', 'A task’s or person’s team (lines, product managers, CRM & ops, data, …)'] },
 ]
 
 export const TERMS_KEY = 'terms'

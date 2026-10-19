@@ -4,7 +4,7 @@ import { ArrowRight, Eye, EyeOff, KeyRound, Loader, User } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { useGoogle } from '../lib/google'
 import { useI18n, L, lbl } from '../lib/i18n'
-import { MarkDraw, NoyanMark } from './Brand'
+import { MarkDraw, NoyanTag, ShadMark } from './Brand'
 import { VERSION } from '../lib/brand'
 import { cx } from './ui'
 
@@ -115,8 +115,8 @@ export function Login({ onEnter }: { onEnter: () => void }) {
       <div className="relative z-10 flex min-h-full flex-col">
         <header className="flex items-center justify-between px-6 py-5 sm:px-10">
           <div className="flex items-center gap-3">
-            <NoyanMark className="h-7 w-7" />
-            <span className="font-mono text-[0.6875rem] uppercase tracking-[0.25em] text-white/50">Noyan · Madar</span>
+            <ShadMark className="h-8 w-8" />
+            <span className="font-mono text-[0.6875rem] uppercase tracking-[0.25em] text-white/50">Shad · Madar</span>
           </div>
           <div className="glass flex rounded-full p-0.5">
             {(['fa', 'en'] as const).map((l) => (
@@ -128,7 +128,7 @@ export function Login({ onEnter }: { onEnter: () => void }) {
         </header>
 
         <main className="mx-auto grid w-full max-w-6xl flex-1 items-center gap-6 px-5 pb-8 sm:gap-10 sm:px-6 lg:grid-cols-[1.1fr_1fr] lg:gap-16 lg:px-10">
-          {/* hero: the Noyan frame draws itself inside its orbits (madar = orbit) */}
+          {/* hero: the Shad mark builds itself inside its orbits (madar = orbit) */}
           <section className="flex flex-col items-center text-center">
             <div className="hero-mark relative mx-auto h-44 w-44 sm:h-64 sm:w-64 lg:h-80 lg:w-80">
               <span className="mark-glow" />
@@ -138,7 +138,7 @@ export function Login({ onEnter }: { onEnter: () => void }) {
               <MarkDraw className="absolute inset-0 m-auto h-[40%] w-[40%] overflow-visible" />
             </div>
             <h2 className="display hero-title mt-5 text-5xl leading-none sm:text-7xl lg:text-8xl">{L('مدار', 'Madar')}</h2>
-            <p className="hero-sub mt-3 text-sm text-white/60 sm:text-lg">{L('مدار محصول و فناوری نویان', 'Noyan product & technology, in one orbit')}</p>
+            <p className="hero-sub mt-3 text-sm text-white/60 sm:text-lg">{L('مدار دپارتمان محصول و فناوری شاد', 'Shad product & technology, in one orbit')}</p>
           </section>
 
           {/* the form, on glass */}
@@ -272,7 +272,7 @@ export function Login({ onEnter }: { onEnter: () => void }) {
         </main>
 
         <footer className="flex items-center justify-between px-6 pb-5 text-[0.6875rem] text-white/35 sm:px-10">
-          <span>{L('فن‌آوری شبکه آموزش دانش نویان', 'Noyan Knowledge Education Network Technology')}</span>
+          <span className="flex items-center gap-2">{L('شاد · دپارتمان محصول و فناوری', 'Shad · Product & Technology')} <span className="text-white/20">|</span> <NoyanTag className="text-white/45" /></span>
           <span className="flex items-center gap-4" dir="ltr">
             <span className="font-mono">v{VERSION}</span>
           </span>

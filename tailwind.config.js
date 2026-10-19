@@ -8,9 +8,9 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"Inter Variable"', 'LatD', 'Peyda', '"Vazirmatn Variable"', 'system-ui', 'sans-serif'],
-        fa: ['LatD', 'Peyda', '"Vazirmatn Variable"', 'Tahoma', 'sans-serif'],
-        mono: ['"Geist Mono"', 'LatD', 'Peyda', 'ui-monospace', 'monospace'],
+        sans: ['Lahzeh', 'Tahoma', 'system-ui', 'sans-serif'],
+        fa: ['Lahzeh', 'Tahoma', 'sans-serif'],
+        mono: ['"Geist Mono"', 'Lahzeh', 'ui-monospace', 'monospace'],
       },
       colors: {
         bg: c('bg'),

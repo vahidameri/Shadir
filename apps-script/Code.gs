@@ -21,7 +21,7 @@
 var MADAR_VERSION = '1.0.0'; // shown on the login page and by diagnose()
 
 var SCHEMA = {
-  Projects: ['id', 'code', 'name', 'description', 'category', 'owner', 'client', 'liaison', 'liaison_contact', 'status', 'priority', 'phase', 'start_date', 'end_date', 'progress', 'health_override', 'objective', 'paused_at', 'pause_reason', 'delivery_day', 'last_delivery', 'archived', 'archived_at', 'links'],
+  Projects: ['id', 'code', 'name', 'description', 'category', 'owner', 'client', 'liaison', 'liaison_contact', 'status', 'priority', 'phase', 'start_date', 'end_date', 'progress', 'health_override', 'objective', 'paused_at', 'pause_reason', 'delivery_day', 'last_delivery', 'archived', 'archived_at', 'links', 'team', 'batch'],
   Scope: ['id', 'project_id', 'item', 'type', 'status', 'change_note', 'date'],
   Milestones: ['id', 'project_id', 'title', 'planned_date', 'actual_date', 'status', 'owner', 'weight'],
   Sprints: ['id', 'project_id', 'name', 'start_date', 'end_date', 'goal', 'committed_points', 'completed_points', 'status'],
@@ -494,7 +494,7 @@ function applyScope_(data, user, owners) {
     data.MizitoMentions = [];
     data.Contacts = [];
     data.Contracts = [];
-    data.Files = data.Files.filter(function (f) { return f.entity !== 'Contracts'; });
+    data.Files = data.Files.filter(function (f) { return f.entity !== 'Contracts' && f.entity !== 'Mizito'; });
   }
   if (LEADERS[a]) return data;
   var ok = allowedProjects_(data, me);
@@ -1199,6 +1199,7 @@ function filesFolder_() {
 function upload_(b, user) {
   if (!b.data || !b.name) throw new Error('فایل ارسال نشده است');
   guardPrivate_('Files', { entity: b.entity, entity_id: b.entity_id }, user);
+  if (b.entity === 'Mizito' && user.access !== 'super' && user.access !== 'exec') throw new Error('این بخش فقط برای CPTO و مدیر برنامه است');
   var bytes = Utilities.base64Decode(b.data);
   if (bytes.length > 10 * 1024 * 1024) throw new Error('حداکثر حجم فایل ۱۰ مگابایت است');
   var boundary = 'atlas' + Date.now();

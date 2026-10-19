@@ -37,7 +37,7 @@ export const TARGETS: Record<Target, { fa: string; en: string; fields: FieldDef[
       { key: 'status', fa: 'وضعیت', en: 'Status', kind: 'enum', syn: ['status', 'وضعیت', 'outcome'] },
       { key: 'priority', fa: 'اولویت', en: 'Priority', kind: 'enum', syn: ['priority', 'اولویت'] },
       { key: 'flag', fa: 'پرچم', en: 'Flag', kind: 'enum', syn: ['⚑', 'flag', 'my flag', 'flag / board', 'پرچم'] },
-      { key: 'track', fa: 'واحد', en: 'Unit', kind: 'enum', syn: ['area', 'unit', 'team', 'line', 'واحد', 'لاین', 'حوزه'] },
+      { key: 'track', fa: 'تیم', en: 'Team', kind: 'enum', syn: ['area', 'team', 'unit', 'line', 'تیم', 'واحد', 'لاین', 'حوزه'] },
       { key: 'assigned_at', fa: 'تاریخ اساین', en: 'Assigned on', kind: 'date', syn: ['assigned', 'assigned at', 'logged', 'date', 'تاریخ اساین'] },
       { key: 'due_date', fa: 'ددلاین', en: 'Deadline', kind: 'date', syn: ['due', 'deadline', 'due date', 'due (shamsi)', 'ددلاین', 'سررسید'] },
       { key: 'link', fa: 'لینک', en: 'Link', kind: 'link', syn: ['link', 'task link', 'لینک'] },

@@ -1,64 +1,59 @@
-/* Peyda (from the Karma prototype) + LatD: Peyda has no Latin digits, so ASCII digits come from LatD. */
-/* Latin subsets only — keeps the single-file build light enough for Apps Script */
-@font-face { font-family: 'Inter Variable'; src: url('./assets/fonts/Inter-latin.woff2') format('woff2-variations'); font-weight: 100 900; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+/* Lahzeh (لحظه) — the Shad typeface, for Persian and Latin. Geist Mono for small code-like labels. */
+@font-face { font-family: Lahzeh; src: url('./assets/fonts/Lahzeh-Regular.woff2') format('woff2'); font-weight: 300 400; font-display: swap; }
+@font-face { font-family: Lahzeh; src: url('./assets/fonts/Lahzeh-Medium.woff2') format('woff2'); font-weight: 500 600; font-display: swap; }
+@font-face { font-family: Lahzeh; src: url('./assets/fonts/Lahzeh-Bold.woff2') format('woff2'); font-weight: 700 900; font-display: swap; }
 @font-face { font-family: 'Geist Mono'; src: url('./assets/fonts/GeistMono-400.woff2') format('woff2'); font-weight: 400; font-display: swap; }
 @font-face { font-family: 'Geist Mono'; src: url('./assets/fonts/GeistMono-500.woff2') format('woff2'); font-weight: 500 700; font-display: swap; }
-@font-face { font-family: LatD; src: url('./assets/fonts/LatD-400.woff2') format('woff2'); font-weight: 400; unicode-range: U+0030-0039; font-display: swap; }
-@font-face { font-family: LatD; src: url('./assets/fonts/LatD-500.woff2') format('woff2'); font-weight: 500 600; unicode-range: U+0030-0039; font-display: swap; }
-@font-face { font-family: LatD; src: url('./assets/fonts/LatD-700.woff2') format('woff2'); font-weight: 700 900; unicode-range: U+0030-0039; font-display: swap; }
-@font-face { font-family: Peyda; src: url('./assets/fonts/Peyda-400.woff2') format('woff2'); font-weight: 300 400; font-display: swap; }
-@font-face { font-family: Peyda; src: url('./assets/fonts/Peyda-500.woff2') format('woff2'); font-weight: 500 600; font-display: swap; }
-@font-face { font-family: Peyda; src: url('./assets/fonts/Peyda-700.woff2') format('woff2'); font-weight: 700 900; font-display: swap; }
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /*
-  Madar design tokens — Noyan identity (from the Noyan logo):
-  orange frame #FFC21A→#FF6A00 (text-safe brand #C2560A), teal square #2EC4A6/#1E8C7E,
-  teal wordmark #2F7A7E. Dark band = deep Noyan teal. Soft rounded shapes like the mark.
-  `wine` is the secondary accent slot (teal); `accent` is an alias of it.
+  Madar design tokens — Shad identity (from the Shad icon):
+  green square #2EE3A6→#0FB884 (text-safe brand #0B8A62), yellow wave #F5CE1F (accent; text-safe #A67C00),
+  white dots. Dark band = deep Shad green. Noyan (the parent company) appears only as a small tag.
+  `wine` is the secondary accent slot (yellow); `accent` is an alias of it.
 */
 :root {
-  --bg: 245 247 247;
+  --bg: 244 248 246;
   --surface: 255 255 255;
-  --muted: 239 243 243;
-  --line: 223 230 230;
-  --line-strong: 203 213 213;
-  --ink: 24 36 42;
-  --sub: 88 104 110;
-  --brand: 194 86 10;
-  --brand-soft: 255 226 196;
-  --wine: 31 122 118;
-  --good: 22 128 96;
+  --muted: 237 243 240;
+  --line: 222 231 227;
+  --line-strong: 201 214 208;
+  --ink: 20 36 31;
+  --sub: 86 104 98;
+  --brand: 11 138 98;
+  --brand-soft: 205 245 228;
+  --wine: 166 124 0;
+  --good: 16 140 96;
   --warn: 184 120 0;
-  --bad: 196 40 56;
-  --band: 15 47 52;
+  --bad: 200 44 60;
+  --band: 10 46 37;
   --on-band: 255 255 255;
-  --band-sub: 146 184 186;
-  --band-line: 34 72 78;
+  --band-sub: 150 196 180;
+  --band-line: 30 76 63;
   color-scheme: light;
 }
 
 .dark {
-  --bg: 7 12 13;
-  --surface: 14 21 23;
-  --muted: 21 30 32;
-  --line: 31 42 45;
-  --line-strong: 48 62 66;
-  --ink: 240 245 245;
-  --sub: 142 160 164;
-  --brand: 255 156 64;
-  --brand-soft: 92 46 10;
-  --wine: 95 214 190;
-  --good: 70 200 150;
+  --bg: 6 12 10;
+  --surface: 13 21 18;
+  --muted: 20 30 26;
+  --line: 30 43 38;
+  --line-strong: 46 63 56;
+  --ink: 238 246 242;
+  --sub: 140 162 154;
+  --brand: 46 227 166;
+  --brand-soft: 12 74 54;
+  --wine: 245 206 31;
+  --good: 70 214 156;
   --warn: 236 178 60;
   --bad: 246 98 116;
-  --band: 8 22 25;
+  --band: 6 24 19;
   --on-band: 255 255 255;
-  --band-sub: 128 160 164;
-  --band-line: 26 46 50;
+  --band-sub: 126 168 153;
+  --band-line: 22 48 40;
   color-scheme: dark;
 }
 
@@ -86,11 +81,10 @@ html {
 
 body {
   @apply bg-bg text-ink font-sans antialiased;
-  font-feature-settings: 'cv11', 'ss01';
+  font-feature-settings: normal;
 }
 html[lang='fa'] body {
   @apply font-fa;
-  /* Peyda's stylistic sets swap in alternate letterforms (e.g. final yeh) — keep defaults */
   font-feature-settings: normal;
 }
 
@@ -152,8 +146,9 @@ select:focus-visible {
   html[lang='fa'] h3 {
     letter-spacing: -0.005em;
   }
+  /* Lahzeh's tabular Persian digits are very wide; proportional figures read better */
   .num {
-    font-variant-numeric: tabular-nums;
+    font-variant-numeric: proportional-nums;
   }
 
   /* ---------- buttons (pill, with state layer) ---------- */
@@ -231,11 +226,11 @@ select:focus-visible {
     @apply px-4 py-3 text-sm align-middle;
   }
 
-  /* ---------- page band (deep Noyan teal with grid) ---------- */
+  /* ---------- page band (deep Shad green with grid) ---------- */
   .band {
     @apply relative overflow-hidden bg-band text-on-band;
     background-image: linear-gradient(rgb(255 255 255 / 0.045) 1px, transparent 1px), linear-gradient(90deg, rgb(255 255 255 / 0.045) 1px, transparent 1px),
-      radial-gradient(900px 600px at 18% 35%, rgb(18 92 96 / 0.5) 0%, transparent 62%), radial-gradient(700px 400px at 95% 110%, rgb(255 149 0 / 0.08) 0%, transparent 60%),
+      radial-gradient(900px 600px at 18% 35%, rgb(14 110 80 / 0.5) 0%, transparent 62%), radial-gradient(700px 400px at 95% 110%, rgb(245 206 31 / 0.08) 0%, transparent 60%),
       linear-gradient(160deg, #1b1c1f 0%, #24262a 55%, #2c2f35 100%);
     background-size:
       56px 56px,
@@ -247,11 +242,11 @@ select:focus-visible {
   }
   .dark .band {
     background-image: linear-gradient(rgb(255 255 255 / 0.035) 1px, transparent 1px), linear-gradient(90deg, rgb(255 255 255 / 0.035) 1px, transparent 1px),
-      radial-gradient(900px 600px at 18% 35%, rgb(18 92 96 / 0.42) 0%, transparent 62%), radial-gradient(700px 400px at 95% 110%, rgb(255 149 0 / 0.06) 0%, transparent 60%),
+      radial-gradient(900px 600px at 18% 35%, rgb(14 110 80 / 0.42) 0%, transparent 62%), radial-gradient(700px 400px at 95% 110%, rgb(245 206 31 / 0.06) 0%, transparent 60%),
       linear-gradient(160deg, #0b0c0e 0%, #121316 60%, #16181c 100%);
   }
   .band-eye {
-    @apply inline-flex items-center gap-2 rounded-full border border-[rgb(205_238_232/0.25)] px-3 py-1 text-[0.75rem] text-[#cdeee8];
+    @apply inline-flex items-center gap-2 rounded-full border border-[rgb(212_247_233/0.25)] px-3 py-1 text-[0.75rem] text-[#d4f7e9];
   }
   .kbd {
     @apply inline-flex h-5 min-w-5 items-center justify-center rounded-md border border-line bg-surface px-1.5 font-mono text-[0.625rem] text-sub;
@@ -383,7 +378,7 @@ select:focus-visible {
   }
 }
 
-/* ---------- Madar loader: the Noyan frame draws itself, the teal square drops in ---------- */
+/* ---------- Madar loader: the Shad square, three dots drop in, the wave draws itself ---------- */
 .madar-loader .mk-frame,
 .hero-mark .mk-frame {
   stroke-dasharray: 1;
@@ -395,6 +390,8 @@ select:focus-visible {
   transform-origin: center;
   animation: mk-dot 2.6s cubic-bezier(0.3, 0, 0.3, 1) infinite;
 }
+.mk-dot-1 { animation-delay: 0.12s !important; }
+.mk-dot-2 { animation-delay: 0.24s !important; }
 .madar-loader .madar-orbit {
   animation: mk-spin 2.6s linear infinite;
 }
@@ -402,18 +399,16 @@ select:focus-visible {
   animation: mk-spin 9s linear infinite reverse;
 }
 @keyframes mk-draw {
-  0% { stroke-dashoffset: 1; opacity: 1; }
-  55% { stroke-dashoffset: 0; }
-  88% { stroke-dashoffset: 0; opacity: 1; }
-  100% { stroke-dashoffset: 0; opacity: 0; }
+  0%, 30% { stroke-dashoffset: 1; }
+  70% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: 0; }
 }
 @keyframes mk-dot {
-  0%, 50% { transform: translateY(-70px) scale(0.6); opacity: 0; }
-  60% { transform: translateY(0) scale(1.15, 0.85); opacity: 1; }
-  68% { transform: translateY(-12px) scale(0.95, 1.05); }
-  76% { transform: translateY(0) scale(1); }
-  88% { opacity: 1; }
-  100% { transform: translateY(0); opacity: 0; }
+  0% { transform: translateY(-30px) scale(0.4); opacity: 0; }
+  22% { transform: translateY(0) scale(1.15, 0.85); opacity: 1; }
+  30% { transform: translateY(-5px) scale(0.95, 1.05); }
+  38% { transform: translateY(0) scale(1); }
+  100% { transform: translateY(0); opacity: 1; }
 }
 @keyframes mk-spin {
   to { transform: rotate(360deg); }
@@ -441,7 +436,7 @@ select:focus-visible {
 /* ---------- login scene ---------- */
 .login-scene {
   /* same navy-charcoal as the app's header band */
-  background: radial-gradient(900px 600px at 22% 30%, rgb(18 92 96 / 0.55) 0%, transparent 62%), radial-gradient(700px 420px at 92% 105%, rgb(255 149 0 / 0.08) 0%, transparent 60%),
+  background: radial-gradient(900px 600px at 22% 30%, rgb(14 110 80 / 0.55) 0%, transparent 62%), radial-gradient(700px 420px at 92% 105%, rgb(245 206 31 / 0.08) 0%, transparent 60%),
     linear-gradient(160deg, #1b1c1f 0%, #24262a 55%, #2c2f35 100%);
   color-scheme: dark;
 }
@@ -465,7 +460,7 @@ select:focus-visible {
 }
 .aurora-3 {
   width: 30rem; height: 30rem; left: 30%; bottom: -16rem;
-  background: radial-gradient(circle, #ff9500 0%, transparent 65%);
+  background: radial-gradient(circle, #f5ce1f 0%, transparent 65%);
   opacity: 0.07;
   animation: aurora-a 56s ease-in-out infinite alternate-reverse;
 }
@@ -506,7 +501,7 @@ select:focus-visible {
 }
 .glass-card::before {
   content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; pointer-events: none;
-  background: linear-gradient(140deg, rgb(255 149 0 / 0.5), transparent 35%, transparent 65%, rgb(46 196 166 / 0.5));
+  background: linear-gradient(140deg, rgb(245 206 31 / 0.5), transparent 35%, transparent 65%, rgb(46 227 166 / 0.5));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
 }
 .light-card {
@@ -516,7 +511,7 @@ select:focus-visible {
 }
 .light-card::before {
   content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 1.5px; pointer-events: none;
-  background: linear-gradient(140deg, rgb(255 149 0 / 0.9), transparent 30%, transparent 70%, rgb(46 196 166 / 0.9));
+  background: linear-gradient(140deg, rgb(245 206 31 / 0.9), transparent 30%, transparent 70%, rgb(46 227 166 / 0.9));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
 }
 .light-field {
@@ -524,7 +519,7 @@ select:focus-visible {
   background: #f4f5f8; border: 1px solid #e6e8ee;
   transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 }
-.light-field:focus-within { border-color: #ff9500; background: #fff; box-shadow: 0 0 0 4px rgb(255 149 0 / 0.18); }
+.light-field:focus-within { border-color: #f5ce1f; background: #fff; box-shadow: 0 0 0 4px rgb(245 206 31 / 0.18); }
 .light-field input { flex: 1; min-width: 0; background: transparent; outline: none; font-size: 0.875rem; color: #16181d; }
 .light-field input::placeholder { color: #9aa0ad; }
 .light-select { background: #f4f5f8; border: 1px solid #e6e8ee; color: #16181d; outline: none; }
@@ -536,7 +531,7 @@ select:focus-visible {
   background: rgb(255 255 255 / 0.05); border: 1px solid rgb(255 255 255 / 0.1);
   transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 }
-.glass-field:focus-within { border-color: rgb(255 149 0 / 0.55); background: rgb(255 255 255 / 0.08); box-shadow: 0 0 0 4px rgb(255 149 0 / 0.12); }
+.glass-field:focus-within { border-color: rgb(245 206 31 / 0.55); background: rgb(255 255 255 / 0.08); box-shadow: 0 0 0 4px rgb(245 206 31 / 0.12); }
 .glass-field input { flex: 1; min-width: 0; background: transparent; outline: none; font-size: 0.875rem; color: #fff; }
 .glass-field input::placeholder { color: rgb(255 255 255 / 0.35); }
 .glass-select { background: rgb(255 255 255 / 0.06); border: 1px solid rgb(255 255 255 / 0.12); color: #fff; outline: none; }
@@ -546,13 +541,13 @@ select:focus-visible {
 .glass-btn:active, .shine-btn:active { transform: scale(0.985); }
 .shine-btn {
   position: relative; overflow: hidden;
-  background: linear-gradient(135deg, #ffc21a 0%, #ff9500 55%, #ff6a00 100%);
-  box-shadow: 0 8px 22px -10px rgb(255 149 0 / 0.45);
+  background: linear-gradient(135deg, #ffe24a 0%, #f5ce1f 55%, #e9b800 100%);
+  box-shadow: 0 8px 22px -10px rgb(245 206 31 / 0.45);
   transition: box-shadow 0.2s, transform 0.15s, opacity 0.2s;
 }
 .shine-btn:disabled { filter: saturate(0.55) brightness(0.8); opacity: 0.7; box-shadow: none; }
 .shine-btn:disabled::after { animation: none; }
-.shine-btn:not(:disabled):hover { box-shadow: 0 10px 26px -10px rgb(255 149 0 / 0.6); }
+.shine-btn:not(:disabled):hover { box-shadow: 0 10px 26px -10px rgb(245 206 31 / 0.6); }
 .shine-btn::after {
   content: ''; position: absolute; inset: 0; transform: translateX(-120%);
   background: linear-gradient(100deg, transparent 35%, rgb(255 255 255 / 0.3) 50%, transparent 65%);
@@ -561,20 +556,20 @@ select:focus-visible {
 @keyframes shine { 0%, 75% { transform: translateX(-120%); } 95%, 100% { transform: translateX(120%); } }
 
 /* hero mark: the loader's motion, slowed down and softened — concentric, centred rings */
-.hero-mark .mark-glow { position: absolute; inset: 26%; border-radius: 9999px; background: radial-gradient(circle, rgb(46 196 166 / 0.22), transparent 70%); filter: blur(28px); animation: glow 8s ease-in-out infinite alternate; }
+.hero-mark .mark-glow { position: absolute; inset: 26%; border-radius: 9999px; background: radial-gradient(circle, rgb(46 227 166 / 0.22), transparent 70%); filter: blur(28px); animation: glow 8s ease-in-out infinite alternate; }
 @keyframes glow { from { opacity: 0.6; transform: scale(0.95); } to { opacity: 0.9; transform: scale(1.05); } }
 .hero-mark .orb { position: absolute; border-radius: 9999px; }
 .hero-mark .orb i { position: absolute; left: 50%; border-radius: 9999px; transform: translateX(-50%); }
 .hero-mark .orb-outer { inset: 0; border: 1px solid rgb(255 255 255 / 0.07); animation: mk-spin 16s linear infinite; }
 .hero-mark .orb-outer i { top: -3px; width: 6px; height: 6px; background: rgb(255 255 255 / 0.85); box-shadow: 0 0 8px 1px rgb(255 255 255 / 0.3); }
-.hero-mark .orb-mid { inset: 14%; border: 1px dashed rgb(255 149 0 / 0.14); animation: mk-spin 28s linear infinite reverse; }
-.hero-mark .orb-mid i { bottom: -2.5px; width: 5px; height: 5px; background: rgb(255 149 0 / 0.85); box-shadow: 0 0 8px 1px rgb(255 149 0 / 0.3); }
-.hero-mark .orb-inner { inset: 27%; border: 1px solid rgb(95 227 198 / 0.07); animation: mk-spin 40s linear infinite; }
-.hero-mark .orb-inner i { top: -2px; width: 4px; height: 4px; background: rgb(95 227 198 / 0.8); box-shadow: 0 0 6px 1px rgb(95 227 198 / 0.3); }
-.hero-mark .mk-frame { animation-duration: 7s; filter: drop-shadow(0 0 8px rgb(255 255 255 / 0.12)); }
-.hero-mark .mk-dot { animation-duration: 7s; filter: drop-shadow(0 0 6px rgb(46 196 166 / 0.5)); }
+.hero-mark .orb-mid { inset: 14%; border: 1px dashed rgb(245 206 31 / 0.14); animation: mk-spin 28s linear infinite reverse; }
+.hero-mark .orb-mid i { bottom: -2.5px; width: 5px; height: 5px; background: rgb(245 206 31 / 0.85); box-shadow: 0 0 8px 1px rgb(245 206 31 / 0.3); }
+.hero-mark .orb-inner { inset: 27%; border: 1px solid rgb(120 240 200 / 0.07); animation: mk-spin 40s linear infinite; }
+.hero-mark .orb-inner i { top: -2px; width: 4px; height: 4px; background: rgb(120 240 200 / 0.8); box-shadow: 0 0 6px 1px rgb(120 240 200 / 0.3); }
+.hero-mark .mk-frame { animation-duration: 5s; filter: drop-shadow(0 0 8px rgb(245 206 31 / 0.35)); }
+.hero-mark .mk-dot { filter: drop-shadow(0 0 6px rgb(255 255 255 / 0.45)); }
 .hero-title {
-  background: linear-gradient(180deg, #fff 20%, #cdeee8 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+  background: linear-gradient(180deg, #fff 20%, #d4f7e9 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
   animation: rise 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.4s both;
 }
 .hero-sub { animation: rise 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.55s both; }

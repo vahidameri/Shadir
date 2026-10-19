@@ -101,7 +101,7 @@ const FIELD_LABEL: Record<TaskField, T2> = {
   sprint_id: ['اسپرینت', 'Sprint'],
   points: ['امتیاز', 'Story points'],
   tags: ['برچسب', 'Tags'],
-  track: ['واحد', 'Unit'],
+  track: ['تیم', 'Team'],
 }
 const MODES: [FieldMode, T2][] = [['off', ['خاموش', 'Off']], ['on', ['اختیاری', 'Optional']], ['req', ['اجباری', 'Required']]]
 

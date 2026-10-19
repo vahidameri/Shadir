@@ -166,7 +166,7 @@ export function BlockerPanel({ t, patch }: { t: Task; patch: (p: Partial<Task>) 
 
 const FIELD: Record<string, [string, string]> = {
   title: ['عنوان', 'title'], description: ['توضیحات', 'description'], status: ['وضعیت', 'status'], priority: ['اولویت', 'priority'], assignee: ['مسئول', 'assignee'],
-  due_date: ['ددلاین', 'deadline'], assigned_at: ['تاریخ اساین', 'assign date'], flag: ['پرچم', 'flag'], track: ['واحد', 'unit'], project_id: ['پروژه', 'project'],
+  due_date: ['ددلاین', 'deadline'], assigned_at: ['تاریخ اساین', 'assign date'], flag: ['پرچم', 'flag'], track: ['تیم', 'team'], project_id: ['پروژه', 'project'],
   blocked_reason: ['علت انسداد', 'blocker reason'], blocked_by: ['مسدودکننده', 'blocked by'], link: ['لینک', 'link'], requested_by: ['درخواست‌دهنده', 'requested by'],
   collaborators: ['همکاران', 'shared with'], watchers: ['ناظرها', 'watchers'], private: ['دیده‌شدن', 'visibility'], deadline: ['ددلاین دوم', 'second deadline'],
   subject: ['موضوع', 'subject'], person: ['طرف پیگیری', 'person'], channel: ['کانال', 'channel'], notes: ['یادداشت', 'notes'], owner: ['پیگیری‌کننده', 'owner'],

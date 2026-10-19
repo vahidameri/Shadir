@@ -444,7 +444,7 @@ export function ItemSheet({ sheet, id, onClose }: { sheet: 'Tasks' | 'FollowUps'
                   </span>
                 </Prop>
               )}
-              <Prop label={L('واحد', 'Unit')}>
+              <Prop label={L('تیم', 'Team')}>
                 <TrackPicker task={item as unknown as Task} onChange={(v) => patch({ track: v })} />
               </Prop>
               <Prop label={L('برچسب', 'Tags')}>

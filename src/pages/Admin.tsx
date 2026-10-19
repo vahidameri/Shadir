@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Plus, Pencil, Lock } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { useEditor } from '../components/Editor'
@@ -24,7 +24,8 @@ type Tab = 'people' | 'contacts' | 'org' | 'projects' | 'import' | 'settings'
 export default function Admin({ initial = 'people' }: { initial?: Tab }) {
   const { db, access } = useStore()
   const { open } = useEditor()
-  const [tab, setTab] = useState<Tab>(initial)
+  const [params] = useSearchParams()
+  const [tab, setTab] = useState<Tab>((params.get('tab') as Tab) || initial)
   const active = db.Team.filter((m) => String(m.active) !== 'false')
   return (
     <>

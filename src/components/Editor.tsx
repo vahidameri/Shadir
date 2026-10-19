@@ -5,7 +5,6 @@ import { ORG_KEYS, orgList } from '../lib/org'
 import type { SheetName } from '../lib/types'
 import { weekCfg } from '../lib/weeks'
 import { canPersonal, dueFor, fieldOn, fieldReq, needsDue, needsProject, taskCfg, TASK_FIELDS, type TaskField } from '../lib/taskcfg'
-import { DAY_OPTIONS } from '../lib/cadence'
 import { columns, isBlocked, statusLabel } from '../lib/columns'
 import { useStore } from '../lib/store'
 import { uid } from '../lib/api'
@@ -64,7 +63,7 @@ export const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields:
       { key: 'estimate', label: ['تخمین (ساعت)', 'Estimate (hours)'], type: 'number', half: true },
       { key: 'points', label: ['امتیاز', 'Story points'], type: 'number', half: true },
       { key: 'tags', label: ['برچسب‌ها', 'Tags'], type: 'text', half: true, placeholder: ['با کاما جدا کنید', 'Comma separated'] },
-      { key: 'track', label: ['واحد', 'Unit'], type: 'side', half: true },
+      { key: 'track', label: ['تیم', 'Team'], type: 'side', half: true },
       { key: 'private', label: ['دیده‌شدن', 'Visibility'], type: 'select', options: { '': ['عمومی', 'Visible'], '1': ['خصوصی', 'Private'] }, half: true },
       { key: 'link', label: ['لینک (میزیتو یا سند)', 'Link (Mizito or doc)'], type: 'text', placeholder: ['https://mizito.noyanet.com/…', 'https://mizito.noyanet.com/…'] },
     ],
@@ -130,24 +129,20 @@ export const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields:
     prefix: 'P',
     fields: [
       { key: 'name', label: ['نام پروژه', 'Project name'], type: 'text', required: true },
+      { key: 'team', label: ['تیم', 'Team'], type: 'side', half: true, required: true },
       { key: 'code', label: ['کد', 'Code'], type: 'text', half: true, placeholder: ['PRJ-XXX', 'PRJ-XXX'] },
-      { key: 'category', label: ['دسته', 'Category'], type: 'text', half: true },
-      { key: 'description', label: ['شرح', 'Description'], type: 'textarea' },
-      { key: 'objective', label: ['هدف کسب‌وکاری', 'Business objective'], type: 'text' },
-      { key: 'owner', label: ['مدیر محصول پروژه', 'Project PM'], type: 'person', half: true },
-      { key: 'client', label: ['کارفرما', 'Client'], type: 'text', half: true },
-      { key: 'liaison', label: ['رابط پروژه', 'Client liaison'], type: 'text', half: true },
-      { key: 'liaison_contact', label: ['تلفن یا ایمیل رابط', 'Liaison phone or email'], type: 'text', half: true },
+      { key: 'owner', label: ['مسئول پروژه', 'Project lead'], type: 'person', half: true },
       { key: 'status', label: ['وضعیت', 'Status'], type: 'select', options: PROJECT_STATUS, half: true },
       { key: 'priority', label: ['اولویت', 'Priority'], type: 'select', options: PRIORITY, half: true },
       { key: 'phase', label: ['فاز فعلی', 'Current phase'], type: 'text', half: true },
-      { key: 'progress', label: ['پیشرفت دستی', 'Manual progress'], type: 'number', half: true },
       { key: 'start_date', label: ['شروع', 'Start'], type: 'date', half: true },
       { key: 'end_date', label: ['ددلاین', 'Deadline'], type: 'date', half: true },
-      { key: 'delivery_day', label: ['روز تحویل هفتگی', 'Weekly delivery day'], type: 'select', options: DAY_OPTIONS, half: true },
+      { key: 'progress', label: ['پیشرفت دستی (٪؛ خالی = از تسک‌ها)', 'Manual progress (%; blank = from tasks)'], type: 'number', half: true },
       { key: 'health_override', label: ['سلامت دستی', 'Health override'], type: 'select', options: { '': ['خودکار', 'Automatic'], ...HEALTH }, half: true },
+      { key: 'objective', label: ['هدف', 'Objective'], type: 'text' },
+      { key: 'description', label: ['شرح', 'Description'], type: 'textarea' },
     ],
-    defaults: () => ({ status: 'planning', priority: 'medium', start_date: todayISO(), progress: '', health_override: '', paused_at: '', pause_reason: '', delivery_day: '', last_delivery: '', archived: '', archived_at: '' }),
+    defaults: () => ({ team: '', status: 'active', priority: 'medium', start_date: todayISO(), progress: '', health_override: '', paused_at: '', pause_reason: '', delivery_day: '', last_delivery: '', archived: '', archived_at: '', client: '', liaison: '', liaison_contact: '', category: '' }),
   },
   Milestones: {
     title: ['مایلستون', 'Milestone'],
@@ -231,7 +226,7 @@ export const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields:
       { key: 'username', label: ['نام کاربری', 'Username'], type: 'text', half: true, placeholder: ['خودکار از نام انگلیسی', 'From the English name'] },
       { key: 'role', label: ['سمت', 'Title'], type: 'title', half: true },
       { key: 'team', label: ['تیم‌ها', 'Teams'], type: 'multi', options: TEAM_NAMES },
-      { key: 'track', label: ['واحد', 'Unit'], type: 'side', half: true },
+      { key: 'track', label: ['تیم', 'Team'], type: 'side', half: true },
       { key: 'capacity', label: ['ظرفیت', 'Capacity'], type: 'number', half: true },
       { key: 'email', label: ['ایمیل گوگل', 'Google email'], type: 'text', half: true },
       { key: 'phone', label: ['تلفن', 'Phone'], type: 'text', half: true },
@@ -261,7 +256,7 @@ export const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields:
       { key: 'project_id', label: ['پروژه', 'Project'], type: 'project', half: true, required: true },
       { key: 'owner', label: ['مسئول', 'Owner'], type: 'person', half: true },
       { key: 'target_date', label: ['تاریخ تحویل', 'Target date'], type: 'date', half: true, required: true },
-      { key: 'track', label: ['واحد', 'Unit'], type: 'side', half: true },
+      { key: 'track', label: ['تیم', 'Team'], type: 'side', half: true },
       { key: 'status', label: ['وضعیت', 'Status'], type: 'select', options: DELIVERABLE_STATUS, half: true },
       { key: 'confidence', label: ['اطمینان', 'Confidence'], type: 'select', options: CONFIDENCE, half: true },
       { key: 'baseline_date', label: ['تاریخ تعهد اولیه', 'Baseline date'], type: 'date', half: true },
@@ -423,7 +418,7 @@ export function FieldInput({ f, value, set, form, disabled, autoFocus, onSubmit 
     case 'side':
       return (
         <select {...common} value={String(v)} onChange={(e) => set(e.target.value)}>
-          <option value="">{f.key === 'track' && 'assignee' in form ? L('خودکار (واحد مسئول)', 'Auto (assignee’s unit)') : '—'}</option>
+          <option value="">{f.key === 'track' && 'assignee' in form ? L('خودکار (تیم پروژه یا مسئول)', 'Auto (project’s team or assignee’s)') : '—'}</option>
           {TRACKS.map((t) => (
             <option key={t} value={t}>
               {lbl(TRACK, t)}

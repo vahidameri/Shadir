@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { closed } from '../lib/columns'
 import { NavLink, useLocation, useNavigate, Link } from 'react-router-dom'
 import {
-  Briefcase, ListChecks, BellRing, ShieldAlert, Settings, Moon, Sun, Search, Plus, RefreshCw, Menu,
+  Briefcase, ListChecks, Users, BellRing, ShieldAlert, Settings, Moon, Sun, Search, Plus, RefreshCw, Menu,
   Sparkles, CheckCircle2, AlertCircle, Bell, PanelLeftClose, PanelLeftOpen, Languages, Star, AtSign, Flag, Clock, CircleAlert, Ban, CalendarDays, Keyboard, CalendarRange, UserRound, LogOut, PackageCheck, Repeat,
 } from 'lucide-react'
 import { useStore, clearSnaps } from '../lib/store'
@@ -19,7 +19,7 @@ import { hubOf, type Hub } from './HubNav'
 import { can } from '../lib/access'
 import { ACCESS, JOB_TITLE } from '../lib/labels'
 import { CommandPalette } from './CommandPalette'
-import { NoyanMark } from './Brand'
+import { ShadMark } from './Brand'
 import { mzClosed, mzSignals } from '../lib/mizito'
 import { lbl } from '../lib/i18n'
 
@@ -102,7 +102,7 @@ export function Layout({ children }: { children: ReactNode }) {
         { to: '/tasks', label: L('تسک‌ها', 'Tasks'), icon: ListChecks, count: openTasks },
         { to: '/followups', label: L('پیگیری‌ها', 'Follow-ups'), icon: BellRing },
         ...(can.mizito(access) ? [{ to: '/mizito', label: L('میزیتو', 'Mizito'), icon: AtSign, badge: mzHot }] : []),
-        { to: '/projects', label: L('پروژه‌ها', 'Projects'), icon: Briefcase, count: db.Projects.filter((p) => p.status === 'active').length },
+        { to: '/teams', label: L('تیم‌ها و پروژه‌ها', 'Teams & projects'), icon: Users, count: db.Projects.filter((p) => p.status === 'active').length },
       ],
     },
     ...(leader
@@ -135,11 +135,11 @@ export function Layout({ children }: { children: ReactNode }) {
     <aside className={cx('flex h-full flex-col bg-band text-on-band transition-[width] duration-300', wide ? 'w-64' : 'w-[4.5rem]')}>
       <div className={cx('flex h-16 shrink-0 items-center border-b border-band-line', wide ? 'gap-3 px-5' : 'justify-center')}>
         <Link to="/" className="flex items-center gap-3">
-          <NoyanMark className="h-7 w-7 shrink-0" />
+          <ShadMark className="h-8 w-8 shrink-0" />
           {wide && (
             <div className="leading-tight">
               <div className="text-sm font-semibold tracking-tight">{APP_NAME()}</div>
-              <div className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-band-sub">Noyan · Madar</div>
+              <div className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-band-sub">Shad · Madar</div>
             </div>
           )}
         </Link>

@@ -2,6 +2,7 @@
 // sheet (thread, status, outcome, reminder text) and the settings (statuses, categories, actions,
 // weights, thresholds, reminder template).
 import { useMemo, useState } from 'react'
+import { Attachments } from './Files'
 import { AtSign, Ban, Check, Clock, Copy, ExternalLink, FileText, Flame, Hourglass, Link2, MessageSquarePlus, MoonStar, Plus, Settings2, Trash2, UserRound, X } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { useEditor } from './Editor'
@@ -252,7 +253,7 @@ export function CaptureSheet({ onClose, onOpen, initialLink = '' }: { onClose: (
               <textarea rows={3} className="input w-full py-2 text-sm" value={f.description} onChange={(e) => set('description', e.target.value)} />
             </label>
             <label className="block">
-              <span className="label">{L('مستندات (هر لینک در یک خط)', 'Documents (one link per line)')}</span>
+              <span className="label">{L('مستندات: لینک‌ها (هر لینک در یک خط). فایل را بعد از ثبت، در صفحه‌ی همین مورد ضمیمه کنید.', 'Documents: links, one per line. Attach files on the item after saving.')}</span>
               <textarea rows={2} dir="ltr" className="input w-full py-2 text-xs" value={f.docs} onChange={(e) => set('docs', e.target.value)} />
             </label>
           </>
@@ -393,10 +394,13 @@ export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }
                 ))}
               </ul>
             ) : (
-              <div className="text-xs text-sub">{L('مستندی ثبت نشده', 'No documents')}</div>
+              <div className="text-xs text-sub">{L('لینکی ثبت نشده؛ فایل را پایین ضمیمه کنید یا لینک بگذارید.', 'No links; attach a file below or add a link.')}</div>
             )}
+            <div className="mt-3">
+              <Attachments entity="Mizito" id={m.id} compact />
+            </div>
             {canEdit && (
-              <textarea key={`docs${m.docs}`} defaultValue={m.docs} dir="ltr" rows={2} placeholder={L('لینک مستندات، هر لینک در یک خط', 'Document links, one per line')} onBlur={(e) => e.target.value !== m.docs && patch({ docs: e.target.value })} className="mt-2 w-full rounded-xl border border-line bg-surface px-3 py-2 text-xs outline-none" />
+              <textarea key={`docs${m.docs}`} defaultValue={m.docs} dir="ltr" rows={2} placeholder={L('لینک مستندات (مثلاً پیوست‌های میزیتو)، هر لینک در یک خط', 'Document links (e.g. Mizito attachments), one per line')} onBlur={(e) => e.target.value !== m.docs && patch({ docs: e.target.value })} className="mt-2 w-full rounded-xl border border-line bg-surface px-3 py-2 text-xs outline-none" />
             )}
           </div>
 

@@ -8,15 +8,15 @@ import { ORG_KEYS, orgList, type OrgItem, type OrgKind } from '../lib/org'
 import { teamCodes } from '../lib/labels'
 import { TERMS, TERMS_KEY, termOverrides } from '../lib/terms'
 
-const TITLE: Record<OrgKind, T2> = { plans: ['هدف‌های برنامه‌ریزی', 'Planning purposes'], links: ['نوع لینک‌های پروژه', 'Project link types'], access: ['سطح دسترسی (فقط نام)', 'Access levels (names only)'], series: ['جلسه‌ها (عنوان سری‌ها)', 'Meeting series'], titles: ['سمت‌ها', 'Job titles'], teams: ['تیم‌ها', 'Teams'], sides: ['واحدهای دپارتمان (لاین‌ها، مدیران محصول، CRM و عملیات، داده…)', 'Department units (lines, product managers, CRM & ops, data…)'] }
+const TITLE: Record<OrgKind, T2> = { plans: ['هدف‌های برنامه‌ریزی', 'Planning purposes'], links: ['نوع لینک‌های پروژه', 'Project link types'], access: ['سطح دسترسی (فقط نام)', 'Access levels (names only)'], series: ['جلسه‌ها (عنوان سری‌ها)', 'Meeting series'], titles: ['سمت‌ها', 'Job titles'], teams: ['گروه‌های سازمانی (مدیریت، PMO…)', 'Org groups (leadership, PMO…)'], sides: ['تیم‌های دپارتمان (لاین‌ها، مدیران محصول، CRM و عملیات، داده…)', 'Department teams (lines, product managers, CRM & ops, data…)'] }
 const HINT: Record<OrgKind, T2> = {
   plans: ['برنامه‌ریزی برای چه؟ دمو، بستن رودمپ، اسپرینت، انتشار… هر هدف چک‌لیست آمادگی خودش را دارد.', 'What a planning session is for: a demo, the roadmap, a sprint, a release… each starts with its own checklist.'],
   links: ['لینک‌هایی که هر پروژه دارد: استیج، پروداکشن، فیگما، …', 'The links each project keeps: staging, production, Figma, …'],
   access: ['چهار سطح ثابت‌اند (مدیر برنامه: همه‌چیز + بک‌آفیس، CPTO، هد، عضو)؛ فقط اسمشان را عوض کنید.', 'The four levels are fixed (PgM: everything + back office, CPTO, head, member); only rename them.'],
   series: ['انواع جلسه؛ ویکلی‌ها هر هفته تکرار می‌شوند، بقیه (وان‌آن‌وان، موردی، بیرونی، برنامه‌ریزی، سایر) نه.', 'Meeting types; the weeklies repeat, the rest (one-on-one, ad-hoc, external, planning, other) don’t.'],
   titles: ['کد کوتاه انگلیسی (مثل CPTO) روی کارت هر نفر دیده می‌شود.', 'The short code (e.g. CPTO) shows on each person.'],
-  teams: ['هر نفر می‌تواند عضو چند تیم باشد.', 'A person can be in several teams.'],
-  sides: ['هر تسک و هر نفر یک واحد دارد؛ تسک‌ها بر اساس واحد فیلتر و گروه‌بندی می‌شوند.', 'Every task and person belongs to a unit; tasks filter and group by it.'],
+  teams: ['گروه‌بندی افراد (هر نفر می‌تواند در چند گروه باشد)؛ با «تیم‌ها»ی دپارتمان فرق دارد.', 'Groupings of people (one can be in several); not the department teams.'],
+  sides: ['هر تیم پروژه‌های خودش را دارد و در صفحه‌ی «تیم‌ها» با وضعیتش دیده می‌شود. هر تسک و هر نفر هم یک تیم دارد. برای حذف یا اضافه، همین فهرست را ویرایش کنید.', 'Each team owns its projects and shows on the Teams page with its status; every task and person has a team. Edit this list to add or remove teams.'],
 }
 
 export function OrgList({ kind, admin: canEdit, bare }: { kind: OrgKind; admin: boolean; bare?: boolean }) {
@@ -104,10 +104,10 @@ export function OrgPage({ admin }: { admin: boolean }) {
       <Card eyebrow={<span className="flex items-center gap-1.5"><Building2 size={12} /> {L('سازمان', 'Organisation')}</span>} title={L('سمت‌ها', 'Job titles')} className="@3xl:col-span-2">
         <OrgList kind="titles" admin={admin} bare />
       </Card>
-      <Card eyebrow={L('سازمان', 'Organisation')} title={L('تیم‌ها و واحدها', 'Teams & units')}>
+      <Card eyebrow={L('سازمان', 'Organisation')} title={L('تیم‌های دپارتمان', 'Department teams')}>
         <div className="space-y-6">
-          <OrgList kind="teams" admin={admin} />
           <OrgList kind="sides" admin={admin} />
+          <OrgList kind="teams" admin={admin} />
         </div>
       </Card>
       <Card eyebrow={L('دسترسی', 'Access')} title={L('نام سطح‌های دسترسی', 'Access level names')}>

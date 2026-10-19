@@ -10,7 +10,8 @@ import { ProjectCard } from '../components/shared'
 import { PRIORITY, PROJECT_STATUS, HEALTH, options } from '../lib/labels'
 import { projectMetrics } from '../lib/metrics'
 import { fa, fmtDate } from '../lib/jalali'
-import { L, useI18n } from '../lib/i18n'
+import { L, lbl, useI18n } from '../lib/i18n'
+import { TRACK, TRACKS } from '../lib/tracks'
 import { usePins } from '../lib/prefs'
 
 export default function Projects() {
@@ -27,13 +28,12 @@ export default function Projects() {
   const [health, setHealth] = useState('')
   const [owner, setOwner] = useState('')
 
-  const cats = Array.from(new Set(db.Projects.map((p) => p.category).filter(Boolean)))
   const owners = Array.from(new Set(db.Projects.map((p) => p.owner).filter(Boolean)))
   const list = db.Projects.filter(
     (p) =>
       (scope === 'all' || pins.includes(p.id)) &&
       (!status || p.status === status) &&
-      (!cat || p.category === cat) &&
+      (!cat || (p.team || '') === cat) &&
       (!prio || p.priority === prio) &&
       (!owner || p.owner === owner) &&
       (!health || projectMetrics(p, db).health === health) &&
@@ -61,7 +61,7 @@ export default function Projects() {
             <FilterSelect value={status} onChange={setStatus} placeholder={L('همه‌ی وضعیت‌ها', 'Any status')} options={options(PROJECT_STATUS, lang)} />
             <FilterSelect value={health} onChange={setHealth} placeholder={L('سلامت', 'Health')} options={options(HEALTH, lang)} />
             <FilterSelect value={prio} onChange={setPrio} placeholder={L('اولویت', 'Priority')} options={options(PRIORITY, lang)} />
-            <FilterSelect value={cat} onChange={setCat} placeholder={L('دسته', 'Category')} options={cats.map((c) => ({ value: c, label: c }))} />
+            <FilterSelect value={cat} onChange={setCat} placeholder={L('همه‌ی تیم‌ها', 'All teams')} options={TRACKS.map((t) => ({ value: t, label: lbl(TRACK, t) }))} />
             <FilterSelect value={owner} onChange={setOwner} placeholder={L('مدیر محصول پروژه', 'Lead')} options={owners.map((c) => ({ value: c, label: c }))} />
           </Toolbar>
         </div>

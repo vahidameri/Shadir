@@ -12,6 +12,7 @@ import Projects from './pages/Projects'
 import ProjectDetail from './pages/ProjectDetail'
 import Tasks from './pages/Tasks'
 import MizitoPage from './pages/Mizito'
+import Teams from './pages/Teams'
 import FollowUps from './pages/FollowUps'
 import Risks from './pages/Risks'
 import CalendarPage from './pages/Calendar'
@@ -47,7 +48,7 @@ function HostedSplash({ error, retry }: { error: string; retry: () => void }) {
         ) : (
           <MadarLoader className="mx-auto h-36 w-36" />
         )}
-        <div className={msg ? 'mt-2 font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-band-sub' : 'madar-word mt-8 font-mono text-[0.6875rem] uppercase tracking-[0.35em] text-band-sub'}>Noyan · Madar</div>
+        <div className={msg ? 'mt-2 font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-band-sub' : 'madar-word mt-8 font-mono text-[0.6875rem] uppercase tracking-[0.35em] text-band-sub'}>Shad · Madar</div>
         {msg ? (
           <>
             <p className="mt-8 whitespace-pre-line [overflow-wrap:anywhere] text-sm leading-7 text-[#ff8a9a]" dir="auto">{msg}</p>
@@ -105,6 +106,7 @@ export default function App() {
                 <Route path="/meetings" element={<Weekly />} />
                 <Route path="/weekly" element={<Navigate to="/meetings" replace />} />
                 <Route path="/calendar" element={<CalendarPage />} />
+                <Route path="/teams" element={<Teams />} />
                 <Route path="/projects" element={<Projects />} />
                 <Route path="/projects/:id" element={<ProjectDetail />} />
                 <Route path="/risks" element={<Only rule="portfolio"><Risks /></Only>} />
