@@ -22,16 +22,16 @@ export interface Tier { id: string; fa: string; en: string; sla: number; weight:
 export type MzCat = 'open' | 'waiting' | 'blocked' | 'done' | 'cancelled'
 export interface MzStatus { id: string; fa: string; en: string; cat: MzCat }
 export interface MzOption { id: string; fa: string; en: string; weight?: number }
-export interface MzWeights { urgent: number; overdue: number; due_soon: number; sla_breach: number; per_mention: number }
-export interface MzThresholds { p0: number; p1: number; p2: number }
+interface MzWeights { urgent: number; overdue: number; due_soon: number; sla_breach: number; per_mention: number }
+interface MzThresholds { p0: number; p1: number; p2: number }
 
-export const DEFAULT_TIERS: Tier[] = [
+const DEFAULT_TIERS: Tier[] = [
   { id: 'executive', fa: 'مدیرعامل / هیئت‌مدیره', en: 'Executive', sla: 4, weight: 40, color: '#c4314b' },
   { id: 'deputy', fa: 'معاون', en: 'Deputy', sla: 24, weight: 30, color: '#e8650a' },
   { id: 'manager', fa: 'مدیر', en: 'Manager', sla: 48, weight: 20, color: '#2f6f9f' },
   { id: 'standard', fa: 'کارشناس / سایر', en: 'Standard', sla: 72, weight: 10, color: '#7a8a90' },
 ]
-export const DEFAULT_STATUSES: MzStatus[] = [
+const DEFAULT_STATUSES: MzStatus[] = [
   { id: 'needs_action', fa: 'نیاز به اقدام', en: 'Needs action', cat: 'open' },
   { id: 'in_progress', fa: 'در حال رسیدگی', en: 'In progress', cat: 'open' },
   { id: 'awaiting', fa: 'منتظر پاسخ', en: 'Awaiting reply', cat: 'waiting' },
@@ -39,24 +39,24 @@ export const DEFAULT_STATUSES: MzStatus[] = [
   { id: 'done', fa: 'انجام‌شده', en: 'Done', cat: 'done' },
   { id: 'cancelled', fa: 'لغوشده', en: 'Cancelled', cat: 'cancelled' },
 ]
-export const DEFAULT_CATEGORIES: MzOption[] = [
+const DEFAULT_CATEGORIES: MzOption[] = [
   { id: 'product', fa: 'محصول و توسعه', en: 'Product & development' },
   { id: 'finance', fa: 'مالی و قراردادها', en: 'Finance & contracts' },
   { id: 'infra', fa: 'زیرساخت و دسترسی', en: 'Infrastructure & access' },
   { id: 'people', fa: 'منابع انسانی', en: 'People & HR' },
   { id: 'cross', fa: 'هماهنگی بین‌تیمی', en: 'Cross-team coordination' },
 ]
-export const DEFAULT_ACTIONS: MzOption[] = [
+const DEFAULT_ACTIONS: MzOption[] = [
   { id: 'approve', fa: 'تأیید', en: 'Approve', weight: 10 },
   { id: 'advise', fa: 'نظر / مشاوره', en: 'Advise', weight: 5 },
   { id: 'followup', fa: 'پیگیری', en: 'Follow-up', weight: 5 },
   { id: 'fyi', fa: 'جهت اطلاع', en: 'FYI', weight: 0 },
 ]
-export const DEFAULT_WEIGHTS: MzWeights = { urgent: 40, overdue: 30, due_soon: 15, sla_breach: 25, per_mention: 3 }
-export const DEFAULT_THRESHOLDS: MzThresholds = { p0: 75, p1: 50, p2: 25 }
-export const DEFAULT_TEMPLATE = 'سلام {name} عزیز، وقت بخیر.\nدر خصوص «{title}» که {days} روز پیش مطرح شد، لطفاً آخرین وضعیت را اعلام بفرمایید.\n{link}\nسپاس'
+const DEFAULT_WEIGHTS: MzWeights = { urgent: 40, overdue: 30, due_soon: 15, sla_breach: 25, per_mention: 3 }
+const DEFAULT_THRESHOLDS: MzThresholds = { p0: 75, p1: 50, p2: 25 }
+const DEFAULT_TEMPLATE = 'سلام {name} عزیز، وقت بخیر.\nدر خصوص «{title}» که {days} روز پیش مطرح شد، لطفاً آخرین وضعیت را اعلام بفرمایید.\n{link}\nسپاس'
 
-export interface MzCfg {
+interface MzCfg {
   base: string
   tiers: Tier[]
   statuses: MzStatus[]
@@ -116,7 +116,7 @@ export const firstMzStatus = (cat: MzCat) => cfg.statuses.find((s) => s.cat === 
 
 // ------------------------------------------------------------------ people
 /** Everyone who can ask or be chased: the department (Team) and the registry (Contacts). */
-export function contactOf(db: DB, name: string): Contact | undefined {
+function contactOf(db: DB, name: string): Contact | undefined {
   const n = String(name || '').trim()
   return db.Contacts.find((c) => c.name === n || c.name_en === n)
 }
@@ -150,11 +150,11 @@ export const mentionsOf = (db: DB, id: string): MizitoMention[] => db.MizitoMent
 /** Everyone who mentioned it: the asker and every re-mention. */
 export const askersOf = (db: DB, m: MizitoItem) => [...new Set([m.asked_by, ...mentionsOf(db, m.id).map((x) => x.by)].filter(Boolean))]
 /** The highest tier among the people who asked. */
-export function topTier(db: DB, m: MizitoItem): Tier | undefined {
+function topTier(db: DB, m: MizitoItem): Tier | undefined {
   return askersOf(db, m).map((n) => tierOf(db, n)).filter(Boolean).sort((a, b) => b!.weight - a!.weight)[0] || undefined
 }
 
-export interface MzSignals {
+interface MzSignals {
   /** computed or overridden P0..P3 */
   p: 0 | 1 | 2 | 3
   score: number
@@ -220,7 +220,7 @@ export type MzView = 'queue' | 'p0' | 'exec' | 'breached' | 'waiting' | 'stale' 
 export const MZ_VIEWS: MzView[] = ['queue', 'p0', 'exec', 'breached', 'waiting', 'stale', 'closed', 'all']
 
 /** The two highest tiers count as "exec asks". */
-export const isExecTier = (t?: Tier) => !!t && [...cfg.tiers].sort((a, b) => b.weight - a.weight).slice(0, 2).some((x) => x.id === t.id)
+const isExecTier = (t?: Tier) => !!t && [...cfg.tiers].sort((a, b) => b.weight - a.weight).slice(0, 2).some((x) => x.id === t.id)
 
 export function inMzView(db: DB, m: MizitoItem, v: MzView, s = mzSignals(db, m)): boolean {
   const cat = mzCat(m.status)

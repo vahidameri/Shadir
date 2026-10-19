@@ -138,37 +138,7 @@ export default function CalendarPage() {
           </Toolbar>
         </div>
 
-        {/* Narrow screens: agenda list of the month's days that have something on them */}
-        <div className="space-y-3 @lg:hidden">
-          {cells
-            .filter((c) => !c.out)
-            .map(({ d }) => {
-              const it = itemsOn(d)
-              const n = count(it)
-              if (!n && d !== today) return null
-              return (
-                <div key={d} className={cx('card p-4', d === today && 'ring-2 ring-ink')}>
-                  <div className="mb-2 flex items-baseline gap-2">
-                    <span className="display text-2xl num">{fa(dayNum(d))}</span>
-                    <span className="text-sm text-sub">{fmtWeekday(d)}</span>
-                    {d === today && <span className="chip ms-auto bg-ink text-surface">{L('امروز', 'Today')}</span>}
-                  </div>
-                  {n === 0 ? (
-                    <div className="text-xs text-sub">{L('برنامه‌ای نیست', 'Nothing scheduled')}</div>
-                  ) : (
-                    <div className="space-y-0.5">
-                      {it.meets.map((m) => <Row key={m.id} onClick={() => nav('/meetings')} icon={<CalendarRange size={14} />} title={`${fa(m.time)} · ${m.title}`} sub={m.facilitator} />)}
-                      {it.mz.map((m) => <Row key={m.id} onClick={() => openMz(m.id)} icon={<MessageSquareText size={14} style={{ color: P_COLOR[mzSignals(db, m).p] }} />} title={m.title} sub={m.assigned_to || m.asked_by} />)}
-                      {it.fus.map((f) => <Row key={f.id} onClick={() => open('FollowUps', f as never)} icon={<BellRing size={14} className="text-warn" />} title={f.subject} sub={f.person} />)}
-                      {it.tasks.map((t) => <Row key={t.id} onClick={() => open('Tasks', t as never)} icon={<StatusIcon s={t.status} size={14} />} title={t.title} sub={t.assignee} />)}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-        </div>
-
-        <div className="hidden gap-4 @lg:grid @2xl:grid-cols-[1fr_22rem]">
+        <div className="grid gap-4 @xl:grid-cols-[1fr_19rem]">
           <div className="card overflow-hidden">
             <div className="grid grid-cols-7 border-b border-line">
               {weekdays.map((w) => (

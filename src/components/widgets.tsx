@@ -20,8 +20,8 @@ import { fa, fmtDayMonth, fmtDate, todayISO, daysFromToday, timeAgo, relDays } f
 import { L, lbl, locale, tr } from '../lib/i18n'
 import { useProjectName } from './shared'
 
-export const tooltipStyle = { background: 'rgb(var(--surface))', border: '1px solid rgb(var(--line))', borderRadius: 14, fontSize: 12, boxShadow: '0 12px 32px -12px rgb(0 0 0 / .3)' }
-export const axisTick = { fontSize: 11, fill: 'rgb(var(--sub))' }
+const tooltipStyle = { background: 'rgb(var(--surface))', border: '1px solid rgb(var(--line))', borderRadius: 14, fontSize: 12, boxShadow: '0 12px 32px -12px rgb(0 0 0 / .3)' }
+const axisTick = { fontSize: 11, fill: 'rgb(var(--sub))' }
 const rtl = () => locale.lang === 'fa'
 
 // ---------------- Kanban ----------------
@@ -407,7 +407,7 @@ export const riskTone = (r: Risk) => {
 }
 
 // ---------------- Activity feed ----------------
-export function whenLabel(s: string) {
+function whenLabel(s: string) {
   if (!s) return ''
   if (s.includes(' ')) return timeAgo(new Date(s.replace(' ', 'T')))
   const d = -daysFromToday(s)

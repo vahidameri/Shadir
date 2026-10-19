@@ -18,7 +18,7 @@ const FIELDS: Partial<Record<SheetName, string[]>> = {
   Files: ['uploaded_by'],
 }
 
-export type NameMap = Map<string, string>
+type NameMap = Map<string, string>
 
 export function nameMaps(db: DB) {
   const toEn: NameMap = new Map()

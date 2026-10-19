@@ -3,10 +3,10 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { otpCall, setAccessToken, setSessionToken } from './api'
 
-export const GOOGLE_SCOPES = ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/calendar.events'].join(' ')
+const GOOGLE_SCOPES = ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/calendar.events'].join(' ')
 const KEY = 'madar.gsession'
 
-export interface GSession {
+interface GSession {
   token: string
   exp: number // ms epoch
   email: string
@@ -81,7 +81,7 @@ function loadGis() {
 }
 
 /** True when the app is served by Apps Script (HtmlService) — the zero-hosting setup. */
-export const hosted = () => typeof window !== 'undefined' && !!window.google?.script?.run
+const hosted = () => typeof window !== 'undefined' && !!window.google?.script?.run
 
 /** Query parameters of the Apps Script page (e.g. ?login=… from the email link). */
 function pageParams(): Promise<Record<string, string>> {

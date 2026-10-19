@@ -12,7 +12,7 @@ export function allocActive(a: Allocation, ws: string) {
   return (!a.start_date || a.start_date <= we) && (!a.end_date || a.end_date >= ws)
 }
 
-export interface WeekLoad {
+interface WeekLoad {
   ws: string
   capacity: number // nominal
   available: number // after leave
@@ -50,5 +50,3 @@ export function trackWeek(db: DB, track: Track | 'all', ws: string = weekStart()
   const allocated = rows.reduce((s, r) => s + r.allocated, 0)
   return { ws, people: people.length, available, allocated, load: available ? Math.round((allocated / available) * 100) : 0, over: rows.filter((r) => r.load > 100).length }
 }
-
-export const fte = (pct: number) => Math.round(pct / 10) / 10

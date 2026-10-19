@@ -9,7 +9,7 @@ export function isPrivateTask(t: Task, db: DB) {
   return String(owner?.tasks_private || '') === '1'
 }
 
-export function canSeeTask(t: Task, db: DB, viewer: string) {
+function canSeeTask(t: Task, db: DB, viewer: string) {
   return !isPrivateTask(t, db) || (!!viewer && (String(t.assignee || '').split(',').map((x) => x.trim()).includes(viewer) || t.reporter === viewer || String(t.collaborators || '').split(',').map((x) => x.trim()).includes(viewer)))
 }
 

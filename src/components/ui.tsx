@@ -11,9 +11,9 @@ export function cx(...c: (string | false | null | undefined)[]) {
   return c.filter(Boolean).join(' ')
 }
 
-export const healthColor: Record<Health, string> = { green: 'bg-good', amber: 'bg-warn', red: 'bg-bad' }
+const healthColor: Record<Health, string> = { green: 'bg-good', amber: 'bg-warn', red: 'bg-bad' }
 export const healthText: Record<Health, string> = { green: 'text-good', amber: 'text-warn', red: 'text-bad' }
-export const healthSoft: Record<Health, string> = {
+const healthSoft: Record<Health, string> = {
   green: 'bg-good/10 text-good',
   amber: 'bg-warn/12 text-warn',
   red: 'bg-bad/10 text-bad',
@@ -43,17 +43,17 @@ export function Card({
 /** Deep-teal band with grid texture; page content overlaps its bottom edge. */
 export function Band({ eyebrow, title, sub, actions, children, nav }: { eyebrow?: ReactNode; title: ReactNode; sub?: ReactNode; actions?: ReactNode; children?: ReactNode; nav?: ReactNode }) {
   return (
-    <div className="band -mx-4 @sm:-mx-6 @lg:-mx-8 px-4 @sm:px-6 @lg:px-8 pt-9 pb-24 no-print">
+    <div className="band -mx-4 @sm:-mx-6 @lg:-mx-8 px-4 @sm:px-6 @lg:px-8 pt-7 pb-20 no-print">
       <div className="relative z-10 mx-auto max-w-[90rem] rise">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
             {nav ? <div className="mb-5 inline-flex">{nav}</div> : eyebrow && <div className="band-eye mb-4"><span className="eyebrow !text-[#c3d0e8] flex items-center gap-2">{eyebrow}</span></div>}
-            <h1 className="display text-3xl @sm:text-[2.625rem] leading-[1.15]">{title}</h1>
-            {sub && <div className="mt-3 max-w-2xl text-[0.9375rem] leading-7 text-[#b9c3d6]">{sub}</div>}
+            <h1 className="display text-[1.75rem] leading-[1.2]">{title}</h1>
+            {sub && <div className="mt-2 max-w-2xl text-sm leading-6 text-[#b9c3d6]">{sub}</div>}
           </div>
           {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
         </div>
-        {children && <div className="mt-8">{children}</div>}
+        {children && <div className="mt-6">{children}</div>}
       </div>
     </div>
   )
@@ -70,7 +70,7 @@ export function StatStrip({ items }: { items: { label: ReactNode; value: ReactNo
     <div className="grid grid-cols-2 border-t border-band-line @sm:grid-cols-3 @lg:grid-cols-6">
       {items.map((it, i) => (
         <div key={i} className="border-b border-band-line px-0 py-4 pe-4 @sm:border-e @sm:last:border-e-0 @sm:ps-4 @sm:first:ps-0 @lg:border-b-0">
-          <div className={cx('display text-3xl @sm:text-4xl num', it.tone === 'red' ? 'text-[#ff8a9a]' : it.tone === 'amber' ? 'text-[#f5c565]' : it.tone === 'green' ? 'text-[#7fe0b0]' : 'text-on-band')}>{it.value}</div>
+          <div className={cx('display text-2xl @sm:text-[1.75rem] num', it.tone === 'red' ? 'text-[#ff8a9a]' : it.tone === 'amber' ? 'text-[#f5c565]' : it.tone === 'green' ? 'text-[#7fe0b0]' : 'text-on-band')}>{it.value}</div>
           <div className="mt-2 text-xs text-band-sub">{it.label}</div>
           {it.sub && <div className="mt-0.5 text-[0.6875rem] text-band-sub/70">{it.sub}</div>}
         </div>
@@ -113,15 +113,6 @@ export function PriorityIcon({ p, className }: { p: Priority; className?: string
       {[1, 2, 3].map((i) => (
         <span key={i} className={cx('w-[3px] rounded-sm', i <= n ? 'bg-ink/80' : 'bg-ink/15')} style={{ height: `${4 + i * 3}px` }} />
       ))}
-    </span>
-  )
-}
-
-export function PriorityBadge({ p }: { p: Priority }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-sub">
-      <PriorityIcon p={p} />
-      <span className="hidden md:inline">{lbl(PRIORITY, p)}</span>
     </span>
   )
 }
@@ -178,15 +169,6 @@ export function StatusIcon({ s, size = 16 }: { s: TaskStatus; size?: number }) {
   )
 }
 
-export function TaskStatusBadge({ s }: { s: TaskStatus }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 text-xs">
-      <StatusIcon s={s} size={14} />
-      {statusLabel(s)}
-    </span>
-  )
-}
-
 export function Chip({ children, className }: { children: ReactNode; className?: string }) {
   return <span className={cx('chip bg-muted text-sub', className)}>{children}</span>
 }
@@ -231,7 +213,7 @@ export function setPhotos(team: { name: string; name_en?: string; photo?: string
     if (m.name_en) photoByName.set(m.name_en, m.photo)
   })
 }
-export const photoOf = (name: string) => photoByName.get(name) || ''
+const photoOf = (name: string) => photoByName.get(name) || ''
 
 const avatarSize = { xs: 'h-5 w-5 text-[0.625rem]', sm: 'h-7 w-7 text-xs', md: 'h-9 w-9 text-sm', lg: 'h-12 w-12 text-base', xl: 'h-24 w-24 text-3xl' }
 export function Avatar({ name, size = 'sm', ring, src }: { name: string; size?: keyof typeof avatarSize; ring?: boolean; src?: string }) {
@@ -494,24 +476,5 @@ export function SearchInput({ value, onChange, placeholder }: { value: string; o
       </svg>
       <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder || L('جستجو…', 'Search…')} className="w-40 bg-transparent outline-none placeholder:text-sub/70" />
     </label>
-  )
-}
-
-/** Band-style page header for simpler pages (no stats strip). */
-export function PageHeader({ title, sub, actions, eyebrow }: { title: ReactNode; sub?: ReactNode; actions?: ReactNode; eyebrow?: ReactNode }) {
-  return <Band title={title} sub={sub} actions={actions} eyebrow={eyebrow} />
-}
-
-/** Big numeric tile for in-page stat rows. */
-export function Stat({ label, value, sub, icon, tone }: { label: string; value: ReactNode; sub?: ReactNode; icon?: ReactNode; tone?: Health | 'brand' }) {
-  return (
-    <div className="card flex items-start justify-between gap-3 p-5">
-      <div className="min-w-0">
-        <div className="eyebrow">{label}</div>
-        <div className={cx('display mt-2 text-3xl num', tone && tone !== 'brand' && healthText[tone])}>{value}</div>
-        {sub && <div className="mt-1 text-xs text-sub">{sub}</div>}
-      </div>
-      {icon && <div className="grid h-10 w-10 place-items-center rounded-full bg-muted text-sub">{icon}</div>}
-    </div>
   )
 }

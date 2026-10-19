@@ -15,7 +15,7 @@ import { isWeeklySeries } from './labels'
 import { isBlocked } from './columns'
 import { taskCfg } from './taskcfg'
 
-export interface AutomationDef {
+interface AutomationDef {
   id: string
   where: 'app' | 'server'
   icon: typeof Repeat
@@ -36,7 +36,7 @@ export const AUTOMATIONS: AutomationDef[] = [
 const names = (s: string) => String(s || '').split(',').map((x) => x.trim()).filter(Boolean)
 
 /** Always invited to planned meetings: Config meeting.always, else the program manager and the CEO (super + exec). */
-export function alwaysInvited(d: DB, configured: string) {
+function alwaysInvited(d: DB, configured: string) {
   if (configured.trim()) return names(configured)
   return d.Team.filter((t) => (t.access === 'super' || t.access === 'exec') && String(t.active) !== '0').map((t) => t.name)
 }

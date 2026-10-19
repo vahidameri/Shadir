@@ -18,7 +18,7 @@ export type OrgKind = 'titles' | 'teams' | 'sides' | 'series' | 'access' | 'link
 export const ORG_KEYS: Record<OrgKind, string> = { titles: 'org.titles', teams: 'org.teams', sides: 'org.sides', series: 'org.series', access: 'org.access', links: 'org.links', plans: 'org.plans' }
 
 const fromMap = (m: Record<string, T2>): OrgItem[] => Object.entries(m).map(([id, [fa, en]]) => ({ id, fa, en }))
-export const ORG_DEFAULT: Record<OrgKind, OrgItem[]> = {
+const ORG_DEFAULT: Record<OrgKind, OrgItem[]> = {
   titles: fromMap(JOB_TITLE),
   teams: fromMap(TEAM_NAMES),
   series: fromMap(MEETING_SERIES),

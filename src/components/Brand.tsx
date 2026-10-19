@@ -1,35 +1,46 @@
-// Shad brand marks, drawn as SVG so the single-file Apps Script build stays light:
-// a green rounded square, three white dots and the yellow wave. Noyan (the parent company) has a
-// small text mark for footers. "Madar" (orbit) — the loader orbits the mark.
+// Brand marks. The Shad icon is the exact artwork supplied (3D icon, as an image). The intro
+// builds it from its flat parts — the square, three dots dropping in, the wave sweeping across —
+// then hands over to the real icon. Noyan (the parent company) appears only as a small footer tag.
+import shadIcon from '../assets/brand/shad.webp'
+import noyanIcon from '../assets/brand/noyan.webp'
 
-/** The yellow wave, as one round-capped stroke. */
-export const WAVE_D = 'M22 61 C28 67 33 72 39 71 C44 70 47 64 50 64 C53 64 56 70 61 71 C67 72 72 67 78 61'
-const DOTS: [number, number][] = [[50, 30], [35, 45], [65, 45]]
+/** The flat wave, traced from the supplied artwork (in its 753×794 drawing space). */
+const WAVE_D = 'M752 592Q751 518 749 514Q747 509 741 504Q735 498 729 496Q723 494 715 494Q707 495 702 498Q696 501 673 521Q650 541 629 556Q608 570 592 578Q575 585 570 586Q566 587 557 587Q548 587 540 585Q533 583 520 577Q506 571 472 550Q437 530 419 521Q401 512 388 508Q374 504 363 504Q352 504 342 507Q331 510 320 516Q308 521 276 542Q245 562 228 572Q210 581 200 584Q190 587 181 587Q172 587 162 584Q153 581 136 572Q120 562 104 549Q87 536 71 521Q55 506 50 504Q44 501 35 501Q26 501 20 504Q13 507 10 510Q6 514 3 521Q0 528 0 599Q0 670 3 677Q6 684 20 698Q35 713 53 728Q71 744 86 755Q102 766 119 775Q136 784 147 788Q158 791 165 792Q172 793 182 792Q191 792 204 788Q217 784 231 776Q245 768 276 742Q307 716 316 710Q325 703 334 698Q342 694 352 692Q363 689 372 691Q382 693 391 698Q400 702 438 730Q477 758 491 767Q505 776 514 780Q523 785 530 788Q537 790 546 792Q554 793 564 792Q574 791 592 784Q609 778 627 768Q645 758 676 736Q706 715 726 698Q747 680 750 672Q752 665 752 592Z'
+/** The three dots in the same drawing space: [cx, cy, r]. */
+const DOTS: [number, number, number][] = [[376, 108, 104], [193, 338, 104], [555, 338, 104]]
 
-let n = 0
-/** The Shad app icon. */
+/** The Shad app icon, exactly as supplied. */
 export function ShadMark({ className = 'h-7 w-7' }: { className?: string }) {
-  const id = `sm${++n}`
+  return <img src={shadIcon} alt="Shad" className={`select-none ${className}`} draggable={false} />
+}
+
+/** The flat parts of the icon, used while the intro builds it. */
+function FlatMark() {
   return (
-    <svg viewBox="0 0 100 100" aria-hidden className={className}>
-      <defs>
-        <linearGradient id={`${id}g`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#2EE3A6" />
-          <stop offset="1" stopColor="#0FB884" />
-        </linearGradient>
-        <linearGradient id={`${id}y`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#FFE24A" />
-          <stop offset="1" stopColor="#F2C80F" />
-        </linearGradient>
-      </defs>
-      <rect x="2" y="2" width="96" height="96" rx="26" fill={`url(#${id}g)`} />
-      {DOTS.map(([cx, cy], i) => <circle key={i} cx={cx} cy={cy} r="8.5" fill="#fff" />)}
-      <path d={WAVE_D} fill="none" stroke={`url(#${id}y)`} strokeWidth="11" strokeLinecap="round" strokeLinejoin="round" />
+    <svg viewBox="0 0 100 100" className="shad-flat absolute inset-0 h-full w-full overflow-visible" aria-hidden>
+      <rect className="sf-box" x="0" y="0" width="100" height="100" rx="24" fill="#1fd492" />
+      <g transform="translate(17.2 15.2) scale(0.0872)">
+        {DOTS.map(([cx, cy, r], i) => <circle key={i} className={`sf-dot sf-dot-${i}`} cx={cx} cy={cy} r={r} fill="#fff" />)}
+        <path className="sf-wave" d={WAVE_D} fill="#f5d01f" />
+      </g>
     </svg>
   )
 }
 
-/** Loading mark: the square glows, the dots drop in one by one, the wave draws itself; a ring orbits. */
+/** The icon building itself, then resting as the real icon with a slow float and a passing shine. */
+export function ShadIntro({ className, loop }: { className?: string; loop?: boolean }) {
+  return (
+    <div className={`shad-intro ${loop ? "is-loop" : ""} ${className || "relative"}`}>
+      <FlatMark />
+      <div className="shad-real absolute inset-0">
+        <img src={shadIcon} alt="" className="h-full w-full select-none" draggable={false} />
+        <span className="shad-shine" style={{ WebkitMaskImage: `url(${shadIcon})`, maskImage: `url(${shadIcon})` }} />
+      </div>
+    </div>
+  )
+}
+
+/** Loading screen: the intro on a loop inside a slowly turning orbit (madar = orbit). */
 export function MadarLoader({ className = 'h-32 w-32' }: { className?: string }) {
   return (
     <div className={`madar-loader relative ${className}`} role="status" aria-label="Loading">
@@ -37,36 +48,16 @@ export function MadarLoader({ className = 'h-32 w-32' }: { className?: string })
         <span className="absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rounded-full bg-[#FF9500] shadow-[0_0_12px_3px_rgba(255,149,0,0.55)]" />
       </span>
       <span className="madar-orbit-2 absolute inset-3 rounded-full border border-dashed border-white/[0.07]" />
-      <MarkDraw className="absolute inset-0 m-auto h-[46%] w-[46%] overflow-visible" />
+      <ShadIntro loop className="absolute inset-0 m-auto h-[48%] w-[48%]" />
     </div>
   )
 }
 
-/** The animated mark used by the loader and the login hero. */
-export function MarkDraw({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 100 100" className={className}>
-      <defs>
-        <linearGradient id="mk-g" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#2EE3A6" />
-          <stop offset="1" stopColor="#0FB884" />
-        </linearGradient>
-      </defs>
-      <rect className="mk-box" x="2" y="2" width="96" height="96" rx="26" fill="url(#mk-g)" />
-      {DOTS.map(([cx, cy], i) => <circle key={i} className={`mk-dot mk-dot-${i}`} cx={cx} cy={cy} r="8.5" fill="#fff" />)}
-      <path className="mk-frame" pathLength={1} d={WAVE_D} fill="none" stroke="#F5CE1F" strokeWidth="11" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-/** "Noyan" as a quiet text mark: the parent company, for footers and the about line. */
+/** Noyan, the parent company: its icon and name, for footers. */
 export function NoyanTag({ className = '' }: { className?: string }) {
   return (
     <span className={`inline-flex items-center gap-1.5 ${className}`}>
-      <svg viewBox="0 0 100 100" aria-hidden className="h-3.5 w-3.5">
-        <path d="M66 14 H31 Q14 14 14 31 V69 Q14 86 31 86 H69 Q86 86 86 69 V45" fill="none" stroke="#FF8A00" strokeWidth="14" strokeLinecap="round" strokeLinejoin="round" />
-        <rect x="76" y="4" width="20" height="20" rx="5" fill="#2EC4A6" />
-      </svg>
+      <img src={noyanIcon} alt="" className="h-3.5 w-3.5" />
       <span>نویان</span>
     </span>
   )

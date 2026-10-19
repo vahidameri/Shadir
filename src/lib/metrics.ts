@@ -1,14 +1,14 @@
 import type { DB, Health, Project, Task, Sprint, Risk } from './types'
 import { closed, isBlocked } from './columns'
-import { daysBetween, daysFromToday, todayISO, addDays, parseISO, fa } from './jalali'
+import { daysBetween, daysFromToday, todayISO, addDays, fa } from './jalali'
 import { L } from './i18n'
 
-export interface HealthReason {
+interface HealthReason {
   level: Health
   text: string
 }
 
-export interface ProjectMetrics {
+interface ProjectMetrics {
   progress: number
   elapsed: number // % of timeline elapsed
   scheduleGap: number // progress - elapsed
@@ -36,7 +36,7 @@ export function isTaskOverdue(t: Task) {
   return !closed(t) && !!t.due_date && daysFromToday(t.due_date) < 0
 }
 
-export function timelineElapsed(p: Pick<Project, 'start_date' | 'end_date'>) {
+function timelineElapsed(p: Pick<Project, 'start_date' | 'end_date'>) {
   const total = daysBetween(p.start_date, p.end_date)
   if (total <= 0) return 0
   const passed = daysBetween(p.start_date, todayISO())
@@ -134,7 +134,7 @@ export function projectMetrics(p: Project, db: DB): ProjectMetrics {
   }
 }
 
-export function sprintTasks(s: Sprint, db: DB) {
+function sprintTasks(s: Sprint, db: DB) {
   return db.Tasks.filter((t) => t.sprint_id === s.id)
 }
 
@@ -167,24 +167,4 @@ export function burndown(s: Sprint, db: DB) {
     rows.push({ day, ideal: Math.round((committed * (1 - i / len)) * 10) / 10, actual })
   }
   return rows
-}
-
-export function portfolioSummary(db: DB) {
-  const live = db.Projects.filter((p) => p.status === 'active' || p.status === 'planning' || p.status === 'on_hold')
-  const ms = new Map(db.Projects.map((p) => [p.id, projectMetrics(p, db)]))
-  const counts = { green: 0, amber: 0, red: 0 } as Record<Health, number>
-  live.forEach((p) => counts[ms.get(p.id)!.health]++)
-  const avgProgress = live.length ? Math.round(live.reduce((a, p) => a + ms.get(p.id)!.progress, 0) / live.length) : 0
-  const today = todayISO()
-  const in30 = addDays(today, 30)
-  const upcomingMilestones = db.Milestones.filter((m) => m.status !== 'done' && m.planned_date >= today && m.planned_date <= in30).sort((a, b) =>
-    a.planned_date < b.planned_date ? -1 : 1,
-  )
-  const overdueMilestones = db.Milestones.filter((m) => m.status !== 'done' && m.planned_date && m.planned_date < today)
-  return { live, metrics: ms, counts, avgProgress, upcomingMilestones, overdueMilestones }
-}
-
-export function inRange(iso: string, from: string, to: string) {
-  const d = parseISO(iso)
-  return !!d && iso >= from && iso <= to
 }

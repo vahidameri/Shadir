@@ -11,7 +11,7 @@ import { TRACK, sideDot } from '../lib/tracks'
 import { useProjectName } from './shared'
 
 type State = ReturnType<typeof deliveryState>
-export const stateTone: Record<State, string> = {
+const stateTone: Record<State, string> = {
   delivered: 'bg-good/10 text-good border-good/25',
   in_progress: 'bg-brand/10 text-brand border-brand/25 dark:text-brand-soft',
   at_risk: 'bg-warn/12 text-warn border-warn/30',
@@ -19,7 +19,7 @@ export const stateTone: Record<State, string> = {
   planned: 'bg-surface text-ink border-line-strong',
   dropped: 'bg-muted text-sub border-line line-through',
 }
-export const stateBar: Record<State, string> = {
+const stateBar: Record<State, string> = {
   delivered: 'bg-good',
   in_progress: 'bg-brand dark:bg-brand-soft',
   at_risk: 'bg-warn',
@@ -27,9 +27,9 @@ export const stateBar: Record<State, string> = {
   planned: 'bg-line-strong',
   dropped: 'bg-line',
 }
-export const stateLabel = (s: State) => (s === 'overdue' ? L('عقب‌افتاده', 'Overdue') : lbl(DELIVERABLE_STATUS, s))
+const stateLabel = (s: State) => (s === 'overdue' ? L('عقب‌افتاده', 'Overdue') : lbl(DELIVERABLE_STATUS, s))
 
-export function useDeliveryActions() {
+function useDeliveryActions() {
   const { upsert, toast } = useStore()
   const setStatus = async (d: Deliverable, status: Deliverable['status']) => {
     const prev = d
@@ -46,41 +46,10 @@ export function useDeliveryActions() {
   return { setStatus, push }
 }
 
-export function TrackDot({ d }: { d: Deliverable }) {
+function TrackDot({ d }: { d: Deliverable }) {
   const { db } = useStore()
   const t = deliveryTrack(d, db)
   return t ? <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={sideDot(t)} title={lbl(TRACK, t)} /> : null
-}
-
-/** Compact chip for timeline cells. */
-export function DeliverableChip({ d, showProject }: { d: Deliverable; showProject?: boolean }) {
-  const { open } = useEditor()
-  const name = useProjectName()
-  const st = deliveryState(d)
-  const slip = slipDays(d)
-  return (
-    <button
-      onClick={() => open('Deliverables', d as never)}
-      className={cx('group flex w-full min-w-0 items-start gap-1.5 rounded-xl border px-2 py-1.5 text-start text-[0.6875rem] leading-4 transition hover:shadow-card', stateTone[st])}
-      title={`${d.title} — ${stateLabel(st)}`}
-    >
-      <TrackDot d={d} />
-      <span className="min-w-0 flex-1">
-        <span className="line-clamp-2 font-medium text-ink">{d.title}</span>
-        <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 opacity-80">
-          {showProject && <span className="truncate">{name(d.project_id)}</span>}
-          <span className="num">{fmtDayMonth(d.target_date)}</span>
-          {slip > 0 && !isClosed(d) && (
-            <span className="inline-flex items-center gap-0.5 font-semibold text-bad">
-              <CornerUpLeft size={10} />
-              {L(`${fa(Math.round(slip / 7) || 1)} هفته`, `${Math.round(slip / 7) || 1}w`)}
-            </span>
-          )}
-        </span>
-      </span>
-      {d.status === 'delivered' && <Check size={12} className="mt-0.5 shrink-0 text-good" />}
-    </button>
-  )
 }
 
 /** Full row for lists: status menu, title, project, owner, date, slip, quick actions. */

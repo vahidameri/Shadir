@@ -4,7 +4,7 @@ import { ArrowRight, Eye, EyeOff, KeyRound, Loader, User } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { useGoogle } from '../lib/google'
 import { useI18n, L, lbl } from '../lib/i18n'
-import { MarkDraw, NoyanTag, ShadMark } from './Brand'
+import { NoyanTag, ShadIntro, ShadMark } from './Brand'
 import { VERSION } from '../lib/brand'
 import { cx } from './ui'
 
@@ -135,7 +135,7 @@ export function Login({ onEnter }: { onEnter: () => void }) {
               <span className="orb orb-outer"><i /></span>
               <span className="orb orb-mid"><i /></span>
               <span className="orb orb-inner"><i /></span>
-              <MarkDraw className="absolute inset-0 m-auto h-[40%] w-[40%] overflow-visible" />
+              <ShadIntro className="absolute inset-0 m-auto h-[42%] w-[42%]" />
             </div>
             <h2 className="display hero-title mt-5 text-5xl leading-none sm:text-7xl lg:text-8xl">{L('مدار', 'Madar')}</h2>
             <p className="hero-sub mt-3 text-sm text-white/60 sm:text-lg">{L('مدار دپارتمان محصول و فناوری شاد', 'Shad product & technology, in one orbit')}</p>

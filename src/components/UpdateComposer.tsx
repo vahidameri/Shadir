@@ -29,7 +29,7 @@ export function ComposerProvider({ children }: { children: ReactNode }) {
 }
 
 /** Latest update for a project, optionally before a date. */
-export function lastUpdate(updates: Update[], projectId: string, before?: string) {
+function lastUpdate(updates: Update[], projectId: string, before?: string) {
   return updates.filter((u) => u.project_id === projectId && (!before || u.week_date < before)).sort((a, b) => (a.week_date < b.week_date ? 1 : -1))[0]
 }
 

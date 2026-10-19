@@ -8,12 +8,12 @@ import { orgList } from '../lib/org'
 import { L, tr } from '../lib/i18n'
 import { Popover, cx } from './ui'
 
-export interface ProjectLink {
+interface ProjectLink {
   type: string
   url: string
   label?: string
 }
-export function linksOf(p: Project): ProjectLink[] {
+function linksOf(p: Project): ProjectLink[] {
   try {
     const v = JSON.parse(p.links || '[]')
     return Array.isArray(v) ? v.filter((x) => x && x.url) : []

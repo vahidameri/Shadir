@@ -13,7 +13,7 @@ import { useStore } from '../lib/store'
 import { useEditor } from './Editor'
 import { Avatar, Due, HealthDot, Progress, cx, healthText, Chip, StatusIcon } from './ui'
 import { addDays, daysBetween, fa, fmtDayMonth, todayISO, daysFromToday } from '../lib/jalali'
-import { L, lbl, locale } from '../lib/i18n'
+import { L, lbl } from '../lib/i18n'
 import { CHANNEL, FOLLOWUP_STATUS, HEALTH, PROJECT_STATUS } from '../lib/labels'
 import { projectMetrics } from '../lib/metrics'
 import { usePins } from '../lib/prefs'
@@ -30,7 +30,7 @@ export function useProjectName() {
 }
 
 /** Toggle a task done with an undo toast. */
-export function useCompleteTask() {
+function useCompleteTask() {
   const { upsert, toast } = useStore()
   return async (t: Task) => {
     const done = t.status === 'done'
@@ -106,7 +106,7 @@ function DueInline({ iso, done, onChange }: { iso: string; done: boolean; onChan
 const channelIcon = { meeting: Users2, call: Phone, email: Mail, chat: MessageSquare, other: MoreHorizontal }
 
 /** Reminder text for a follow-up (the template from the settings), copied for Mizito or a messenger. */
-export function followUpText(f: FollowUp) {
+function followUpText(f: FollowUp) {
   const since = f.last_ping || f.created_at
   const days = since ? Math.max(0, daysBetween(since, todayISO())) : 0
   return reminderText({ title: f.waiting_for ? `${f.subject} (${f.waiting_for})` : f.subject, link: f.link }, f.person, days)
@@ -326,15 +326,3 @@ export function ProjectCard({ p }: { p: Project }) {
   )
 }
 
-
-/** Compact money: 8.5B / ۸٫۵ میلیارد (values are in IRR in the sheet). */
-export function money(n: number) {
-  const v = Number(n) || 0
-  const en = locale.lang === 'en'
-  if (Math.abs(v) >= 1e9) {
-    const x = (v / 1e9).toFixed(1).replace(/\.0$/, '')
-    return en ? `${x}B` : `${fa(x.replace('.', '٫'))} میلیارد`
-  }
-  if (Math.abs(v) >= 1e6) return en ? `${Math.round(v / 1e6)}M` : `${fa(Math.round(v / 1e6))} میلیون`
-  return fa(v.toLocaleString('en-US'))
-}

@@ -13,8 +13,8 @@ import { mzCfg, mzKeyOf } from './mizito'
 import { uid } from './api'
 
 export type Target = 'Tasks' | 'FollowUps' | 'Mizito' | 'Contacts' | 'Log'
-export type Kind = 'text' | 'long' | 'date' | 'stamp' | 'person' | 'people' | 'enum' | 'link' | 'id'
-export interface FieldDef {
+type Kind = 'text' | 'long' | 'date' | 'stamp' | 'person' | 'people' | 'enum' | 'link' | 'id'
+interface FieldDef {
   key: string
   fa: string
   en: string
@@ -103,7 +103,7 @@ export const TARGETS: Record<Target, { fa: string; en: string; fields: FieldDef[
 const SEP = '\u0001'
 /** A cell from a Google Sheet may carry its link: "text\u0001url". */
 export const cellText = (v: string) => String(v ?? '').split(SEP)[0].trim()
-export const cellLink = (v: string) => {
+const cellLink = (v: string) => {
   const parts = String(v ?? '').split(SEP)
   if (parts[1]) return parts[1].trim()
   const t = parts[0].trim()
@@ -168,7 +168,7 @@ const pad = (n: number) => String(n).padStart(2, '0')
 const toLatin = (s: string) => s.replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
 
 /** "2026-08-11", "2026-08-11 09:14:26", "1405/05/31", "1405/05/20 9:32", "8/11/2026" → ISO (with time when asked). */
-export function parseDate(v: string, withTime = false): string {
+function parseDate(v: string, withTime = false): string {
   const s = toLatin(cellText(v)).replace(/‏|‎/g, '')
   if (!s || s === '-' || s === '—') return ''
   let m = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/.exec(s)
@@ -191,7 +191,7 @@ export function parseDate(v: string, withTime = false): string {
   return ''
 }
 
-export interface EnumOpt { value: string; label: string }
+interface EnumOpt { value: string; label: string }
 /** The choices for an enum field of a target. */
 export function enumOptions(target: Target, key: string): EnumOpt[] {
   const c = mzCfg()
@@ -250,7 +250,7 @@ export interface Plan {
   addPeople: boolean
   me: string
 }
-export interface Built {
+interface Built {
   Tasks: Task[]
   FollowUps: FollowUp[]
   Mizito: MizitoItem[]

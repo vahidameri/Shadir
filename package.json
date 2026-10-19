@@ -1,7 +1,7 @@
 {
   "name": "madar",
   "private": true,
-  "version": "1.1.1",
+  "version": "1.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,9 +12,6 @@
     "build:apps-script": "vite build --config vite.single.config.ts && node -e \"require('fs').copyFileSync('dist-single/index.html','apps-script/Index.html')\""
   },
   "dependencies": {
-    "@fontsource-variable/inter": "^5.3.0",
-    "@fontsource-variable/vazirmatn": "^5.3.0",
-    "@fontsource/geist-mono": "^5.3.0",
     "lucide-react": "^1.52.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

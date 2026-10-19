@@ -2,6 +2,11 @@
 @font-face { font-family: Lahzeh; src: url('./assets/fonts/Lahzeh-Regular.woff2') format('woff2'); font-weight: 300 400; font-display: swap; }
 @font-face { font-family: Lahzeh; src: url('./assets/fonts/Lahzeh-Medium.woff2') format('woff2'); font-weight: 500 600; font-display: swap; }
 @font-face { font-family: Lahzeh; src: url('./assets/fonts/Lahzeh-Bold.woff2') format('woff2'); font-weight: 700 900; font-display: swap; }
+/* Lahzeh's middle dot sits tight and looks like a Persian zero next to digits («۲ · ۲» read as «۲۰۲»);
+   take the separator from Geist Mono, whose wider advance keeps it apart. */
+@font-face { font-family: Lahzeh; src: url('./assets/fonts/GeistMono-500.woff2') format('woff2'); font-weight: 300 400; unicode-range: U+00B7; font-display: swap; }
+@font-face { font-family: Lahzeh; src: url('./assets/fonts/GeistMono-500.woff2') format('woff2'); font-weight: 500 600; unicode-range: U+00B7; font-display: swap; }
+@font-face { font-family: Lahzeh; src: url('./assets/fonts/GeistMono-500.woff2') format('woff2'); font-weight: 700 900; unicode-range: U+00B7; font-display: swap; }
 @font-face { font-family: 'Geist Mono'; src: url('./assets/fonts/GeistMono-400.woff2') format('woff2'); font-weight: 400; font-display: swap; }
 @font-face { font-family: 'Geist Mono'; src: url('./assets/fonts/GeistMono-500.woff2') format('woff2'); font-weight: 500 700; font-display: swap; }
 
@@ -64,19 +69,11 @@ body,
 }
 
 /*
-  Fluid scale: every size in the app is rem-based, so scaling the root font size
-  scales the whole UI to the monitor (laptop → 4K) while phones keep 16px.
+  Desktop scale (13-inch laptops and up): every size in the app is rem-based, so the root font
+  size scales the whole UI — 13px at 1280px wide, about 14px at 1440, 16px at 1920, capped at 17.
 */
-:root {
-  --page-w: 120rem;
-}
 html {
-  font-size: 16px;
-}
-@media (min-width: 1024px) {
-  html {
-    font-size: clamp(14px, calc(7.5px + 0.58vw), 20px);
-  }
+  font-size: clamp(13px, calc(6.5px + 0.5vw), 17px);
 }
 
 body {
@@ -378,52 +375,58 @@ select:focus-visible {
   }
 }
 
-/* ---------- Madar loader: the Shad square, three dots drop in, the wave draws itself ---------- */
-.madar-loader .mk-frame,
-.hero-mark .mk-frame {
-  stroke-dasharray: 1;
-  animation: mk-draw 2.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+/* ---------- Shad intro: the flat square pops in, three dots drop, the wave sweeps across, then the
+   real 3D icon takes over and rests with a slow float and a passing shine. One run on the login
+   page; a loop on the loading screen. ---------- */
+.shad-intro { aspect-ratio: 1; }
+.shad-flat { animation: sf-out 2.6s ease both; }
+.shad-flat .sf-box { transform-box: fill-box; transform-origin: center; animation: sf-box 2.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.shad-flat .sf-dot { transform-box: fill-box; transform-origin: 50% 100%; animation: sf-dot 2.6s cubic-bezier(0.3, 0, 0.3, 1) both; }
+.shad-flat .sf-dot-1 { animation-delay: 0.08s; }
+.shad-flat .sf-dot-2 { animation-delay: 0.16s; }
+.shad-flat .sf-wave { transform-box: fill-box; transform-origin: center; animation: sf-wave 2.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.shad-real { opacity: 0; animation: sr-in 2.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.shad-real img { filter: drop-shadow(0 14px 22px rgb(31 212 146 / 0.28)); }
+.shad-shine {
+  position: absolute; inset: 0; pointer-events: none; -webkit-mask-size: 100% 100%; mask-size: 100% 100%;
+  background: linear-gradient(115deg, transparent 38%, rgb(255 255 255 / 0.55) 50%, transparent 62%) no-repeat;
+  background-size: 260% 100%; background-position: 160% 0; mix-blend-mode: soft-light;
+  animation: sr-shine 6s ease-in-out 2.7s infinite;
 }
-.madar-loader .mk-dot,
-.hero-mark .mk-dot {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: mk-dot 2.6s cubic-bezier(0.3, 0, 0.3, 1) infinite;
+.shad-intro:not(.is-loop) { animation: sr-float 6s ease-in-out 2.6s infinite; }
+.shad-intro.is-loop .shad-flat, .shad-intro.is-loop .sf-box, .shad-intro.is-loop .sf-dot, .shad-intro.is-loop .sf-wave { animation-duration: 3.2s; animation-iteration-count: infinite; }
+.shad-intro.is-loop .shad-real { animation: sr-loop 3.2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite; }
+.shad-intro.is-loop .shad-shine { animation: sr-shine 3.2s ease-in-out infinite; }
+@keyframes sf-box {
+  0% { opacity: 0; transform: scale(0.2) rotate(-18deg); }
+  16% { opacity: 1; transform: scale(1) rotate(0); }
+  100% { opacity: 1; transform: scale(1); }
 }
-.mk-dot-1 { animation-delay: 0.12s !important; }
-.mk-dot-2 { animation-delay: 0.24s !important; }
-.madar-loader .madar-orbit {
-  animation: mk-spin 2.6s linear infinite;
+@keyframes sf-dot {
+  0%, 14% { opacity: 0; transform: translateY(-520px) scale(0.6, 1.3); }
+  26% { opacity: 1; transform: translateY(0) scale(1.25, 0.75); }
+  31% { transform: translateY(-90px) scale(0.92, 1.08); }
+  36% { transform: translateY(0) scale(1.06, 0.94); }
+  40%, 100% { opacity: 1; transform: translateY(0) scale(1); }
 }
-.madar-loader .madar-orbit-2 {
-  animation: mk-spin 9s linear infinite reverse;
+@keyframes sf-wave {
+  0%, 34% { clip-path: inset(0 100% 0 0); transform: scaleY(0.6); }
+  48% { clip-path: inset(0 0 0 0); transform: scaleY(1.18); }
+  54% { transform: scaleY(0.92); }
+  58%, 100% { clip-path: inset(0 0 0 0); transform: scaleY(1); }
 }
-@keyframes mk-draw {
-  0%, 30% { stroke-dashoffset: 1; }
-  70% { stroke-dashoffset: 0; }
-  100% { stroke-dashoffset: 0; }
-}
-@keyframes mk-dot {
-  0% { transform: translateY(-30px) scale(0.4); opacity: 0; }
-  22% { transform: translateY(0) scale(1.15, 0.85); opacity: 1; }
-  30% { transform: translateY(-5px) scale(0.95, 1.05); }
-  38% { transform: translateY(0) scale(1); }
-  100% { transform: translateY(0); opacity: 1; }
-}
-@keyframes mk-spin {
-  to { transform: rotate(360deg); }
-}
+@keyframes sf-out { 0%, 62% { opacity: 1; } 76%, 100% { opacity: 0; } }
+@keyframes sr-in { 0%, 60% { opacity: 0; transform: scale(0.94); } 72% { opacity: 1; transform: scale(1.05); } 80%, 100% { opacity: 1; transform: scale(1); } }
+@keyframes sr-loop { 0%, 60% { opacity: 0; transform: scale(0.94); } 72% { opacity: 1; transform: scale(1.05); } 80%, 90% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1); } }
+@keyframes sr-shine { 0%, 70% { background-position: 160% 0; } 100% { background-position: -60% 0; } }
+@keyframes sr-float { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-4%) rotate(-1.5deg); } }
+.madar-loader .madar-orbit { animation: mk-spin 2.6s linear infinite; }
+.madar-loader .madar-orbit-2 { animation: mk-spin 9s linear infinite reverse; }
+@keyframes mk-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
-  .madar-loader .mk-frame,
-  .madar-loader .mk-dot,
-  .hero-mark .mk-frame,
-  .hero-mark .mk-dot,
-  .madar-loader .madar-orbit,
-  .madar-loader .madar-orbit-2 {
-    animation: none !important;
-    stroke-dashoffset: 0;
-    opacity: 1;
-  }
+  .shad-intro, .shad-intro *, .madar-loader .madar-orbit, .madar-loader .madar-orbit-2 { animation: none !important; }
+  .shad-flat { opacity: 0; }
+  .shad-real { opacity: 1; }
 }
 .madar-word {
   animation: mk-breathe 2.6s ease-in-out infinite;
@@ -566,8 +569,6 @@ select:focus-visible {
 .hero-mark .orb-mid i { bottom: -2.5px; width: 5px; height: 5px; background: rgb(255 149 0 / 0.85); box-shadow: 0 0 8px 1px rgb(255 149 0 / 0.3); }
 .hero-mark .orb-inner { inset: 27%; border: 1px solid rgb(95 227 198 / 0.07); animation: mk-spin 40s linear infinite; }
 .hero-mark .orb-inner i { top: -2px; width: 4px; height: 4px; background: rgb(95 227 198 / 0.8); box-shadow: 0 0 6px 1px rgb(95 227 198 / 0.3); }
-.hero-mark .mk-frame { animation-duration: 2.4s; animation-iteration-count: 1; animation-fill-mode: forwards; filter: drop-shadow(0 0 8px rgb(255 255 255 / 0.12)); }
-.hero-mark .mk-dot { animation-iteration-count: 1; animation-fill-mode: forwards; filter: drop-shadow(0 0 6px rgb(255 255 255 / 0.4)); }
 .hero-title {
   background: linear-gradient(180deg, #fff 20%, #cdeee8 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
   animation: rise 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.4s both;

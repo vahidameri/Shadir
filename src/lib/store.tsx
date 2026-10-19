@@ -104,7 +104,7 @@ function normalize(raw: Partial<DB>): DB {
   return db
 }
 
-export type Mode = 'demo' | 'live'
+type Mode = 'demo' | 'live'
 
 interface Toast {
   id: number
@@ -323,10 +323,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const prev = dbRef.current
       const list = prev[sheet] as Row<S>[]
       if (sheet === 'Mizito') row = stampMizito(list.find((r) => r.id === row.id) as unknown as MizitoItem | undefined, row as unknown as MizitoItem) as unknown as Row<S>
-      if (sheet === 'Tasks' && !(row as unknown as Task).track && (row as unknown as Task).project_id) {
-        const team = prev.Projects.find((p) => p.id === (row as unknown as Task).project_id)?.team
-        if (team) row = { ...row, track: team } as Row<S>
-      }
       if (sheet === 'Tasks') row = stampTask(list.find((r) => r.id === row.id) as unknown as Task | undefined, row as unknown as Task) as unknown as Row<S>
       const old = list.find((r) => r.id === row.id)
       const exists = !!old

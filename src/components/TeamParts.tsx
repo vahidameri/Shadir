@@ -2,7 +2,7 @@
 // and small chart helpers shared with the overview dashboard.
 import { Link } from 'react-router-dom'
 import { Ban, CalendarClock, Clock3, MoonStar, Plus } from 'lucide-react'
-import type { DB, StatusCat } from '../lib/types'
+import type { StatusCat } from '../lib/types'
 import { useStore } from '../lib/store'
 import { useEditor } from './Editor'
 import { AvatarStack, HealthDot, Progress, cx } from './ui'
@@ -14,9 +14,9 @@ import { projectMetrics } from '../lib/metrics'
 import { teamStats, type TeamStats } from '../lib/teams'
 import { closed } from '../lib/columns'
 
-export const CAT_ORDER: StatusCat[] = ['active', 'open', 'waiting', 'blocked', 'intake', 'done']
+const CAT_ORDER: StatusCat[] = ['active', 'open', 'waiting', 'blocked', 'intake', 'done']
 // calm palette: shades of ink for work in motion, red only for blocked, green for done
-export const CAT_FILL: Record<StatusCat, string> = { intake: 'rgb(var(--ink) / 0.12)', open: 'rgb(var(--ink) / 0.3)', active: 'rgb(var(--ink) / 0.75)', waiting: 'rgb(var(--ink) / 0.5)', blocked: 'rgb(var(--bad))', done: 'rgb(var(--good) / 0.8)', cancelled: 'rgb(var(--line-strong))' }
+const CAT_FILL: Record<StatusCat, string> = { intake: 'rgb(var(--ink) / 0.12)', open: 'rgb(var(--ink) / 0.3)', active: 'rgb(var(--ink) / 0.75)', waiting: 'rgb(var(--ink) / 0.5)', blocked: 'rgb(var(--bad))', done: 'rgb(var(--good) / 0.8)', cancelled: 'rgb(var(--line-strong))' }
 
 /** Tasks by status category as one stacked bar, with an optional legend. */
 export function CatBar({ by, legend, className }: { by: Record<StatusCat, number>; legend?: boolean; className?: string }) {
@@ -165,4 +165,3 @@ export function TeamCard({ id, stats, compact }: { id: string; stats?: TeamStats
 
 export const teamName = name
 export const teamColor = (_id: string) => 'rgb(var(--ink) / 0.55)'
-export type { DB }

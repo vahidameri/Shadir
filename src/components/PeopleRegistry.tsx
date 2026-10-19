@@ -12,7 +12,7 @@ import { uid } from '../lib/api'
 import { MZ_KEYS, mzCfg, mzClosed, mzSignals, optLabel, tierById, type Tier } from '../lib/mizito'
 import type { Contact } from '../lib/types'
 
-export function TiersCard({ admin }: { admin: boolean }) {
+function TiersCard({ admin }: { admin: boolean }) {
   const { setSetting, db } = useStore()
   const tiers = mzCfg().tiers
   const save = (next: Tier[]) => setSetting(MZ_KEYS.tiers, JSON.stringify(next))
@@ -63,7 +63,7 @@ export function TiersCard({ admin }: { admin: boolean }) {
 }
 
 /** "name<TAB>title<TAB>org<TAB>tier<TAB>email<TAB>phone" per line — straight from a spreadsheet. */
-export function parsePeople(text: string, existing: Contact[]): { add: Contact[]; skip: string[] } {
+function parsePeople(text: string, existing: Contact[]): { add: Contact[]; skip: string[] } {
   const tiers = mzCfg().tiers
   const tierFor = (v: string) => {
     const x = String(v || '').trim().toLowerCase()
@@ -128,7 +128,7 @@ function PasteSheet({ onClose }: { onClose: () => void }) {
 }
 
 /** A person's record: what they asked in Mizito, follow-ups with them, tasks they requested, how fast we answer. */
-export function ContactSheet({ name, onClose }: { name: string; onClose: () => void }) {
+function ContactSheet({ name, onClose }: { name: string; onClose: () => void }) {
   const { db } = useStore()
   const { open } = useEditor()
   const c = db.Contacts.find((x) => x.name === name)

@@ -19,7 +19,7 @@ const HINT: Record<OrgKind, T2> = {
   sides: ['هر تیم پروژه‌های خودش را دارد و در صفحه‌ی «تیم‌ها» با وضعیتش دیده می‌شود. هر تسک و هر نفر هم یک تیم دارد. برای حذف یا اضافه، همین فهرست را ویرایش کنید.', 'Each team owns its projects and shows on the Teams page with its status; every task and person has a team. Edit this list to add or remove teams.'],
 }
 
-export function OrgList({ kind, admin: canEdit, bare }: { kind: OrgKind; admin: boolean; bare?: boolean }) {
+function OrgList({ kind, admin: canEdit, bare }: { kind: OrgKind; admin: boolean; bare?: boolean }) {
   const admin = canEdit
   const fixed = kind === 'access'
   const { db, setSetting, toast } = useStore()
@@ -128,7 +128,7 @@ export function OrgPage({ admin }: { admin: boolean }) {
 }
 
 /** The glossary: rename Madar's main words; every label follows. */
-export function TermsCard({ admin }: { admin: boolean }) {
+function TermsCard({ admin }: { admin: boolean }) {
   const { setSetting } = useStore()
   const o = termOverrides()
   const save = (id: string, k: 'fa' | 'en', v: string) => {

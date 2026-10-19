@@ -7,7 +7,7 @@ import { daysBetween, daysFromToday, todayISO } from './jalali'
 import { taskCfg } from './taskcfg'
 import { assigneesOf } from './assignees'
 
-export interface Signals {
+interface Signals {
   /** days since the assign date (null = no assign date) */
   sinceAssign: number | null
   /** days until the deadline (negative = late; null = none or closed) */

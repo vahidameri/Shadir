@@ -2,7 +2,7 @@
 // in the back office (Config "terms", JSON {id: {fa, en}}); every label follows (see i18n setTermSwaps).
 import { setTermSwaps, type T2 } from './i18n'
 
-export interface Term {
+interface Term {
   id: string
   /** the word as written in the interface (Persian, English) */
   word: T2
@@ -21,7 +21,7 @@ export const TERMS: Term[] = [
 ]
 
 export const TERMS_KEY = 'terms'
-export type TermOverrides = Record<string, { fa?: string; en?: string }>
+type TermOverrides = Record<string, { fa?: string; en?: string }>
 let current: TermOverrides = {}
 export const termOverrides = () => current
 

@@ -7,7 +7,7 @@ export const isClosed = (d: Deliverable) => d.status === 'delivered' || d.status
 export const isOverdue = (d: Deliverable) => !isClosed(d) && !!d.target_date && d.target_date < todayISO()
 /** Days the target moved past the first commitment (0 when on baseline). */
 export const slipDays = (d: Deliverable) => (d.baseline_date && d.target_date ? Math.max(0, daysBetween(d.baseline_date, d.target_date)) : 0)
-export const onTime = (d: Deliverable) => d.status === 'delivered' && !!d.delivered_date && d.delivered_date <= (d.baseline_date || d.target_date)
+const onTime = (d: Deliverable) => d.status === 'delivered' && !!d.delivered_date && d.delivered_date <= (d.baseline_date || d.target_date)
 
 export function deliveryTrack(d: Deliverable, db: DB): Track | '' {
   return d.track || memberTrack(db, d.owner)

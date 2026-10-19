@@ -3,7 +3,7 @@
 import { addDays, daysBetween, fa, fmtDayMonth, parseISO, todayISO, weekdayIndex } from './jalali'
 import { L } from './i18n'
 
-export interface WeekCfg {
+interface WeekCfg {
   start: number
   workdays: number[]
   weeklyDay: number
@@ -11,7 +11,7 @@ export interface WeekCfg {
   dueDay: number
 }
 /** Defaults: week Sat–Fri, Sat–Thu workdays, portfolio weekly Thursday 10:00, reports due Wednesday. */
-export const WEEK_DEFAULT: WeekCfg = { start: 0, workdays: [0, 1, 2, 3, 4, 5], weeklyDay: 5, weeklyTime: '10:00', dueDay: 4 }
+const WEEK_DEFAULT: WeekCfg = { start: 0, workdays: [0, 1, 2, 3, 4, 5], weeklyDay: 5, weeklyTime: '10:00', dueDay: 4 }
 export const WEEK_KEYS = { start: 'week.start', workdays: 'week.workdays', weeklyDay: 'week.weekly_day', weeklyTime: 'week.weekly_time', dueDay: 'week.due_day' } as const
 
 let cfg: WeekCfg = WEEK_DEFAULT
@@ -47,7 +47,7 @@ export function weekStart(iso: string = todayISO()) {
 }
 /** The portfolio weekly meeting's date in the week starting ws. */
 export const weeklyDate = (ws: string) => addDays(ws, offset(cfg.weeklyDay))
-export const weekEnd = (ws: string) => addDays(ws, 6)
+const weekEnd = (ws: string) => addDays(ws, 6)
 export const inWeek = (iso: string, ws: string) => !!iso && iso >= ws && iso <= weekEnd(ws)
 export const weeksFrom = (ws: string, n: number) => Array.from({ length: n }, (_, i) => addDays(ws, i * 7))
 

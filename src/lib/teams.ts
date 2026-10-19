@@ -15,7 +15,7 @@ export const TEAM_KEYS = {
   amberPct: 'team.amber_pct', // … amber (default 10)
   doneDays: 'team.done_days', // "done recently" window in days (default 14)
 } as const
-export interface TeamCfg { redPct: number; amberPct: number; doneDays: number }
+interface TeamCfg { redPct: number; amberPct: number; doneDays: number }
 export function readTeamCfg(get: (k: string) => string | undefined): TeamCfg {
   return { redPct: Number(get(TEAM_KEYS.redPct)) || 25, amberPct: Number(get(TEAM_KEYS.amberPct)) || 10, doneDays: Number(get(TEAM_KEYS.doneDays)) || 14 }
 }
@@ -23,13 +23,8 @@ let cfg: TeamCfg = { redPct: 25, amberPct: 10, doneDays: 14 }
 export const teamCfg = () => cfg
 export const setTeamCfg = (c: TeamCfg) => (cfg = c)
 
-/** The team a task counts for. */
-export function teamOf(t: Task, db: DB): string {
-  const own = String(t.track || '')
-  if (own) return own
-  const p = t.project_id ? db.Projects.find((x) => x.id === t.project_id) : undefined
-  return p?.team || trackOf(t, db) || ''
-}
+/** The team a task counts for (same rule as the Tasks page filter). */
+export const teamOf = (t: Task, db: DB): string => trackOf(t, db)
 
 export interface TeamStats {
   id: string
@@ -81,6 +76,7 @@ export function teamStats(db: DB, id: string): TeamStats {
 
 /** Every team in the settings' order, plus "no team" when something has none. */
 export function allTeams(db: DB): string[] {
+  // teams removed from the back office still show while something points at them
   const used = new Set([...db.Projects.map((p) => p.team || ''), ...db.Tasks.map((t) => teamOf(t, db))])
-  return [...TRACKS, ...(used.has('') ? [''] : [])]
+  return [...TRACKS, ...[...used].filter((id) => id && !TRACKS.includes(id as never)), ...(used.has('') ? [''] : [])]
 }

@@ -9,7 +9,6 @@ import { weekCfg, weekStart } from './weeks'
 import { locale, type T2 } from './i18n'
 
 export const DAYS: T2[] = [['شنبه', 'Saturday'], ['یکشنبه', 'Sunday'], ['دوشنبه', 'Monday'], ['سه‌شنبه', 'Tuesday'], ['چهارشنبه', 'Wednesday'], ['پنجشنبه', 'Thursday'], ['جمعه', 'Friday']]
-export const DAY_OPTIONS: Record<string, T2> = { '': ['— ندارد —', '— None —'], ...Object.fromEntries(DAYS.map((d, i) => [String(i), d])) }
 export const DELIVERY_KEYS = { grace: 'delivery.grace', remind: 'delivery.remind' } as const
 
 let grace = 0
@@ -96,7 +95,6 @@ export function weekLine(p: Project, st: WeekState): string {
     case 'skipped': return fa ? 'این هفته تحویل ندارد' : 'No delivery this week'
   }
 }
-export const needsAttention = (s: WeekState | '') => s === 'today' || s === 'late' || s === 'missed'
 
 /** "Every Sunday" — the project's weekly delivery day in words ('' when it has none). */
 export function everyDay(p: Project) {

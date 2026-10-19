@@ -17,7 +17,7 @@ export const TASK_KEYS = {
 } as const
 
 export interface Flag { id: string; fa: string; en: string; color: string }
-export const DEFAULT_FLAGS: Flag[] = [
+const DEFAULT_FLAGS: Flag[] = [
   { id: 'watch', fa: 'زیر نظر', en: 'Watch', color: '#2f6f9f' },
   { id: 'key', fa: 'کلیدی', en: 'Key', color: '#d97706' },
   { id: 'escalate', fa: 'اسکالیشن', en: 'Escalate', color: '#c4314b' },
@@ -32,7 +32,7 @@ const FIELD_DEFAULT: Record<TaskField, FieldMode> = { assigned_at: 'on', flag: '
 export const fieldKey = (f: TaskField) => `task.field.${f}`
 
 interface Person { id: string; access?: string }
-export interface TaskCfg { defaultDue: string; flexDefaultDue: string; dueRequired: boolean; projectRequired: boolean; noDue: string[]; personal: string[]; areas: string[]; fields: Record<TaskField, FieldMode>; flags: Flag[]; staleDays: number; blockedDays: number; pingDays: number }
+interface TaskCfg { defaultDue: string; flexDefaultDue: string; dueRequired: boolean; projectRequired: boolean; noDue: string[]; personal: string[]; areas: string[]; fields: Record<TaskField, FieldMode>; flags: Flag[]; staleDays: number; blockedDays: number; pingDays: number }
 
 let cfg: TaskCfg = { defaultDue: '0', flexDefaultDue: '', dueRequired: true, projectRequired: false, noDue: [], personal: [], areas: [], fields: { ...FIELD_DEFAULT }, flags: DEFAULT_FLAGS, staleDays: 7, blockedDays: 3, pingDays: 2 }
 export const taskCfg = () => cfg
@@ -76,7 +76,7 @@ function readFlags(raw: string | undefined): Flag[] {
 export const flagOf = (id?: string) => (id ? cfg.flags.find((f) => f.id === id) : undefined)
 export const setTaskCfg = (c: TaskCfg) => (cfg = c)
 
-export const canSkipDue = (m?: Person) => !!m && cfg.noDue.includes(m.id)
+const canSkipDue = (m?: Person) => !!m && cfg.noDue.includes(m.id)
 export const canPersonal = (m?: Person) => !!m && cfg.personal.includes(m.id)
 export const needsDue = (m?: Person) => cfg.dueRequired && !canSkipDue(m)
 export const needsProject = (m?: Person) => cfg.projectRequired && !canPersonal(m)

@@ -55,7 +55,7 @@ export function FlagPicker({ value, onChange }: { value?: string; onChange: (v: 
 const chip = 'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[0.6875rem] leading-5'
 
 /** Deadline countdown: "۳ روز مانده", "امروز", "۵ روز تأخیر". */
-export function DeadlineChip({ t }: { t: Task }) {
+function DeadlineChip({ t }: { t: Task }) {
   const s = signals(t)
   if (s.toDeadline === null) return null
   const d = s.toDeadline

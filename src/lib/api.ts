@@ -45,7 +45,7 @@ export function saveConfig(c: Config) {
   } catch {}
 }
 
-export interface RemoteUser {
+interface RemoteUser {
   name: string
   role: Role
   email?: string

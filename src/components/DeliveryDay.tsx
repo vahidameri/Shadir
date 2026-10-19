@@ -1,17 +1,16 @@
 // Weekly delivery day: badge, the "record this week" popover, the last weeks as dots, and the week strip.
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { PackageCheck } from 'lucide-react'
 import type { DeliveryStatus, Project, WeeklyDelivery } from '../lib/types'
 import { useStore } from '../lib/store'
 import { can } from '../lib/access'
 import { DAYS, WEEK_STATE, deliveryDate, everyDay, hasDeliveryDay, history, onTimeRate, recordOf, weekLine, weekState, type WeekState } from '../lib/cadence'
 import { L, lbl, tr } from '../lib/i18n'
-import { addDays, fa, fmtDayMonth, todayISO } from '../lib/jalali'
+import { fa, fmtDayMonth, todayISO } from '../lib/jalali'
 import { weekStart } from '../lib/weeks'
 import { Popover, cx } from './ui'
 
-export const stateTone: Record<WeekState, string> = {
+const stateTone: Record<WeekState, string> = {
   delivered: 'bg-good/10 text-good',
   partial: 'bg-warn/12 text-warn',
   skipped: 'bg-muted text-sub',
@@ -90,42 +89,5 @@ export function DeliveredButton({ p, dark, small }: { p: Project; dark?: boolean
         </div>
       )}
     </Popover>
-  )
-}
-
-/** This week, day by day: which project delivers when, and how it went. */
-export function DeliveryWeek() {
-  const { db } = useStore()
-  const ws = weekStart()
-  const today = todayISO()
-  const list = db.Projects.filter(hasDeliveryDay)
-  if (!list.length)
-    return <p className="text-xs leading-6 text-sub">{L('هنوز برای هیچ پروژه‌ای روز تحویل هفتگی تعیین نشده. در ویرایش پروژه «روز تحویل هفتگی» را انتخاب کنید.', 'No project has a weekly delivery day yet. Pick one in the project’s edit form.')}</p>
-  const days = Array.from({ length: 7 }, (_, i) => addDays(ws, i)).filter((d) => list.some((p) => deliveryDate(p) === d) || d === today)
-  return (
-    <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}>
-      {days.map((d) => {
-        const ps = list.filter((p) => deliveryDate(p) === d)
-        return (
-          <div key={d} className={cx('min-w-0 rounded-2xl border p-2', d === today ? 'border-warn/40 bg-warn/[0.04]' : 'border-line')}>
-            <div className="mb-1.5 flex items-baseline justify-between gap-1 px-0.5">
-              <span className="text-xs font-semibold">{tr(DAYS[(Number(new Date(d + 'T12:00:00').getDay()) + 1) % 7])}</span>
-              <span className="text-[0.625rem] text-sub num">{fmtDayMonth(d)}</span>
-            </div>
-            <div className="space-y-1">
-              {ps.map((p) => {
-                const st = weekState(p, db) || 'upcoming'
-                return (
-                  <Link key={p.id} to={`/projects/${p.id}`} className={cx('block truncate rounded-lg px-2 py-1 text-[0.6875rem] font-medium', stateTone[st])} title={`${p.name} · ${lbl(WEEK_STATE, st)}`} dir="auto">
-                    {p.code || p.name}
-                  </Link>
-                )
-              })}
-              {!ps.length && <div className="px-1 py-1 text-[0.625rem] text-sub">—</div>}
-            </div>
-          </div>
-        )
-      })}
-    </div>
   )
 }

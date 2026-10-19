@@ -7,7 +7,7 @@
 //            and their own + shared tasks (plus all tasks of the projects they lead)
 import type { Access, DB } from './types'
 
-export const isLeader = (a: Access) => a === 'super' || a === 'exec' || a === 'head'
+const isLeader = (a: Access) => a === 'super' || a === 'exec' || a === 'head'
 export const can = {
   portfolio: isLeader,
   contracts: (a: Access) => a === 'super' || a === 'exec',
@@ -31,7 +31,7 @@ export const isMine = (t: { assignee: string; reporter: string; collaborators?: 
   !!me && (names(t.assignee).includes(me) || t.reporter === me || names(t.collaborators || '').includes(me) || names(t.watchers || '').includes(me))
 
 /** Projects a member is involved in. */
-export function relatedProjects(db: DB, me: string) {
+function relatedProjects(db: DB, me: string) {
   const id = db.Team.find((m) => m.name === me)?.id
   const set = new Set<string>()
   db.Projects.forEach((p) => p.owner === me && set.add(p.id))

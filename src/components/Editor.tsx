@@ -21,7 +21,7 @@ import { useAuto } from '../lib/automations'
 import { can } from '../lib/access'
 
 type FieldType = 'text' | 'textarea' | 'select' | 'multi' | 'date' | 'number' | 'project' | 'person' | 'people' | 'sprint' | 'member' | 'scale' | 'status' | 'area' | 'side' | 'title' | 'assignees' | 'flag' | 'tier' | 'mzstatus' | 'mzcat' | 'mzaction' | 'pprio'
-export interface Field {
+interface Field {
   key: string
   label: T2
   type: FieldType
@@ -33,7 +33,7 @@ export interface Field {
 
 export type EditableSheet = Exclude<SheetName, 'Comments' | 'Files' | 'Config' | 'Handoffs' | 'Deliveries' | 'History' | 'MizitoMentions'>
 
-export const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields: Field[]; defaults: () => Record<string, unknown> }> = {
+const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields: Field[]; defaults: () => Record<string, unknown> }> = {
   Tasks: {
     title: ['تسک', 'Task'],
     prefix: 'T',
@@ -332,7 +332,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
   )
 }
 
-export function FieldInput({ f, value, set, form, disabled, autoFocus, onSubmit }: { f: Field; value: unknown; set: (v: unknown) => void; form: Record<string, unknown>; disabled?: boolean; autoFocus?: boolean; onSubmit?: () => void }) {
+function FieldInput({ f, value, set, form, disabled, autoFocus, onSubmit }: { f: Field; value: unknown; set: (v: unknown) => void; form: Record<string, unknown>; disabled?: boolean; autoFocus?: boolean; onSubmit?: () => void }) {
   const { db } = useStore()
   const v = value ?? ''
   const common = { className: 'input', disabled }

@@ -71,7 +71,7 @@ function d2j(jdn: number) {
   return { jy, jm: 7 + div(k, 30), jd: (k % 30) + 1 }
 }
 
-export function toJalali(gy: number, gm: number, gd: number) {
+function toJalali(gy: number, gm: number, gd: number) {
   return d2j(g2d(gy, gm, gd))
 }
 
@@ -79,7 +79,7 @@ export function toGregorian(jy: number, jm: number, jd: number) {
   return d2g(j2d(jy, jm, jd))
 }
 
-export function isLeapJalali(jy: number) {
+function isLeapJalali(jy: number) {
   return jalCal(jy).leap === 0
 }
 
@@ -153,11 +153,6 @@ const faDigits = '۰۱۲۳۴۵۶۷۸۹'
 export function fa(n: number | string) {
   const s = String(n)
   return locale.lang === 'fa' ? s.replace(/\d/g, (d) => faDigits[+d]).replace(/%/g, '٪') : s
-}
-
-export function fmtNum(n: number) {
-  const s = Math.round(n).toLocaleString('en-US')
-  return locale.lang === 'fa' ? fa(s.replace(/,/g, '٬')) : s
 }
 
 interface DateParts { y: number; m: number; d: number; monthName: string }

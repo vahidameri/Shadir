@@ -23,7 +23,7 @@ import { Avatar, AvatarStack, Sheet, cx, Chip, MenuItem, Popover } from './ui'
 import { DatePicker } from './DatePicker'
 import { useEditor } from './Editor'
 import { AssigneesPicker, ListPicker, PeoplePicker, PersonPicker, PriorityPicker, ProjectPicker, StatusPicker } from './pickers'
-import { TRACK, TRACKS, trackOf, depsOf, dependentsOf, depIds, sideSoft, memberTrack } from '../lib/tracks'
+import { TRACK, TRACKS, trackOf, depsOf, dependentsOf, depIds, sideSoft, autoTrack } from '../lib/tracks'
 import type { Track } from '../lib/types'
 import { StatusIcon } from './ui'
 import { Link2, X, Plus, ArrowLeftRight } from 'lucide-react'
@@ -695,7 +695,7 @@ function TrackPicker({ task, onChange }: { task: Task; onChange: (v: Track | '')
     >
       {(close) => (
         <>
-          <MenuItem active={!task.track} hint={memberTrack(db, task.assignee.split(',')[0]) ? lbl(TRACK, memberTrack(db, task.assignee.split(',')[0]) as Track) : ''} onClick={() => { onChange(''); close() }}>
+          <MenuItem active={!task.track} hint={autoTrack(task, db) ? lbl(TRACK, autoTrack(task, db) as Track) : ''} onClick={() => { onChange(''); close() }}>
             {L('خودکار (واحد مسئول)', 'Auto (assignee’s unit)')}
           </MenuItem>
           {TRACKS.map((t) => (
@@ -803,7 +803,7 @@ function useEditorLite() {
 }
 
 /** The road to final delivery: hand-off to product → testing → deadline, with today's position. */
-export function Stages({ task }: { task: Task }) {
+function Stages({ task }: { task: Task }) {
   const steps = [
     { on: fieldOn('handoff_date'), d: task.handoff_date || '', label: L('تحویل به پروداکت', 'Hand-off to product') },
     { on: fieldOn('test_date'), d: task.test_date || '', label: L('تست', 'Testing') },
@@ -833,12 +833,12 @@ export function Stages({ task }: { task: Task }) {
 }
 
 /** ClickUp-style checklist kept as text lines: "[ ] item" / "[x] item". */
-export function parseChecklist(v: string) {
+function parseChecklist(v: string) {
   return String(v || '').split('\n').map((l) => l.trim()).filter(Boolean).map((l) => ({ done: /^\[x\]/i.test(l), text: l.replace(/^\[( |x)\]\s*/i, '') }))
 }
 const serialize = (items: { done: boolean; text: string }[]) => items.map((i) => `[${i.done ? 'x' : ' '}] ${i.text}`).join('\n')
 
-export function Checklist({ value, onChange, title }: { value: string; onChange: (v: string) => void; title?: string }) {
+function Checklist({ value, onChange, title }: { value: string; onChange: (v: string) => void; title?: string }) {
   const { canEdit } = useStore()
   const items = parseChecklist(value)
   const [draft, setDraft] = useState('')

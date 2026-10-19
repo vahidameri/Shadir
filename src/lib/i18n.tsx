@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 
-export type Lang = 'fa' | 'en'
-export type Calendar = 'jalali' | 'gregorian'
+type Lang = 'fa' | 'en'
+type Calendar = 'jalali' | 'gregorian'
 
 /** Bilingual string: [persian, english]. */
 export type T2 = readonly [string, string]

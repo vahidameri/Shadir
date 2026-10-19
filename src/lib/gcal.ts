@@ -58,25 +58,8 @@ export async function fetchEvents(token: string, from: string, to: string): Prom
   return (j.items || []).map(toEvent).filter(Boolean) as GEvent[]
 }
 
-/** Create the calendar event for a meeting, with a Google Meet link, and invite attendees. */
-export async function createEvent(token: string, m: Meeting, emails: string[], description: string) {
-  const start = new Date(`${m.date}T${m.time || '10:00'}:00`)
-  const end = new Date(start.getTime() + (Number(m.duration) || 45) * 60000)
-  const body = {
-    summary: m.title,
-    description,
-    start: { dateTime: start.toISOString() },
-    end: { dateTime: end.toISOString() },
-    attendees: emails.map((email) => ({ email })),
-    conferenceData: m.meet_url ? undefined : { createRequest: { requestId: `madar-${m.id}`, conferenceSolutionKey: { type: 'hangoutsMeet' } } },
-  }
-  const r = await fetch(`${API}?conferenceDataVersion=1&sendUpdates=all`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-  if (!r.ok) throw new Error(`Calendar ${r.status}`)
-  return toEvent((await r.json()) as RawEvent)!
-}
-
 // ------------------------------------------------------------------ matching
-export interface Relation {
+interface Relation {
   meeting?: Meeting
   projectId: string
   members: string[] // team member names among the attendees

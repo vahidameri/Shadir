@@ -28,7 +28,7 @@ export const DASH_WIDGETS: Choice<DashWidget>[] = [
   { id: 'blocked', label: ['مسدودها و راکدها', 'Blocked & quiet'] },
 ]
 
-export interface Pick<K extends string> { id: K; on: boolean }
+interface Pick<K extends string> { id: K; on: boolean }
 
 /** Reads an ordered on/off list; ids missing from the stored value keep their default place, on. */
 export function readPicks<K extends string>(raw: string | undefined, all: Choice<K>[]): Pick<K>[] {
