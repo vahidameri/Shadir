@@ -10,12 +10,12 @@ import { useEditor } from '../components/Editor'
 import { daysFromToday, fa, fmtDayMonth, todayISO } from '../lib/jalali'
 import { can } from '../lib/access'
 import { assigneesOf } from '../lib/assignees'
-import { catOf, closed, columnHex, columns, statusLabel } from '../lib/columns'
+import { catOf, closed, columns, statusLabel } from '../lib/columns'
 import { signals } from '../lib/signals'
 import { allTeams, teamOf, teamStats } from '../lib/teams'
 import { mzClosed, mzSignals, P_COLOR } from '../lib/mizito'
 import { DASH_KEY, DASH_WIDGETS, readPicks, type DashWidget } from '../lib/views'
-import { Bars, CAT_FILL, CatBar, Ring, TeamCard, teamColor, teamName } from '../components/TeamParts'
+import { Bars, CatBar, Ring, TeamCard, teamColor, teamName } from '../components/TeamParts'
 import type { StatusCat } from '../lib/types'
 
 const WIDE: DashWidget[] = ['teams']
@@ -53,14 +53,14 @@ export default function Overview() {
     status: () => (
       <Card eyebrow={L('تسک‌ها', 'Tasks')} title={L('بر اساس وضعیت', 'By status')} action={<Link to="/tasks?v=all" className="text-xs text-sub hover:text-ink">{L('همه', 'All')}</Link>}>
         <div className="flex items-center gap-5">
-          <Ring value={onTime} size={84} color={onTime >= 85 ? '#19c48a' : onTime >= 70 ? '#f5b301' : '#e0475a'} />
+          <Ring value={onTime} size={84} color={onTime >= 85 ? 'rgb(var(--ink))' : onTime >= 70 ? 'rgb(var(--warn))' : 'rgb(var(--bad))'} />
           <div className="min-w-0 flex-1">
             <div className="text-sm font-medium">{L('سهم کارهای باز که از ددلاین عقب نیستند', 'Open work that is not past its deadline')}</div>
             <CatBar by={d.byCat} legend className="mt-3" />
           </div>
         </div>
         <div className="mt-5">
-          <Bars rows={columns().filter((c) => catOf(c.id) !== 'cancelled').map((c) => ({ label: statusLabel(c.id), value: db.Tasks.filter((t) => t.status === c.id).length, color: columnHex(c.id), to: `/tasks?v=all&status=${c.id}` })).filter((r) => r.value)} />
+          <Bars rows={columns().filter((c) => catOf(c.id) !== 'cancelled').map((c) => ({ label: statusLabel(c.id), value: db.Tasks.filter((t) => t.status === c.id).length, to: `/tasks?v=all&status=${c.id}` })).filter((r) => r.value)} />
         </div>
       </Card>
     ),
@@ -75,7 +75,7 @@ export default function Overview() {
                 <li key={s.id || '-'}>
                   <Link to={`/tasks?track=${s.id}`} className="block rounded-lg hover:bg-muted/50">
                     <div className="flex items-baseline justify-between gap-2 text-xs">
-                      <span className="flex items-center gap-1.5 truncate"><span className="h-2 w-2 rounded-full" style={{ background: teamColor(s.id) }} /> {teamName(s.id)}</span>
+                      <span className="flex items-center gap-1.5 truncate">{teamName(s.id)}</span>
                       <span className="shrink-0 text-sub num">
                         {fa(s.open)} {L('باز', 'open')}
                         {s.late > 0 && <b className="ms-2 font-medium text-bad">{fa(s.late)} {L('معوق', 'late')}</b>}
@@ -83,9 +83,9 @@ export default function Overview() {
                       </span>
                     </div>
                     <div className="mt-1 flex h-2.5 overflow-hidden rounded-full bg-ink/[0.06]" style={{ width: `${Math.max(8, (s.open / max) * 100)}%` }}>
-                      <span style={{ width: `${(s.late / s.open) * 100}%`, background: '#e0475a' }} />
-                      <span style={{ width: `${(s.blocked / s.open) * 100}%`, background: CAT_FILL.blocked, opacity: 0.55 }} />
-                      <span style={{ width: `${(rest / s.open) * 100}%`, background: teamColor(s.id), opacity: 0.6 }} />
+                      <span style={{ width: `${(s.late / s.open) * 100}%`, background: 'rgb(var(--bad))' }} />
+                      <span style={{ width: `${(s.blocked / s.open) * 100}%`, background: 'rgb(var(--bad) / 0.4)' }} />
+                      <span style={{ width: `${(rest / s.open) * 100}%`, background: teamColor(s.id) }} />
                     </div>
                   </Link>
                 </li>
@@ -127,7 +127,7 @@ export default function Overview() {
       const rows = [...map].sort((a, b) => b[1].n - a[1].n).slice(0, 10)
       return (
         <Card eyebrow={L('افراد', 'People')} title={L('بار کاری (تسک باز)', 'Workload (open tasks)')}>
-          {rows.length === 0 ? <Empty /> : <Bars rows={rows.map(([p, r]) => ({ label: p, value: r.n, sub: r.late ? L(`${fa(r.late)} معوق`, `${r.late} late`) : undefined, color: r.late ? '#e0475a' : undefined, to: `/tasks?assignee=${encodeURIComponent(p)}` }))} />}
+          {rows.length === 0 ? <Empty /> : <Bars rows={rows.map(([p, r]) => ({ label: p, value: r.n, sub: r.late ? L(`${fa(r.late)} معوق`, `${r.late} late`) : undefined, color: r.late ? 'rgb(var(--bad))' : undefined, to: `/tasks?assignee=${encodeURIComponent(p)}` }))} />}
         </Card>
       )
     },

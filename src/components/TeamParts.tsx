@@ -9,13 +9,14 @@ import { AvatarStack, HealthDot, Progress, cx } from './ui'
 import { L, lbl, tr } from '../lib/i18n'
 import { fa, fmtDayMonth } from '../lib/jalali'
 import { STATUS_CAT } from '../lib/labels'
-import { TRACK, sideColor } from '../lib/tracks'
+import { TRACK } from '../lib/tracks'
 import { projectMetrics } from '../lib/metrics'
 import { teamStats, type TeamStats } from '../lib/teams'
 import { closed } from '../lib/columns'
 
 export const CAT_ORDER: StatusCat[] = ['active', 'open', 'waiting', 'blocked', 'intake', 'done']
-export const CAT_FILL: Record<StatusCat, string> = { intake: '#38bdf8', open: '#9fb3ab', active: '#f5b301', waiting: '#8b5cf6', blocked: '#e0475a', done: '#19c48a', cancelled: '#c8d2ce' }
+// calm palette: shades of ink for work in motion, red only for blocked, green for done
+export const CAT_FILL: Record<StatusCat, string> = { intake: 'rgb(var(--ink) / 0.12)', open: 'rgb(var(--ink) / 0.3)', active: 'rgb(var(--ink) / 0.75)', waiting: 'rgb(var(--ink) / 0.5)', blocked: 'rgb(var(--bad))', done: 'rgb(var(--good) / 0.8)', cancelled: 'rgb(var(--line-strong))' }
 
 /** Tasks by status category as one stacked bar, with an optional legend. */
 export function CatBar({ by, legend, className }: { by: Record<StatusCat, number>; legend?: boolean; className?: string }) {
@@ -55,7 +56,7 @@ export function Bars({ rows, max, unit }: { rows: { label: string; value: number
               </span>
             </div>
             <div className="mt-1 h-2 rounded-full bg-ink/[0.06]">
-              <div className="h-2 rounded-full transition-all" style={{ width: `${Math.max(2, (r.value / m) * 100)}%`, background: r.color || 'rgb(var(--brand))' }} />
+              <div className="h-2 rounded-full transition-all" style={{ width: `${Math.max(2, (r.value / m) * 100)}%`, background: r.color || 'rgb(var(--ink) / 0.7)' }} />
             </div>
           </>
         )
@@ -86,7 +87,6 @@ export function TeamCard({ id, stats, compact }: { id: string; stats?: TeamStats
   const { db, canEdit } = useStore()
   const { open } = useEditor()
   const s = stats || teamStats(db, id)
-  const color = id ? sideColor(id) : '#9fb3ab'
   const num = (icon: React.ReactNode, n: number, label: string, tone: string, to: string) => (
     <Link to={to} className={cx('flex items-center gap-1.5 rounded-xl px-2 py-1.5 text-xs transition hover:bg-muted', n ? tone : 'text-sub')}>
       {icon}
@@ -95,10 +95,9 @@ export function TeamCard({ id, stats, compact }: { id: string; stats?: TeamStats
   )
   return (
     <div className="card overflow-hidden">
-      <div className="h-1.5" style={{ background: color }} />
       <div className="p-5">
         <div className="flex items-start gap-3">
-          <span className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-sm font-bold text-white" style={{ background: color }}>{name(id).slice(0, 2)}</span>
+          <span className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-muted text-sm font-bold text-ink">{name(id).slice(0, 2)}</span>
           <div className="min-w-0 flex-1">
             <Link to={`/tasks?track=${id}`} className="flex items-center gap-2 font-semibold hover:underline">
               {name(id)} <HealthDot h={s.health} pulse />
@@ -115,7 +114,7 @@ export function TeamCard({ id, stats, compact }: { id: string; stats?: TeamStats
         <div className="mt-3 grid grid-cols-2 gap-1 sm:grid-cols-4">
           {num(<CalendarClock size={13} />, s.late, L('معوق', 'late'), 'text-bad', `/tasks?track=${id}&v=late`)}
           {num(<Ban size={13} />, s.blocked, L('مسدود', 'blocked'), 'text-bad', `/tasks?track=${id}&v=blocked`)}
-          {num(<Clock3 size={13} />, s.byCat.waiting, L('در انتظار', 'waiting'), 'text-violet-600', `/tasks?track=${id}&v=waiting`)}
+          {num(<Clock3 size={13} />, s.byCat.waiting, L('در انتظار', 'waiting'), 'text-ink', `/tasks?track=${id}&v=waiting`)}
           {num(<MoonStar size={13} />, s.stale, L('راکد', 'quiet'), 'text-sub', `/tasks?track=${id}&v=stale`)}
         </div>
 
@@ -165,5 +164,5 @@ export function TeamCard({ id, stats, compact }: { id: string; stats?: TeamStats
 }
 
 export const teamName = name
-export const teamColor = (id: string) => (id ? sideColor(id) : '#9fb3ab')
+export const teamColor = (_id: string) => 'rgb(var(--ink) / 0.55)'
 export type { DB }

@@ -128,7 +128,7 @@ export default function CalendarPage() {
                 const on = layers.includes(k)
                 return (
                   <button key={k} onClick={() => setHidden((h) => (on ? [...h, k] : h.filter((x) => x !== k)))} className={cx('inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs transition', on ? 'border-transparent bg-ink text-surface' : 'border-line text-sub hover:text-ink')} aria-pressed={on}>
-                    <span className="h-2 w-2 rounded-full" style={{ background: LAYER_DOT[k] }} /> {tr(CAL_LAYERS.find((c) => c.id === k)!.label)}
+                    {tr(CAL_LAYERS.find((c) => c.id === k)!.label)}
                   </button>
                 )
               })}
@@ -183,7 +183,7 @@ export default function CalendarPage() {
                 const all = [
                   ...it.gev.map((e) => ({ k: `g${e.id}`, el: <Pill key={e.id} tone="plain" icon={<CalendarRange size={10} className="text-[#1a73e8]" />} text={`${fa(e.time)} ${e.title}`} onClick={() => setSel(d)} /> })),
                   ...it.meets.map((m) => ({ k: `mt${m.id}`, el: <Pill key={m.id} tone="ink" icon={<CalendarRange size={10} />} text={`${fa(m.time)} ${m.title}`} onClick={() => nav('/meetings')} /> })),
-                  ...it.mz.map((m) => ({ k: `z${m.id}`, el: <Pill key={m.id} tone={m.due_date < today ? 'bad' : 'mz'} icon={<MessageSquareText size={10} />} text={m.title} onClick={() => openMz(m.id)} /> })),
+                  ...it.mz.map((m) => ({ k: `z${m.id}`, el: <Pill key={m.id} tone={m.due_date < today ? 'late' : 'brand'} icon={<MessageSquareText size={10} />} text={m.title} onClick={() => openMz(m.id)} /> })),
                   ...it.fus.map((f) => ({ k: `f${f.id}`, el: <Pill key={f.id} tone="warn" icon={<BellRing size={10} />} text={f.subject} onClick={() => open('FollowUps', f as never)} /> })),
                   ...it.tasks.map((t) => ({ k: `t${t.id}`, el: <Pill key={t.id} tone={closed(t) ? 'muted' : t.due_date < today ? 'late' : 'plain'} icon={<StatusIcon s={t.status} size={10} />} text={t.title} done={closed(t)} onClick={() => open('Tasks', t as never)} /> })),
                 ]
@@ -263,9 +263,8 @@ const pillTone = {
   plain: 'bg-surface border border-line text-ink',
   muted: 'bg-muted text-sub',
   late: 'bg-surface border border-bad/40 text-bad',
-  mz: 'bg-[#2f6f9f]/12 text-[#2f6f9f] dark:text-sky-300',
 }
-const LAYER_DOT: Record<CalLayer, string> = { tasks: 'rgb(var(--brand))', meetings: 'rgb(var(--ink))', followups: '#f5b301', mizito: '#2f6f9f', google: '#1a73e8' }
+
 function Pill({ tone, icon, text, onClick, done }: { tone: keyof typeof pillTone; icon: React.ReactNode; text: string; onClick: () => void; done?: boolean }) {
   return (
     <button

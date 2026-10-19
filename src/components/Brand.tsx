@@ -34,7 +34,7 @@ export function MadarLoader({ className = 'h-32 w-32' }: { className?: string })
   return (
     <div className={`madar-loader relative ${className}`} role="status" aria-label="Loading">
       <span className="madar-orbit absolute inset-0 rounded-full border border-white/10">
-        <span className="absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rounded-full bg-[#F5CE1F] shadow-[0_0_12px_3px_rgba(245,206,31,0.55)]" />
+        <span className="absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rounded-full bg-[#FF9500] shadow-[0_0_12px_3px_rgba(255,149,0,0.55)]" />
       </span>
       <span className="madar-orbit-2 absolute inset-3 rounded-full border border-dashed border-white/[0.07]" />
       <MarkDraw className="absolute inset-0 m-auto h-[46%] w-[46%] overflow-visible" />
