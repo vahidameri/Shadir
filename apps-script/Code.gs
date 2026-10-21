@@ -156,6 +156,7 @@ function doPost(e) {
       var logged = !!HISTORY_FIELDS[body.sheet];
       var before = (body.action === 'upsert' && (body.sheet === 'Tasks' || logged)) ? existingRow_(body.sheet, body.row.id) : null;
       if (body.action === 'upsert') {
+        if (body.sheet === 'Mizito' && before) body.row = mzKeepAgentFields_(before, body.row);
         result = upsert_(body.sheet, body.row, user);
         // the log and the assignment email must never turn a saved row into an error
         if (logged) { try { history_(body.sheet, before, body.row, user); } catch (eLog) {} }
@@ -908,6 +909,8 @@ function writeRows_(name, rows) {
     if (DATE_COLS.indexOf(h) !== -1 || h === 'value') return "'" + v;
     // text that starts like a formula (=, +, -, @) stays text
     if (typeof v === 'string' && /^[=+\-@]/.test(v) && isNaN(Number(v))) return "'" + v;
+    // what the agent brings is text ("0912…", "1405", "100" stay as written)
+    if (typeof v === 'string' && MZ_TEXT_SHEETS[name]) return "'" + v;
     return v;
   };
   var fresh = [];
@@ -1620,6 +1623,7 @@ function seedDemo() {
 // notes, links) stays Madar's and is never overwritten.
 // --------------------------------------------------------------------------
 
+var MZ_TEXT_SHEETS = { Mizito: 1, MizitoMentions: 1, MizitoComments: 1 };
 var MZ_CUTOFF = '2026-06-22'; // 1 Tir 1405: the agent reads tasks with activity since then
 var MZ_AGENT = { name: 'میزیتو' }; // how the agent's changes are signed in the log
 
@@ -1675,9 +1679,9 @@ function mzHello_(agent) {
   var known = {};
   // a task counts as known to this agent only once it carries this person's name (the other person's
   // agent may have brought it), so a shared task is sent again and gets both names
-  (rawAll_().Mizito || []).forEach(function (m) { if (m.mz_key) known[String(m.mz_key)] = names_(m.mentioned).indexOf(agent.name) !== -1 ? String(m.mz_sig || '') : ''; });
+  (rawAll_().Mizito || []).forEach(function (m) { if (m.mz_key) known[String(m.mz_key)] = names_(m.mentioned).indexOf(agent.name) !== -1 && m.mz_state !== 'gone' ? String(m.mz_sig || '') : ''; });
   var st = mzStatus_(agent.name);
-  return { account: agent.name, cutoff: setting_('mz.agent.cutoff', MZ_CUTOFF), last: st.at || '', known: known, version: MADAR_VERSION };
+  return { account: agent.name, cutoff: setting_('mz.agent.cutoff', MZ_CUTOFF), last: st.done_at || '', known: known, version: MADAR_VERSION };
 }
 
 function mzStatusList_() {
@@ -1826,10 +1830,13 @@ function mzIngest_(body, agent) {
     body.seen.forEach(function (k) { seen[String(k)] = 1; });
     (data.Mizito || []).forEach(function (m) {
       var key = String(m.mz_key || '');
-      if (!key || seen[key] || items[key] || m.mz_state !== 'open' || !listed(m.mentioned, agent.name)) return;
+      // only tasks in this person's inbox (they are an assignee): a task they were just mentioned on
+      // is never in that list, and clearing a mention notice in Mizito must not hide it
+      if (!key || seen[key] || items[key] || m.mz_state !== 'open' || !listed(m.mz_assignees, agent.name)) return;
       var c = {};
       for (var k in m) c[k] = m[k];
       c.mz_state = 'gone';
+      c.mz_sig = ''; // read in full again when it shows up
       c.synced_at = now;
       items[key] = c;
       gone++;
@@ -1842,7 +1849,12 @@ function mzIngest_(body, agent) {
   writeRows_('MizitoComments', notes);
   try { historyRows_(hist, MZ_AGENT); } catch (e) {}
   var st = mzStatus_(agent.name);
-  var patch = { at: now, version: String(body.version || ''), error: String(body.error || '').slice(0, 300) };
+  if (body.error && !(body.items || []).length) {
+    // a failed run: shown next to the person's name, but the next read still starts from the last good one
+    mzSetStatus_(agent.name, { error: String(body.error).slice(0, 300), error_at: now, version: String(body.version || '') });
+    return { made: 0, updated: 0, mentions: 0, comments: 0, gone: 0 };
+  }
+  var patch = { at: now, version: String(body.version || ''), error: '' };
   if (body.final) {
     patch.done_at = now;
     patch.run = body.stats || {};
@@ -1850,4 +1862,19 @@ function mzIngest_(body, agent) {
   }
   mzSetStatus_(agent.name, patch);
   return { made: made, updated: updated, mentions: mentions.length, comments: notes.length, gone: gone };
+}
+
+var MZ_AGENT_FIELDS = ['mz_state', 'mz_done_at', 'mz_done_by', 'mz_progress', 'mz_project', 'mz_owner', 'mz_assignees', 'mz_labels', 'mz_checklist', 'mz_deadline', 'mz_last_by', 'mz_last_at', 'synced_at', 'last_mention_at', 'last_mention_by', 'received_at', 'mentioned'];
+/**
+ * A save from a page that loaded before the agent's last read must not take the agent's newer facts
+ * back: those fields keep the sheet's values, and the task is read in full again (sig cleared) so
+ * Mizito's open/done is re-applied over a status that may be stale.
+ */
+function mzKeepAgentFields_(before, row) {
+  if (!before.synced_at || String(row.synced_at || '') >= String(before.synced_at)) return row;
+  var out = {};
+  for (var k in row) out[k] = row[k];
+  MZ_AGENT_FIELDS.forEach(function (f) { if (f in before) out[f] = before[f]; });
+  out.mz_sig = '';
+  return out;
 }

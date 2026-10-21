@@ -295,8 +295,8 @@ export function CaptureSheet({ onClose, onOpen, initialLink = '' }: { onClose: (
 // ------------------------------------------------------------------ the item
 /** One comment of the Mizito conversation: who, when, what it answers, the text, who it mentions, files. */
 function MzCommentLine({ c, m, all }: { c: MizitoComment; m: MizitoItem; all: MizitoComment[] }) {
-  const ours = m.mentioned.split(',').map((x) => x.trim()).filter(Boolean)
-  const tagged = c.mentions.split(',').map((x) => x.trim()).filter(Boolean)
+  const ours = String(m.mentioned || '').split(',').map((x) => x.trim()).filter(Boolean)
+  const tagged = String(c.mentions || '').split(',').map((x) => x.trim()).filter(Boolean)
   const parent = c.reply_to ? all.find((x) => x.id === c.reply_to) : undefined
   const files = String(c.files || '').split('\n').filter(Boolean)
   const mine = ours.includes(c.by)
@@ -304,10 +304,10 @@ function MzCommentLine({ c, m, all }: { c: MizitoComment; m: MizitoItem; all: Mi
     <li className="relative">
       <span className="absolute -start-[37px] top-0"><Avatar name={c.by || '?'} size="sm" ring /></span>
       <div className="text-sm">
-        <b className="font-medium">{c.by}</b> <span className="text-sub">{fmtDate(c.at)} {c.at.slice(11, 16)} · {timeAgo(toDate(c.at))}</span>
+        <b className="font-medium">{c.by}</b> <span className="text-sub">{fmtDate(c.at)} {String(c.at).slice(11, 16)} · {timeAgo(toDate(c.at))}</span>
       </div>
-      {parent && <div className="mt-1 truncate border-s-2 border-line-strong ps-2 text-xs text-sub"><Reply size={11} className="inline" /> {parent.by}: {parent.body.slice(0, 120)}</div>}
-      <div className={cx('mt-1 whitespace-pre-wrap rounded-2xl rounded-ss-md px-4 py-2 text-sm leading-7', mine ? 'bg-ink/[0.06]' : 'bg-muted')}>{c.body || <span className="text-sub">{L('(بدون متن)', '(no text)')}</span>}</div>
+      {parent && <div className="mt-1 truncate border-s-2 border-line-strong ps-2 text-xs text-sub"><Reply size={11} className="inline" /> {parent.by}: {String(parent.body).slice(0, 120)}</div>}
+      <div className={cx('mt-1 whitespace-pre-wrap rounded-2xl rounded-ss-md px-4 py-2 text-sm leading-7', mine ? 'bg-ink/[0.06]' : 'bg-muted')}>{String(c.body ?? '') || <span className="text-sub">{L('(بدون متن)', '(no text)')}</span>}</div>
       {(tagged.length > 0 || files.length > 0) && (
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[0.6875rem] text-sub">
           {tagged.map((n) => <span key={n} className={cx('rounded-full px-1.5', ours.includes(n) ? 'bg-brand/10 font-medium text-brand' : 'bg-muted')}>@{n}</span>)}

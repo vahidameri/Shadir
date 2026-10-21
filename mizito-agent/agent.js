@@ -5,7 +5,7 @@
 ;(() => {
   const VERSION = chrome.runtime.getManifest().version
   // read-only: nothing else can be called from here
-  const READ = new Set(['workspace/userId', 'workspace/getUsers', 'projects/getList', 'labels/getAll', 'chat/getDialogs', 'chat/getHistory', 'tasks/getAll', 'tasks/getComments'])
+  const READ = new Set(['workspace/userId', 'workspace/getUsers', 'projects/getList', 'labels/getAll', 'chat/getDialogs', 'chat/getHistory', 'tasks/getAll', 'tasks/upcoming', 'tasks/getComments'])
   const BOT = '592d81b962bd6e0e6a6cfc00' // "دستیار میزیتو", who posts the mention notices
   const GAP = 350 // ms between calls, to stay gentle with Mizito
   const BATCH = 10 // tasks per message to Madar
@@ -59,11 +59,34 @@
       return res.json()
     }
   }
-  const madar = (body) =>
-    chrome.runtime.sendMessage({ type: 'madar', body }).then((r) => {
-      if (!r || !r.ok) throw new Error((r && r.error) || 'مدار پاسخ نداد')
-      return r.row
-    })
+  // Posted from here, not from the worker: Chrome stops an extension worker whose request takes over
+  // 30s, and a batch can (the sheet lock, a cold start). The key stays in the extension's storage,
+  // out of the page's reach (this script runs in its own world).
+  async function madar(body) {
+    const { conn } = await chrome.storage.local.get('conn')
+    if (!conn || !conn.u || !conn.k) throw new Error('افزونه به مدار وصل نیست')
+    let lastErr
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const ctl = new AbortController()
+      const timer = setTimeout(() => ctl.abort(), 150000)
+      try {
+        const res = await fetch(conn.u, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ ...body, agent: conn.k }), redirect: 'follow', credentials: 'omit', signal: ctl.signal })
+        const text = await res.text()
+        if (text.trimStart().startsWith('<')) throw new Error('آدرس مدار به‌جای داده صفحه برگرداند؛ کد اتصال را دوباره بگیرید')
+        const r = JSON.parse(text)
+        if (!r.ok) throw new Error(r.error || 'مدار پاسخ نداد')
+        return r.row
+      } catch (e) {
+        lastErr = ctl.signal.aborted ? new Error('مدار پاسخ نداد') : e
+        // a refused key or a bad address will not get better on a retry
+        if (/کلید|کد اتصال|وصل نیست/.test(String(lastErr.message))) break
+        await sleep(5000)
+      } finally {
+        clearTimeout(timer)
+      }
+    }
+    throw lastErr
+  }
   const progress = (text) => chrome.runtime.sendMessage({ type: 'progress', text }).catch(() => {})
   const ms = (iso) => {
     const t = Date.parse(iso || '')
@@ -108,10 +131,14 @@
     const box = dialogs.find((d) => !d.is_group && (d.peer_user === BOT || /^دستیار میزیتو/.test(name(d.peer_user))))
     let pages = 0
     let mentionCount = 0
+    let mentionsDone = false
     if (box) {
       for (let offset = 0; pages < 400; pages++) {
         const page = await api('chat/getHistory', { dialog: box._id, offset })
-        if (!Array.isArray(page) || !page.length) break
+        if (!Array.isArray(page) || !page.length) {
+          pages++
+          break
+        }
         let older = false
         for (const msg of page) {
           const at = ms(msg.date)
@@ -128,13 +155,25 @@
         if (older) break
         offset += page.length
       }
+      mentionsDone = pages < 400
     }
 
     // 2. the open tasks of this person's inbox
     progress('تسک‌های باز…')
-    const open = await api('tasks/getAll', { inbox: true, sort_type: 'default', filter: null })
+    // the inbox comes in pages: the first from getAll, the rest from upcoming (from = how many so far)
+    const query = { inbox: true, sort_type: 'default', filter: null }
+    const open = [...((await api('tasks/getAll', query)) || [])]
+    let inboxDone = false
+    for (let i = 0; i < 40; i++) {
+      const more = await api('tasks/upcoming', { ...query, from: open.length })
+      if (!Array.isArray(more) || !more.length) {
+        inboxDone = true
+        break
+      }
+      open.push(...more)
+    }
     const seen = []
-    for (const t of Array.isArray(open) ? open : []) {
+    for (const t of open) {
       seen.push(t._id)
       const activity = Math.max(ms(t.created_at), ms(t.modified_at), ms(t.last_mention_date))
       if (activity >= cutoff) take(t)
@@ -209,15 +248,28 @@
       await madar({ action: 'mzIngest', items: out.slice(i, i + BATCH), version: VERSION })
     }
     const stats = { tasks: tasks.size, sent: out.length, mentions: mentionCount, comments: commentsRead, pages: pages + 1, open: seen.length, uid: me && me.uid }
-    await madar({ action: 'mzIngest', items: [], final: true, full: !!full, seen: full ? [...new Set([...seen, ...list.filter((x) => !x.t.completed).map((x) => x.t._id)])] : undefined, stats, version: VERSION })
+    await madar({ action: 'mzIngest', items: [], final: true, full: !!full, seen: full && inboxDone && mentionsDone ? [...new Set([...seen, ...list.filter((x) => !x.t.completed).map((x) => x.t._id)])] : undefined, stats, version: VERSION })
     return stats
   }
 
+  let busy = false
   chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
     if (!msg || msg.type !== 'run') return
+    if (busy) {
+      reply({ ok: false, error: 'در حال خواندن است' })
+      return
+    }
+    busy = true
+    // keeps the worker (which waits for this reply) awake through long steps
+    const beat = setInterval(() => chrome.runtime.sendMessage({ type: 'beat' }).catch(() => {}), 10000)
+    const done = (r) => {
+      busy = false
+      clearInterval(beat)
+      reply(r)
+    }
     run(!!msg.full || !!msg.force, !!msg.force).then(
-      (stats) => reply({ ok: true, stats }),
-      (e) => reply({ ok: false, error: String((e && e.message) || e) }),
+      (stats) => done({ ok: true, stats }),
+      (e) => done({ ok: false, error: String((e && e.message) || e) }),
     )
     return true
   })

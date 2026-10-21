@@ -29,7 +29,7 @@
 - باید کروم و یک تب میزیتو باز باشد. اگر نباشد، با باز شدن تب، خواندن عقب‌مانده انجام می‌شود.
 - بین درخواست‌ها فاصله می‌گذارد تا فشاری به میزیتو نیاید.
 - **فقط خواندن:** فقط این آدرس‌های میزیتو صدا زده می‌شوند و بقیه در کد مسدودند:
-  `workspace/userId`، `workspace/getUsers`، `projects/getList`، `labels/getAll`، `chat/getDialogs`، `chat/getHistory`، `tasks/getAll`، `tasks/getComments`.
+  `workspace/userId`، `workspace/getUsers`، `projects/getList`، `labels/getAll`، `chat/getDialogs`، `chat/getHistory`، `tasks/getAll`، `tasks/upcoming`، `tasks/getComments`.
 - نشست میزیتو جایی ذخیره نمی‌شود و فقط در همان صفحه استفاده می‌شود. کلید مدار در حافظه‌ی افزونه می‌ماند و در مدار فقط هش آن نگه داشته می‌شود. با «باطل کردن» در مدار، دیگر کار نمی‌کند.
 
 ## در مدار چه می‌شود

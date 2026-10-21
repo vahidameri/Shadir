@@ -8,6 +8,9 @@ const get = (k) => chrome.storage.local.get(k).then((x) => x[k])
 const set = (o) => chrome.storage.local.set(o)
 const status = async (patch) => set({ status: { ...((await get('status')) || {}), ...patch } })
 
+// a worker that was stopped mid-read left "running" behind: the read is over
+get('status').then((st) => st && st.state === 'running' && status({ state: 'idle', progress: '' }))
+
 chrome.runtime.onInstalled.addListener(() => chrome.alarms.create('quick', { periodInMinutes: QUICK_MIN, delayInMinutes: 1 }))
 chrome.runtime.onStartup.addListener(() => chrome.alarms.create('quick', { periodInMinutes: QUICK_MIN, delayInMinutes: 1 }))
 chrome.alarms.onAlarm.addListener((a) => a.name === 'quick' && start(null, 'schedule'))
@@ -76,6 +79,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     madar(msg.body).then(reply)
     return true
   }
+  if (msg.type === 'beat') return
   if (msg.type === 'progress') {
     status({ progress: msg.text })
     return
