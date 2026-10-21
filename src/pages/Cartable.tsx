@@ -29,7 +29,8 @@ export default function CartablePage() {
   const period = periodOf(box, day)
 
   const mineBox = db.Cartable.filter((c) => c.owner === owner && c.box === box)
-  const drafts = mineBox.filter((c) => c.status === 'draft' && c.from === me && c.period === period).sort(order)
+  // every unsent draft of mine for this box, whatever day it was written for; it goes out with this period
+  const drafts = mineBox.filter((c) => c.status === 'draft' && c.from === me).sort(order)
   // what is open: sent for this period, plus anything earlier still not done
   const pending = mineBox.filter((c) => c.status === 'sent' && c.period <= period).sort(order)
   const carried = pending.filter((c) => c.period < period)
@@ -51,7 +52,7 @@ export default function CartablePage() {
 
   const send = async () => {
     const at = nowStamp()
-    for (const c of drafts) await upsert('Cartable', { ...c, status: 'sent', sent_at: at })
+    for (const c of drafts) await upsert('Cartable', { ...c, status: 'sent', sent_at: at, period: c.period < period ? period : c.period })
     if (mail && mode !== 'demo') {
       try {
         const r = (await action('mailCartable', { owner, box, period })) as { sent?: boolean; reason?: string } | undefined

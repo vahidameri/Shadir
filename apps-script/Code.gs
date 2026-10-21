@@ -593,6 +593,10 @@ function guardWrite_(sheet, row, user) {
   if (sheet === 'Config' && a !== 'super') throw new Error('فقط مدیر برنامه می‌تواند تنظیمات را تغییر دهد');
   if (sheet === 'Contracts' && a !== 'super' && a !== 'exec') throw new Error('دسترسی به قراردادها ندارید');
   if ((sheet === 'Mizito' || sheet === 'MizitoMentions' || sheet === 'MizitoComments' || sheet === 'Contacts' || sheet === 'Cartable') && a !== 'super' && a !== 'exec') throw new Error('این بخش فقط برای CPTO و مدیر برنامه است');
+  if (sheet === 'Cartable') {
+    var cb = existingRow_('Cartable', row && row.id);
+    if (cb && cb.status === 'draft' && cb.from !== user.name) throw new Error('این پیش‌نویس مال شخص دیگری است');
+  }
   if (sheet === 'Todos') {
     var mine = existingRow_('Todos', row && row.id);
     if ((mine && mine.owner !== user.name) || (row && row.owner && row.owner !== user.name)) throw new Error('یادداشت‌های هر کس فقط برای خودش است');
@@ -1693,9 +1697,10 @@ function mzHello_(agent) {
   var known = {};
   // a task counts as known to this agent only once it carries this person's name (the other person's
   // agent may have brought it), so a shared task is sent again and gets both names
-  (rawAll_().Mizito || []).forEach(function (m) { if (m.mz_key) known[String(m.mz_key)] = names_(m.mentioned).indexOf(agent.name) !== -1 && m.mz_state !== 'gone' ? String(m.mz_sig || '') : ''; });
+  (rawAll_().Mizito || []).forEach(function (m) { if (m.mz_key) known[String(m.mz_key).replace(/^.*_sl/i, '')] = names_(m.mentioned).indexOf(agent.name) !== -1 && m.mz_state !== 'gone' && !/\/inbox\/[0-9a-f]{24}$/.test(String(m.link)) ? String(m.mz_sig || '') : ''; });
   var mids = [];
-  (rawAll_().MizitoMentions || []).forEach(function (x) { if (x.mz_id && x.account === agent.name) mids.push(String(x.mz_id)); });
+  var since = setting_('mz.agent.cutoff', MZ_CUTOFF);
+  (rawAll_().MizitoMentions || []).forEach(function (x) { if (x.mz_id && x.account === agent.name && String(x.at) >= since) mids.push(String(x.mz_id)); });
   (rawAll_().Mizito || []).forEach(function (m) { if (m.ext_id && names_(m.mentioned).indexOf(agent.name) !== -1) mids.push(String(m.ext_id)); });
   var st = mzStatus_(agent.name);
   return { mentions: mids, account: agent.name, cutoff: setting_('mz.agent.cutoff', MZ_CUTOFF), last: st.done_at || '', known: known, version: MADAR_VERSION };
@@ -1729,7 +1734,8 @@ function mzIngest_(body, agent) {
   var firstOf = function (cat) { var x = statuses.filter(function (st) { return st.cat === cat; })[0]; return x ? x.id : statuses[0].id; };
 
   var byKey = {};
-  (data.Mizito || []).forEach(function (m) { if (m.mz_key) byKey[String(m.mz_key)] = m; });
+  // a key taken by hand from Mizito's own link is "<workspace>_sl<task>": the task id is what matches
+  (data.Mizito || []).forEach(function (m) { if (m.mz_key) byKey[String(m.mz_key).replace(/^.*_sl/i, '')] = m; });
   var mentionIds = {};
   (data.MizitoMentions || []).forEach(function (x) { if (x.mz_id) mentionIds[String(x.mz_id)] = 1; });
   var comments = {};
@@ -1786,7 +1792,7 @@ function mzIngest_(body, agent) {
       var synced = cur && cur.mz_state;
       if (synced) {
         var ticks = function (x) { return (String(x || '').match(/✓/g) || []).length; };
-        var nextChecklist = (t.checklist || []).map(function (c) { return (c.ok ? '✓ ' : '○ ') + c.t; }).join('\n');
+        var nextChecklist = long((t.checklist || []).map(function (c) { return (c.ok ? '✓ ' : '○ ') + c.t; }).join('\n'), 2000);
         if (!!t.completed !== (cur.mz_state === 'done')) {
           actor = t.completed ? t.completed_by || '' : '';
           changes.push(t.completed ? 'در میزیتو انجام شد' + (actor ? ' (' + actor + ')' : '') : 'در میزیتو دوباره باز شد');
@@ -1845,7 +1851,9 @@ function mzIngest_(body, agent) {
       if (mentionIds[id] || id === String(m.ext_id || '')) return;
       mentionIds[id] = 1;
       var at = ts(x.at);
-      if (cur && cur.mz_state && freshMentions.indexOf(x.by) === -1) freshMentions.push(x.by || '');
+      // a change only when it happened after the last read and this person already had the task
+      // (a second person's agent bringing old mentions, or a first comment read, is not news)
+      if (cur && cur.mz_state && listed(cur.mentioned, agent.name) && at > String(cur.synced_at || '') && freshMentions.indexOf(x.by) === -1) freshMentions.push(x.by || '');
       mentions.push({ id: 'MM-' + id, item_id: m.id, by: x.by || '', at: at, note: '', status: '', mz_id: id, account: agent.name, mz_comment: x.comment || '' });
       if (at > String(m.last_mention_at || '')) { m.last_mention_at = at; m.last_mention_by = x.by || ''; }
       if (at < String(m.received_at || '9999')) m.received_at = at;
@@ -1856,7 +1864,7 @@ function mzIngest_(body, agent) {
       var row = { id: 'MC-' + c.id, item_id: m.id, by: c.by || '', at: ts(c.at), body: long(c.body), mentions: (c.mentions || []).join(', '), reply_to: c.reply_to ? 'MC-' + c.reply_to : '', files: long((c.files || []).join('\n'), 1000) };
       var old = comments[row.id];
       if (old && String(old.body) === row.body && String(old.files || '') === row.files && String(old.mentions || '') === row.mentions) return;
-      if (!old && cur && cur.mz_state) newComments.push(row);
+      if (!old && cur && cur.mz_state && row.at > String(cur.synced_at || '')) newComments.push(row);
       comments[row.id] = row;
       notes.push(row);
     });
