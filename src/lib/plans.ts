@@ -58,6 +58,12 @@ export function planHealth(db: DB, p: PlanItem, today = todayISO()): Exclude<KrC
 export const plansIn = (db: DB, team: string, a: string, b: string) =>
   db.Plans.filter((p) => (!team || p.team === team) && p.status !== 'dropped' && (p.start_date || p.end_date || '9999') <= b && (p.end_date || p.start_date || '0000') >= a).sort((x, y) => (x.start_date || '').localeCompare(y.start_date || '') || (x.end_date || '').localeCompare(y.end_date || ''))
 
+/** When an item was finished: the log line that set it to done, else its last update. */
+export function doneAt(db: DB, p: PlanItem) {
+  const h = db.History.filter((x) => x.entity === 'Plans' && x.entity_id === p.id && x.field === 'status' && x.to === 'done').sort((a, b) => (a.at < b.at ? 1 : -1))[0]
+  return String(h?.at || p.updated_at || '').slice(0, 10)
+}
+
 /** Stamps a roadmap item as it is saved: the first end becomes the baseline. */
 export function stampPlan(prev: PlanItem | undefined, next: PlanItem, now: string): PlanItem {
   const out = { ...next, updated_at: now }

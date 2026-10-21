@@ -13,7 +13,7 @@ import { L, tr } from '../lib/i18n'
 import { addDays, fa, fmtDate, fmtDayMonth, todayISO } from '../lib/jalali'
 import { allTeams, teamStats } from '../lib/teams'
 import { CONF, elapsed, quarterLabel, quarterOf, quarterRange, teamOkr } from '../lib/okr'
-import { isLate, planHealth, planOpen, planProgress, plansIn, slipDays } from '../lib/plans'
+import { doneAt, isLate, planHealth, planOpen, planProgress, plansIn, slipDays } from '../lib/plans'
 import { activeSprint, sprintCfg, sprintStats } from '../lib/sprints'
 import { riskScore } from '../lib/metrics'
 import type { PlanItem } from '../lib/types'
@@ -41,7 +41,7 @@ export default function Report() {
           sprintSt: sprint ? sprintStats(db, sprint) : undefined,
           moving: plans.filter((p) => p.status === 'in_progress' || p.status === 'review'),
           risky: plans.filter((p) => planOpen(p) && planHealth(db, p, today) !== 'on_track'),
-          done: plans.filter((p) => p.status === 'done' && (p.updated_at || '').slice(0, 10) >= since),
+          done: plans.filter((p) => p.status === 'done' && doneAt(db, p) >= since),
           next: db.Plans.filter((p) => p.team === t && planOpen(p) && p.status !== 'in_progress' && p.status !== 'review' && p.start_date > today && p.start_date <= ahead),
         }
       }),
