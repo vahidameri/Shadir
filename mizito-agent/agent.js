@@ -94,16 +94,21 @@
   }
   const tehran = (s) => ms(String(s).replace(' ', 'T') + (String(s).length <= 10 ? 'T00:00' : '') + ':00' + TEHRAN)
 
-  // full = read back to the cutoff (and report which tasks are still open); force = re-read every task
-  async function run(full, force) {
+  // Every read goes through the whole assistant chat back to the cutoff: its messages carry each task
+  // as it is now, so a task someone else changed (the CPTO commenting, closing, moving the deadline)
+  // is noticed even with no new mention. Only tasks that changed are read in full and sent.
+  // force = re-read every task and its comments.
+  async function run(_full, force) {
     const hello = await madar({ action: 'mzHello' })
     const cutoff = tehran(hello.cutoff)
-    // a quick read goes back to two days before the last one; a full read to the cutoff
-    const since = !full && hello.last ? Math.max(cutoff, tehran(hello.last) - 2 * 86400000) : cutoff
+    const since = cutoff
     const known = hello.known || {}
+    const knownMentions = new Set(hello.mentions || [])
 
     progress('آماده‌سازی…')
     const me = await api('workspace/userId', { regId: null })
+    // Mizito's own task link (the one "لینک وظیفه" copies): <workspace>_sl<task>
+    const linkOf = (id) => location.origin + '/#/ws/tasks/inbox/' + (me && me.wid ? me.wid + '_sl' : '') + id
     const users = {}
     // Arabic ي/ك typed in some profiles become Persian, so names match Madar's people
     const clean = (s) => String(s || '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/\s+/g, ' ').trim()
@@ -144,9 +149,10 @@
           const at = ms(msg.date)
           if (at && at < since) older = true
           const media = msg.media
-          if (msg.deleted || !media || media._ !== 'messageMediaMentionInTask' || !media.task || at < since) continue
+          // every task the assistant talks about comes in; a mention is also kept as a mention
+          if (msg.deleted || !media || !media.task || at < since) continue
           const slot = take(media.task)
-          if (slot) {
+          if (slot && media._ === 'messageMediaMentionInTask') {
             slot.mentions.push({ id: msg._id, by: name(media.from_user), at: msg.date, comment: media.comment || '' })
             mentionCount++
           }
@@ -185,7 +191,8 @@
     let commentsRead = 0
     const list = [...tasks.values()]
     for (let i = 0; i < list.length; i++) {
-      const { t, mentions } = list[i]
+      const { t } = list[i]
+      const mentions = list[i].mentions.filter((x) => !knownMentions.has(x.id))
       const sig = sigOf(t)
       if (!force && known[t._id] === sig) {
         if (mentions.length) out.push({ key: t._id, mentions })
@@ -195,7 +202,7 @@
         key: t._id,
         title: t.title || '',
         notes: t.notes || '',
-        link: location.origin + '/#/ws/tasks/inbox/' + t._id,
+        link: linkOf(t._id),
         project: projects[t.project] || '',
         owner: name(t.owner),
         assignees: (t.assignee || []).map(name).filter(Boolean),
@@ -248,7 +255,7 @@
       await madar({ action: 'mzIngest', items: out.slice(i, i + BATCH), version: VERSION })
     }
     const stats = { tasks: tasks.size, sent: out.length, mentions: mentionCount, comments: commentsRead, pages: pages + 1, open: seen.length, uid: me && me.uid }
-    await madar({ action: 'mzIngest', items: [], final: true, full: !!full, seen: full && inboxDone && mentionsDone ? [...new Set([...seen, ...list.filter((x) => !x.t.completed).map((x) => x.t._id)])] : undefined, stats, version: VERSION })
+    await madar({ action: 'mzIngest', items: [], final: true, full: true, seen: inboxDone && mentionsDone ? [...new Set([...seen, ...list.filter((x) => !x.t.completed).map((x) => x.t._id)])] : undefined, stats, version: VERSION })
     return stats
   }
 

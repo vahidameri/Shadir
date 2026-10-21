@@ -17,6 +17,7 @@ export const MZ_KEYS = {
   staleDays: 'mz.stale_days',
   template: 'mz.template', // reminder text with {name} {title} {days} {link} {asked_by}
   cutoff: 'mz.agent.cutoff', // the agent reads tasks with activity since this day (ISO)
+  keyProjects: 'mz.key_projects', // JSON [names]: Mizito projects that get a badge (default میز شاد)
   agent: 'mz.agent.', // + a person's name: their agent's last run (written by the server)
 } as const
 /** 1 Tir 1405 */
@@ -70,8 +71,9 @@ interface MzCfg {
   thresholds: MzThresholds
   staleDays: number
   template: string
+  keyProjects: string[]
 }
-let cfg: MzCfg = { base: 'https://mizito.noyanet.com', tiers: DEFAULT_TIERS, statuses: DEFAULT_STATUSES, categories: DEFAULT_CATEGORIES, actions: DEFAULT_ACTIONS, weights: DEFAULT_WEIGHTS, thresholds: DEFAULT_THRESHOLDS, staleDays: 7, template: DEFAULT_TEMPLATE }
+let cfg: MzCfg = { base: 'https://mizito.noyanet.com', tiers: DEFAULT_TIERS, statuses: DEFAULT_STATUSES, categories: DEFAULT_CATEGORIES, actions: DEFAULT_ACTIONS, weights: DEFAULT_WEIGHTS, thresholds: DEFAULT_THRESHOLDS, staleDays: 7, template: DEFAULT_TEMPLATE, keyProjects: ['میز شاد'] }
 export const mzCfg = () => cfg
 
 function list<T extends { id: string }>(raw: string | undefined, def: T[]): T[] {
@@ -107,6 +109,13 @@ export function readMzCfg(get: (k: string) => string | undefined): MzCfg {
     thresholds: obj(get(MZ_KEYS.thresholds), DEFAULT_THRESHOLDS),
     staleDays: Number(get(MZ_KEYS.staleDays)) || 7,
     template: get(MZ_KEYS.template) || DEFAULT_TEMPLATE,
+    keyProjects: (() => {
+      try {
+        const v = JSON.parse(get(MZ_KEYS.keyProjects) || 'null')
+        if (Array.isArray(v)) return v.map((x) => String(x).trim()).filter(Boolean)
+      } catch {}
+      return ['میز شاد']
+    })(),
   }
 }
 export const setMzCfg = (c: MzCfg) => (cfg = c)
@@ -165,7 +174,8 @@ export function mzKeyOf(link: string): string {
   const hash = s.includes('#') ? s.slice(s.indexOf('#') + 1) : s.replace(/^https?:\/\/[^/]+/, '')
   const parts = hash.split(/[/?&=]/).map((x) => x.trim()).filter(Boolean)
   const id = [...parts].reverse().find((p) => /[0-9a-f]{12,}/i.test(p) || /^\d{4,}$/.test(p))
-  return id || ''
+  // Mizito's own task link is <workspace>_sl<task>: the task is after "_sl"
+  return (id || '').replace(/^.*_sl/i, '')
 }
 export const isMizitoLink = (s: string) => /^https?:\/\//i.test(String(s || '').trim()) && !!mzKeyOf(s)
 
@@ -194,7 +204,30 @@ export function mzFlags(m: MizitoItem) {
     /** no longer in this person's Mizito (done, removed or handed off) while open here */
     gone: m.mz_state === 'gone' && !closed,
     answered: !closed && answered(m),
+    /** one of the Mizito projects that matter most (settings), e.g. میز شاد */
+    keyProject: !!m.mz_project && cfg.keyProjects.includes(String(m.mz_project).trim()),
   }
+}
+
+/** Changed in Mizito within the last week (comments, done, progress, deadline, new mentions). */
+export const recentlyChanged = (m: MizitoItem, days = 7) => !!m.mz_changed_at && Date.now() - stampMs(m.mz_changed_at) < days * 86400000
+// what each person has already looked at (this browser): item id → the change time they saw
+const SEEN_KEY = 'madar.mz.seen'
+function seenMap(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem(SEEN_KEY) || '{}') || {}
+  } catch {
+    return {}
+  }
+}
+export const changeUnseen = (m: MizitoItem) => recentlyChanged(m) && seenMap()[m.id] !== m.mz_changed_at
+export function markSeen(m: MizitoItem) {
+  if (!m.mz_changed_at) return
+  try {
+    const all = seenMap()
+    all[m.id] = m.mz_changed_at
+    localStorage.setItem(SEEN_KEY, JSON.stringify(all))
+  } catch {}
 }
 /** Everyone who mentioned it: the asker and every re-mention. */
 export const askersOf = (db: DB, m: MizitoItem) => [...new Set([m.asked_by, ...mentionsOf(db, m.id).map((x) => x.by)].filter(Boolean))]
@@ -285,11 +318,11 @@ export const P_HINT: T2[] = [
   ['خوب است انجام شود', 'Good to do'],
 ]
 
-export type MzView = 'queue' | 'inbox' | 'p0' | 'exec' | 'breached' | 'waiting' | 'stale' | 'mine_cpto' | 'mine_pgm' | 'closed' | 'all'
-export const MZ_VIEWS: MzView[] = ['queue', 'inbox', 'p0', 'exec', 'breached', 'waiting', 'stale', 'closed', 'all']
+export type MzView = 'queue' | 'inbox' | 'changed' | 'p0' | 'exec' | 'breached' | 'waiting' | 'stale' | 'mine_cpto' | 'mine_pgm' | 'closed' | 'all'
+export const MZ_VIEWS: MzView[] = ['queue', 'inbox', 'changed', 'p0', 'exec', 'breached', 'waiting', 'stale', 'closed', 'all']
 
 /** The two highest tiers count as "exec asks". */
-const isExecTier = (t?: Tier) => !!t && [...cfg.tiers].sort((a, b) => b.weight - a.weight).slice(0, 2).some((x) => x.id === t.id)
+export const isExecTier = (t?: Tier) => !!t && [...cfg.tiers].sort((a, b) => b.weight - a.weight).slice(0, 2).some((x) => x.id === t.id)
 
 export function inMzView(db: DB, m: MizitoItem, v: MzView, s = mzSignals(db, m)): boolean {
   const cat = mzCat(m.status)
@@ -302,6 +335,8 @@ export function inMzView(db: DB, m: MizitoItem, v: MzView, s = mzSignals(db, m))
       return !mzClosed(m)
     case 'inbox':
       return m.review === 'new' && !mzClosed(m)
+    case 'changed':
+      return recentlyChanged(m) && m.review !== 'ignored'
     case 'p0':
       return !mzClosed(m) && s.p === 0
     case 'exec':

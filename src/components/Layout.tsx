@@ -5,6 +5,7 @@ import {
   Briefcase, ListChecks, Users, BellRing, ShieldAlert, Settings, Moon, Sun, Search, Plus, RefreshCw, Menu,
   Sparkles, CheckCircle2, AlertCircle, Bell, PanelLeftClose, PanelLeftOpen, Languages, Star, AtSign, Flag, Clock, CircleAlert, Ban, CalendarDays, Keyboard, CalendarRange, UserRound, LogOut, PackageCheck, Repeat,
   LayoutDashboard, Target, Gauge, Zap, GanttChart, FileBarChart,
+  Inbox,
 } from 'lucide-react'
 import { useStore, clearSnaps } from '../lib/store'
 import { useI18n, L } from '../lib/i18n'
@@ -87,12 +88,15 @@ export function Layout({ children }: { children: ReactNode }) {
 
   // Madar: my work → tracking → watching → back office
   const openTasks = db.Tasks.filter((t) => !closed(t)).length
+  // what is waiting in my own cartable
+  const cartCount = db.Cartable.filter((c) => c.owner === me && c.status === 'sent').length
   const mzHot = can.mizito(access) ? db.Mizito.filter((m) => { const s = mzSignals(db, m); return !mzClosed(m) && (s.p === 0 || s.breached) }).length : 0
   const groups: { label: string; links: { to: string; label: string; icon: typeof ListChecks; badge?: number; count?: number; hub?: Hub }[] }[] = [
     {
       label: L('کار من', 'My work'),
       links: [
         { to: '/my', label: L('میز کار', 'My desk'), icon: Sparkles, badge: myCount },
+        ...(can.cartable(access) ? [{ to: '/cartable', label: L('کارتابل', 'Cartable'), icon: Inbox, badge: cartCount }] : []),
         { to: '/overview', label: L('نمای کلی', 'Overview'), icon: LayoutDashboard },
         { to: '/calendar', label: L('تقویم', 'Calendar'), icon: CalendarDays },
         { to: '/meetings', label: L('جلسات', 'Meetings'), icon: CalendarRange },

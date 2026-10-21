@@ -169,6 +169,7 @@ export function BlockerPanel({ t, patch }: { t: Task; patch: (p: Partial<Task>) 
 const FIELD: Record<string, [string, string]> = {
   title: ['عنوان', 'title'], description: ['توضیحات', 'description'], status: ['وضعیت', 'status'], priority: ['اولویت', 'priority'], assignee: ['مسئول', 'assignee'],
   due_date: ['ددلاین', 'deadline'], assigned_at: ['تاریخ اساین', 'assign date'], flag: ['پرچم', 'flag'], track: ['تیم', 'team'], project_id: ['محصول / پروژه', 'product / project'], kr_id: ['نتیجه‌ی کلیدی', 'key result'], current: ['مقدار', 'value'], confidence: ['اطمینان', 'confidence'], target: ['هدف', 'target'], note: ['یادداشت', 'note'],
+  mz_state: ['وضعیت در میزیتو', 'Mizito state'], mz_progress: ['پیشرفت در میزیتو', 'Mizito progress'], mz_deadline: ['مهلت در میزیتو', 'Mizito deadline'],
   blocked_reason: ['علت انسداد', 'blocker reason'], blocked_by: ['مسدودکننده', 'blocked by'], link: ['لینک', 'link'], requested_by: ['درخواست‌دهنده', 'requested by'],
   collaborators: ['همکاران', 'shared with'], watchers: ['ناظرها', 'watchers'], private: ['دیده‌شدن', 'visibility'], deadline: ['ددلاین دوم', 'second deadline'],
   subject: ['موضوع', 'subject'], person: ['طرف پیگیری', 'person'], channel: ['کانال', 'channel'], notes: ['یادداشت', 'notes'], owner: ['پیگیری‌کننده', 'owner'],
@@ -180,6 +181,9 @@ function show(h: HistoryRow, v: string, projectName: (id: string) => string) {
   if (h.field === 'status') return h.entity === 'Tasks' ? statusLabel(v) : h.entity === 'Mizito' ? optLabel(statusById(v)) || v : lbl(FOLLOWUP_STATUS, v as never)
   if (h.field === 'confidence') return v in CONF ? tr(CONF[v as keyof typeof CONF].label) : v
   if (h.field === 'kr_id') return krTitle(v) || v
+  if (h.field === 'mz_state') return v === 'done' ? L('انجام‌شده', 'done') : v === 'gone' ? L('دیده نمی‌شود', 'not seen') : L('باز', 'open')
+  if (h.field === 'mz_progress') return `${fa(Number(v) || 0)}٪`
+  if (h.field === 'mz_deadline' || h.field === 'due_date') return fmtDate(v)
   if (h.field === 'priority') return lbl(PRIORITY, v as never)
   if (h.field === 'flag') return flagOf(v) ? L(flagOf(v)!.fa, flagOf(v)!.en) : v
   if (h.field === 'track') return lbl(TRACK, v) || v

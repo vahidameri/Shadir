@@ -17,6 +17,8 @@ export const can = {
   allFollowUps: (a: Access) => a === 'super' || a === 'exec',
   /** the Mizito queue and the people registry: the CPTO and the PgM */
   mizito: (a: Access) => a === 'super' || a === 'exec',
+  /** the cartable between the PgM and the CPTO */
+  cartable: (a: Access) => a === 'super' || a === 'exec',
 }
 
 export function accessOf(db: DB, name: string, demo: boolean): Access {
@@ -46,9 +48,10 @@ export function scopeDB(db: DB, me: string, access: Access): DB {
   const FollowUps = can.allFollowUps(access)
     ? db.FollowUps.filter((f) => !f.owner || f.owner === me || !privateOwners.has(f.owner))
     : db.FollowUps.filter((f) => f.owner === me || f.person === me)
-  let out: DB = { ...db, FollowUps }
+  // personal notes stay with their owner; a cartable draft only with whoever writes it
+  let out: DB = { ...db, FollowUps, Todos: db.Todos.filter((t) => t.owner === me), Cartable: db.Cartable.filter((c) => c.status !== 'draft' || c.from === me) }
   if (!can.contracts(access)) out = { ...out, Contracts: [], Files: out.Files.filter((f) => f.entity !== 'Contracts') }
-  if (!can.mizito(access)) out = { ...out, Mizito: [], MizitoMentions: [], MizitoComments: [], Contacts: [], History: out.History.filter((h) => h.entity !== 'Mizito'), Files: out.Files.filter((f) => f.entity !== 'Mizito') }
+  if (!can.mizito(access)) out = { ...out, Mizito: [], MizitoMentions: [], MizitoComments: [], Cartable: [], Contacts: [], History: out.History.filter((h) => h.entity !== 'Mizito'), Files: out.Files.filter((f) => f.entity !== 'Mizito') }
   if (isLeader(access)) return out
 
   const ok = relatedProjects(db, me)

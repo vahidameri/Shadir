@@ -1,9 +1,10 @@
 // Mizito pieces: the priority badge, the signal chips, the capture sheet ("a new mention"), the item
 // sheet (thread, status, outcome, reminder text) and the settings (statuses, categories, actions,
 // weights, thresholds, reminder template).
-import { useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Attachments } from './Files'
-import { AtSign, Ban, Bot, Check, CheckCheck, Clock, Copy, ExternalLink, FileText, Flame, Hourglass, KeyRound, Link2, MessageSquarePlus, MoonStar, Paperclip, Plus, Reply, Settings2, Trash2, UserRound, X } from 'lucide-react'
+import { CartableButton } from './CartableParts'
+import { AtSign, Ban, Bot, Check, CheckCheck, Clock, Crown, Star, Copy, ExternalLink, FileText, Flame, Hourglass, KeyRound, Link2, MessageSquarePlus, MoonStar, Paperclip, Plus, Reply, Settings2, Trash2, UserRound, X } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { useEditor } from './Editor'
 import { SaveClose } from './SaveClose'
@@ -16,7 +17,7 @@ import { uid } from '../lib/api'
 import { historyOf } from '../lib/history'
 import { historyText } from './TaskTracking'
 import {
-  MZ_CUTOFF, MZ_KEYS, P_COLOR, P_HINT, agentRun, allPeople, askersOf, commentsOf, firstMzStatus, isMizitoLink, mentionsOf, mzCat, mzCfg, mzClosed, mzFlags, mzKeyOf, mzSignals, nowStampMz, optLabel, reminderText, statusById, tierOf,
+  MZ_CUTOFF, MZ_KEYS, P_COLOR, P_HINT, agentRun, isExecTier, markSeen, recentlyChanged, allPeople, askersOf, commentsOf, firstMzStatus, isMizitoLink, mentionsOf, mzCat, mzCfg, mzClosed, mzFlags, mzKeyOf, mzSignals, nowStampMz, optLabel, reminderText, statusById, tierOf,
   type MzCat, type MzOption, type MzStatus,
 } from '../lib/mizito'
 import type { MizitoComment, MizitoItem, MizitoMention } from '../lib/types'
@@ -41,6 +42,37 @@ export function PBadge({ p, big }: { p: number; big?: boolean }) {
     <span className={cx('inline-grid shrink-0 place-items-center rounded-lg font-mono font-bold text-white', big ? 'h-9 w-11 text-sm' : 'h-6 w-8 text-[0.6875rem]')} style={{ background: P_COLOR[p] }} title={L(...P_HINT[p])}>
       P{p}
     </span>
+  )
+}
+
+/** Text with its links clickable; long words and URLs wrap inside the bubble instead of running out. */
+function Linked({ text }: { text: string }) {
+  const parts = String(text ?? '').split(/(https?:\/\/[^\s]+)/g)
+  return (
+    <>
+      {parts.map((p, i) =>
+        /^https?:\/\//.test(p) ? (
+          <a key={i} href={p} target="_blank" rel="noreferrer" dir="ltr" className="text-brand underline-offset-2 hover:underline">{p}</a>
+        ) : (
+          <Fragment key={i}>{p}</Fragment>
+        ),
+      )}
+    </>
+  )
+}
+
+/** The two things that must jump out: a task of a key Mizito project (میز شاد) and an ask from a senior manager. */
+export function MzBadges({ m }: { m: MizitoItem }) {
+  const { db } = useStore()
+  const f = mzFlags(m)
+  const s = mzSignals(db, m)
+  const exec = isExecTier(s.tier)
+  if (!f.keyProject && !exec) return null
+  return (
+    <>
+      {f.keyProject && <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-band px-1.5 text-[0.625rem] font-semibold leading-5 text-white" title={L('تسک پروژه‌ی کلیدی در میزیتو', 'A key Mizito project')}><Star size={10} className="fill-current" /> {m.mz_project}</span>}
+      {exec && <span className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 text-[0.625rem] font-semibold leading-5 text-white" style={{ background: s.tier!.color }} title={optLabel(s.tier)}><Crown size={10} /> {L('مدیر ارشد', 'Senior ask')}</span>}
+    </>
   )
 }
 
@@ -301,13 +333,13 @@ function MzCommentLine({ c, m, all }: { c: MizitoComment; m: MizitoItem; all: Mi
   const files = String(c.files || '').split('\n').filter(Boolean)
   const mine = ours.includes(c.by)
   return (
-    <li className="relative">
+    <li className="relative min-w-0">
       <span className="absolute -start-[37px] top-0"><Avatar name={c.by || '?'} size="sm" ring /></span>
       <div className="text-sm">
         <b className="font-medium">{c.by}</b> <span className="text-sub">{fmtDate(c.at)} {String(c.at).slice(11, 16)} · {timeAgo(toDate(c.at))}</span>
       </div>
-      {parent && <div className="mt-1 truncate border-s-2 border-line-strong ps-2 text-xs text-sub"><Reply size={11} className="inline" /> {parent.by}: {String(parent.body).slice(0, 120)}</div>}
-      <div className={cx('mt-1 whitespace-pre-wrap rounded-2xl rounded-ss-md px-4 py-2 text-sm leading-7', mine ? 'bg-ink/[0.06]' : 'bg-muted')}>{String(c.body ?? '') || <span className="text-sub">{L('(بدون متن)', '(no text)')}</span>}</div>
+      {parent && <div className="mt-1 min-w-0 truncate border-s-2 border-line-strong ps-2 text-xs text-sub"><Reply size={11} className="inline" /> {parent.by}: {String(parent.body).slice(0, 120)}</div>}
+      <div className={cx('mt-1 whitespace-pre-wrap rounded-2xl rounded-ss-md px-4 py-2 text-sm leading-7 [overflow-wrap:anywhere]', mine ? 'bg-ink/[0.06]' : 'bg-muted')}>{String(c.body ?? '') ? <Linked text={String(c.body)} /> : <span className="text-sub">{L('(بدون متن)', '(no text)')}</span>}</div>
       {(tagged.length > 0 || files.length > 0) && (
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[0.6875rem] text-sub">
           {tagged.map((n) => <span key={n} className={cx('rounded-full px-1.5', ours.includes(n) ? 'bg-brand/10 font-medium text-brand' : 'bg-muted')}>@{n}</span>)}
@@ -336,8 +368,13 @@ export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }
     const ms = mentionsOf(db, m.id).filter((x) => !(x.mz_comment && said.has(`MC-${x.mz_comment}`))).map((x) => ({ kind: 'm' as const, at: x.at, x }))
     const hs = historyOf(db, 'Mizito', m.id).filter((h) => h.field !== '_created').map((h) => ({ kind: 'h' as const, at: h.at, h }))
     const cms = cs.map((c) => ({ kind: 'c' as const, at: c.at, c }))
-    return [...ms, ...hs, ...cms].sort((a, b) => (a.at < b.at ? -1 : 1))
+    // newest first
+    return [...ms, ...hs, ...cms].sort((a, b) => (a.at < b.at ? 1 : -1))
   }, [db, m])
+  // opening it counts as having seen its latest change in Mizito
+  useEffect(() => {
+    if (m) markSeen(m)
+  }, [m?.id, m?.mz_changed_at]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!m) return null
   const s = mzSignals(db, m)
   const c = mzCfg()
@@ -406,6 +443,7 @@ export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }
             />
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
+            <MzBadges m={m} />
             <MzStatusChip id={m.status} />
             <MzSignals m={m} />
             <MzLink m={m} />
@@ -417,6 +455,13 @@ export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }
             {L(...P_HINT[s.p])}
           </div>
 
+          {m.mz_change && recentlyChanged(m) && (
+            <div className="mt-4 flex items-start gap-2 rounded-2xl bg-muted px-3 py-2 text-xs leading-6">
+              <Bot size={15} className="mt-0.5 shrink-0 text-brand" />
+              <span className="min-w-0 flex-1 [overflow-wrap:anywhere]"><b className="font-medium">{L('تازه در میزیتو:', 'New in Mizito:')}</b> {m.mz_change}</span>
+              <span className="shrink-0 text-sub">{timeAgo(toDate(String(m.mz_changed_at)))}</span>
+            </div>
+          )}
           {canEdit && mzFlags(m).fresh && (
             <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-brand/20 bg-brand-soft/30 px-3 py-2 text-xs">
               <Bot size={15} className="text-brand" />
@@ -499,37 +544,8 @@ export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }
               <AtSign size={13} /> {commentsOf(db, m.id).length ? L('گفتگو در میزیتو، منشن‌ها و تغییرات', 'Mizito conversation, mentions & changes') : L('ترد منشن‌ها و تغییرات', 'Mentions & changes')}
               {m.synced_at && <span className="font-normal normal-case text-sub">· {L(`خوانده‌شده ${timeAgo(toDate(m.synced_at))}`, `read ${timeAgo(toDate(m.synced_at))}`)}</span>}
             </div>
-            {!allThread && thread.length > 25 && (
-              <button className="mb-3 text-xs text-brand hover:underline" onClick={() => setAllThread(true)}>{L(`نمایش ${fa(thread.length - 25)} مورد قدیمی‌تر`, `Show ${thread.length - 25} older`)}</button>
-            )}
-            <ol className="relative space-y-4 border-s border-line ps-6">
-              <li className="relative">
-                <span className="absolute -start-[37px] top-0"><Avatar name={m.asked_by || '?'} size="sm" ring /></span>
-                <div className="text-sm"><b className="font-medium">{m.asked_by || L('نامشخص', 'Unknown')}</b> <span className="text-sub">{L('مطرح کرد / منشن کرد', 'raised it')} · {fmtDate(m.received_at)} {m.received_at.slice(11, 16)}</span></div>
-                {m.notes && <div className="mt-1 whitespace-pre-wrap rounded-2xl rounded-ss-md bg-muted px-4 py-2 text-sm leading-7">{m.notes}</div>}
-              </li>
-              {(allThread ? thread : thread.slice(-25)).map((t) =>
-                t.kind === 'c' ? (
-                  <MzCommentLine key={t.c.id} c={t.c} m={m} all={commentsOf(db, m.id)} />
-                ) : t.kind === 'm' ? (
-                  <li key={t.x.id} className="relative">
-                    <span className="absolute -start-[37px] top-0"><Avatar name={t.x.by || '?'} size="sm" ring /></span>
-                    <div className="text-sm">
-                      <b className="font-medium">{t.x.by}</b> <span className="text-sub">{t.x.account ? L(`${t.x.account} را منشن کرد`, `mentioned ${t.x.account}`) : L('دوباره منشن کرد', 'mentioned again')} · {fmtDate(t.x.at)} {t.x.at.slice(11, 16)} · {timeAgo(toDate(t.x.at))}</span>
-                      {t.x.status && <span className="ms-2"><MzStatusChip id={t.x.status} /></span>}
-                    </div>
-                    {t.x.note && <div className="mt-1 whitespace-pre-wrap rounded-2xl rounded-ss-md bg-brand-soft/40 px-4 py-2 text-sm leading-7">{t.x.note}</div>}
-                  </li>
-                ) : (
-                  <li key={t.h.id} className="relative text-xs text-sub">
-                    <span className="absolute -start-[31px] top-1 h-2 w-2 rounded-full bg-line-strong" />
-                    <b className="font-medium text-ink">{t.h.by}</b> {historyText(t.h, () => '')} · {timeAgo(toDate(t.h.at))}
-                  </li>
-                ),
-              )}
-            </ol>
             {canEdit && (
-              <div className="mt-5 rounded-2xl border border-line bg-surface p-3">
+              <div className="mb-5 rounded-2xl border border-line bg-surface p-3">
                 <div className="flex flex-wrap gap-2">
                   <input list="mz-people2" value={by} onChange={(e) => setBy(e.target.value)} placeholder={L(`چه کسی؟ (${m.asked_by || ''})`, `Who? (${m.asked_by || ''})`)} className="input h-9 w-48 text-xs" />
                   <datalist id="mz-people2">{allPeople(db).map((p) => <option key={p} value={p} />)}</datalist>
@@ -540,6 +556,39 @@ export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }
                   </button>
                 </div>
               </div>
+            )}
+            <ol className="relative space-y-4 border-s border-line ps-6">
+              {(allThread ? thread : thread.slice(0, 25)).map((t) =>
+                t.kind === 'c' ? (
+                  <MzCommentLine key={t.c.id} c={t.c} m={m} all={commentsOf(db, m.id)} />
+                ) : t.kind === 'm' ? (
+                  <li key={t.x.id} className="relative">
+                    <span className="absolute -start-[37px] top-0"><Avatar name={t.x.by || '?'} size="sm" ring /></span>
+                    <div className="text-sm">
+                      <b className="font-medium">{t.x.by}</b> <span className="text-sub">{t.x.account ? L(`${t.x.account} را منشن کرد`, `mentioned ${t.x.account}`) : L('دوباره منشن کرد', 'mentioned again')} · {fmtDate(t.x.at)} {t.x.at.slice(11, 16)} · {timeAgo(toDate(t.x.at))}</span>
+                      {t.x.status && <span className="ms-2"><MzStatusChip id={t.x.status} /></span>}
+                    </div>
+                    {t.x.note && <div className="mt-1 whitespace-pre-wrap rounded-2xl rounded-ss-md bg-brand-soft/40 px-4 py-2 text-sm leading-7 [overflow-wrap:anywhere]"><Linked text={t.x.note} /></div>}
+                  </li>
+                ) : (
+                  <li key={t.h.id} className="relative text-xs text-sub">
+                    <span className="absolute -start-[31px] top-1 h-2 w-2 rounded-full bg-line-strong" />
+                    <b className="font-medium text-ink">{t.h.by}</b> {historyText(t.h, () => '')} · {timeAgo(toDate(t.h.at))}
+                  </li>
+                ),
+              )}
+              {(allThread || thread.length <= 25) && (
+                <>
+                  <li className="relative">
+                    <span className="absolute -start-[37px] top-0"><Avatar name={m.asked_by || '?'} size="sm" ring /></span>
+                    <div className="text-sm"><b className="font-medium">{m.asked_by || L('نامشخص', 'Unknown')}</b> <span className="text-sub">{L('مطرح کرد / منشن کرد', 'raised it')} · {fmtDate(m.received_at)} {m.received_at.slice(11, 16)}</span></div>
+                    {m.notes && <div className="mt-1 whitespace-pre-wrap rounded-2xl rounded-ss-md bg-muted px-4 py-2 text-sm leading-7 [overflow-wrap:anywhere]"><Linked text={m.notes} /></div>}
+                  </li>
+                </>
+              )}
+            </ol>
+            {!allThread && thread.length > 25 && (
+              <button className="mt-3 text-xs text-brand hover:underline" onClick={() => setAllThread(true)}>{L(`نمایش ${fa(thread.length - 25)} مورد قدیمی‌تر`, `Show ${thread.length - 25} older`)}</button>
             )}
           </div>
         </div>
@@ -617,6 +666,7 @@ export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }
               <button className="btn-outline btn-sm w-full" onClick={() => open('FollowUps', { person: m.assigned_to || m.asked_by, subject: L(`میزیتو: ${m.title}`, `Mizito: ${m.title}`), notes: m.link, priority: s.p <= 1 ? 'high' : 'medium' })}>
                 <Plus size={14} /> {L('ساخت پیگیری', 'Create a follow-up')}
               </button>
+              <CartableButton className="mt-2 w-full" source={{ entity: 'Mizito', entity_id: m.id, title: m.title }} />
             </div>
           )}
         </aside>
@@ -771,6 +821,10 @@ export function MizitoSettings({ admin }: { admin: boolean }) {
           <label className="block">
             <span className="label">{L('آدرس میزیتو', 'Mizito address')}</span>
             <input dir="ltr" key={c.base} defaultValue={c.base} onBlur={(e) => e.target.value.trim() && e.target.value.trim() !== c.base && setSetting(MZ_KEYS.base, e.target.value.trim())} className="input h-9 w-full text-xs" />
+          </label>
+          <label className="block">
+            <span className="label">{L('پروژه‌های کلیدی میزیتو (بج روی تسک‌ها؛ با کاما جدا کنید)', 'Key Mizito projects (badge on their tasks; comma separated)')}</span>
+            <input key={c.keyProjects.join(',')} defaultValue={c.keyProjects.join('، ')} onBlur={(e) => setSetting(MZ_KEYS.keyProjects, JSON.stringify(e.target.value.split(/[,،]/).map((x) => x.trim()).filter(Boolean)))} className="input h-9 w-full text-xs" />
           </label>
           <OptionList kind="status" title={L('وضعیت‌ها (و معنی هرکدام)', 'Statuses (and what each means)')} items={c.statuses} onSave={(n) => setSetting(MZ_KEYS.statuses, JSON.stringify(n))} />
           <OptionList kind="plain" title={L('دسته‌ها', 'Categories')} items={c.categories} onSave={(n) => setSetting(MZ_KEYS.categories, JSON.stringify(n))} />

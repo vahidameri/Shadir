@@ -18,7 +18,7 @@
  *   viewer — read only (leadership)
  */
 
-var MADAR_VERSION = '1.6.0'; // shown on the login page and by diagnose()
+var MADAR_VERSION = '1.7.0'; // shown on the login page and by diagnose()
 
 var SCHEMA = {
   Projects: ['id', 'code', 'name', 'description', 'category', 'owner', 'client', 'liaison', 'liaison_contact', 'status', 'priority', 'phase', 'start_date', 'end_date', 'progress', 'health_override', 'objective', 'paused_at', 'pause_reason', 'delivery_day', 'last_delivery', 'archived', 'archived_at', 'links', 'team', 'kind', 'batch'],
@@ -65,11 +65,16 @@ var SCHEMA = {
   // source = agent when the Mizito agent brought it; review = new (waiting for a look) | ignored.
   // mz_* columns mirror the task in Mizito and are written by the agent only.
   Mizito: ['id', 'mz_key', 'link', 'title', 'description', 'docs', 'asked_by', 'mentioned', 'category', 'action', 'status', 'priority_override', 'override_reason', 'urgent', 'assigned_to', 'due_date', 'received_at', 'last_mention_at', 'last_mention_by', 'outcome', 'notes', 'created_at', 'updated_at', 'closed_at', 'ext_id', 'batch',
-    'source', 'review', 'mz_state', 'mz_done_at', 'mz_done_by', 'mz_progress', 'mz_project', 'mz_owner', 'mz_assignees', 'mz_labels', 'mz_checklist', 'mz_deadline', 'mz_last_by', 'mz_last_at', 'mz_sig', 'synced_at'],
+    'source', 'review', 'mz_state', 'mz_done_at', 'mz_done_by', 'mz_progress', 'mz_project', 'mz_owner', 'mz_assignees', 'mz_labels', 'mz_checklist', 'mz_deadline', 'mz_last_by', 'mz_last_at', 'mz_sig', 'synced_at', 'mz_change', 'mz_changed_at'],
   // account = whose Mizito the agent read it in; mz_id = the mention's id there, mz_comment = the comment that mentioned
   MizitoMentions: ['id', 'item_id', 'by', 'at', 'note', 'status', 'batch', 'mz_id', 'account', 'mz_comment'],
   // the conversation on a Mizito task, as the agent read it (one row per Mizito comment)
   MizitoComments: ['id', 'item_id', 'by', 'at', 'body', 'mentions', 'reply_to', 'files', 'batch'],
+  // the cartable: items the PgM puts in front of the CPTO (or either for themselves) to act on.
+  // box = daily | weekly; period = the day, or the week's first day; status = draft | sent | done | returned
+  Cartable: ['id', 'owner', 'box', 'period', 'from', 'entity', 'entity_id', 'title', 'ask', 'kind', 'priority', 'due_date', 'status', 'response', 'sent_at', 'done_at', 'sort', 'created_at', 'batch'],
+  // a person's own to-do notes on their desk (nobody else receives them)
+  Todos: ['id', 'owner', 'text', 'done', 'day', 'created_at', 'sort', 'batch'],
   // quarterly OKRs per team: objectives, and key results under them (kind: number | percent | done)
   Objectives: ['id', 'team', 'quarter', 'title', 'description', 'owner', 'sort', 'batch'],
   // weight = share of the team's quarter (a team's key results add up to 100); mizito_link = where it is discussed
@@ -85,7 +90,7 @@ var SCHEMA = {
 var USERS_SHEET = 'Users';
 var USERS_HEADERS = ['key', 'name', 'email', 'role', 'active'];
 var LOG_SHEET = 'AuditLog';
-var DATE_COLS = ['start_date', 'end_date', 'planned_date', 'actual_date', 'due_date', 'created_at', 'completed_at', 'done_at', 'week_date', 'date', 'target_date', 'baseline_date', 'delivered_date', 'time', 'deadline', 'handoff_date', 'test_date', 'follow_date', 'last_delivery', 'archived_at', 'sent_at', 'responded_at', 'week', 'assigned_at', 'blocked_since', 'updated_at', 'received_at', 'last_mention_at', 'closed_at', 'at', 'last_ping', 'started_at', 'baseline_end', 'mz_done_at', 'mz_deadline', 'mz_last_at', 'synced_at'];
+var DATE_COLS = ['start_date', 'end_date', 'planned_date', 'actual_date', 'due_date', 'created_at', 'completed_at', 'done_at', 'week_date', 'date', 'target_date', 'baseline_date', 'delivered_date', 'time', 'deadline', 'handoff_date', 'test_date', 'follow_date', 'last_delivery', 'archived_at', 'sent_at', 'responded_at', 'week', 'assigned_at', 'blocked_since', 'updated_at', 'received_at', 'last_mention_at', 'closed_at', 'at', 'last_ping', 'started_at', 'baseline_end', 'mz_done_at', 'mz_deadline', 'mz_last_at', 'synced_at', 'mz_changed_at', 'period', 'sent_at'];
 
 // --------------------------------------------------------------------------
 // HTTP entry points
@@ -147,6 +152,7 @@ function doPost(e) {
     else if (body.action === 'readSheet') result = readOtherSheet_(body.url, body.tab, user);
     else if (body.action === 'mailTask') result = mailTask_(body.id, user);
     else if (body.action === 'mailMinutes') result = mailMinutes_(body.meeting_id, user);
+    else if (body.action === 'mailCartable') result = mailCartable_(body.owner, body.box, body.period, user);
     else if (body.action === 'syncMeeting') result = syncMeeting_(body.meeting_id, user);
     else {
       if (!SCHEMA[body.sheet]) throw new Error('Unknown sheet: ' + body.sheet);
@@ -500,6 +506,9 @@ function applyPrivacy_(data, user) {
   });
   data.Comments = (data.Comments || []).filter(function (c) { return !(c.entity === 'Tasks' && hidden[c.entity_id]); });
   data.Files = (data.Files || []).filter(function (f) { return !(f.entity === 'Tasks' && hidden[f.entity_id]); });
+  // to-do notes are personal; a cartable draft is seen only by whoever is writing it
+  data.Todos = (data.Todos || []).filter(function (t) { return t.owner === user.name; });
+  data.Cartable = (data.Cartable || []).filter(function (c) { return c.status !== 'draft' || c.from === user.name; });
   var out = applyScope_(data, user, owners);
   // the log of a task or follow-up travels only with the row itself
   var seen = { Tasks: {}, FollowUps: {}, Mizito: {}, KeyResults: {}, Kpis: {}, Plans: {} };
@@ -527,6 +536,7 @@ function applyScope_(data, user, owners) {
     data.Mizito = [];
     data.MizitoMentions = [];
     data.MizitoComments = [];
+    data.Cartable = [];
     data.Contacts = [];
     data.Contracts = [];
     data.Files = data.Files.filter(function (f) { return f.entity !== 'Contracts' && f.entity !== 'Mizito'; });
@@ -582,7 +592,11 @@ function guardWrite_(sheet, row, user) {
   var a = user.access || 'member';
   if (sheet === 'Config' && a !== 'super') throw new Error('فقط مدیر برنامه می‌تواند تنظیمات را تغییر دهد');
   if (sheet === 'Contracts' && a !== 'super' && a !== 'exec') throw new Error('دسترسی به قراردادها ندارید');
-  if ((sheet === 'Mizito' || sheet === 'MizitoMentions' || sheet === 'MizitoComments' || sheet === 'Contacts') && a !== 'super' && a !== 'exec') throw new Error('این بخش فقط برای CPTO و مدیر برنامه است');
+  if ((sheet === 'Mizito' || sheet === 'MizitoMentions' || sheet === 'MizitoComments' || sheet === 'Contacts' || sheet === 'Cartable') && a !== 'super' && a !== 'exec') throw new Error('این بخش فقط برای CPTO و مدیر برنامه است');
+  if (sheet === 'Todos') {
+    var mine = existingRow_('Todos', row && row.id);
+    if ((mine && mine.owner !== user.name) || (row && row.owner && row.owner !== user.name)) throw new Error('یادداشت‌های هر کس فقط برای خودش است');
+  }
   if (sheet === 'Team' && a !== 'super') {
     // anyone may update their own photo / phone; only the program manager manages people
     var cur = rawAll_().Team.filter(function (m) { return String(m.id) === String(row.id); })[0];
@@ -863,7 +877,7 @@ function historyRows_(rows, user) {
   // values are written as text so Sheets doesn't turn "1405" or "2026-10-19" into numbers or dates
   var t = function (v) { return v === '' ? '' : "'" + v; };
   var vals = rows.map(function (r, i) {
-    return ['H' + Date.now().toString(36) + i, r.entity, r.entity_id, r.field, t(r.from), t(r.to), user.name, "'" + at];
+    return ['H' + Date.now().toString(36) + i, r.entity, r.entity_id, r.field, t(r.from), t(r.to), r.by || user.name, "'" + at];
   });
   sh.getRange(sh.getLastRow() + 1, 1, vals.length, SCHEMA.History.length).setValues(vals);
   bumpVersion_();
@@ -1680,8 +1694,11 @@ function mzHello_(agent) {
   // a task counts as known to this agent only once it carries this person's name (the other person's
   // agent may have brought it), so a shared task is sent again and gets both names
   (rawAll_().Mizito || []).forEach(function (m) { if (m.mz_key) known[String(m.mz_key)] = names_(m.mentioned).indexOf(agent.name) !== -1 && m.mz_state !== 'gone' ? String(m.mz_sig || '') : ''; });
+  var mids = [];
+  (rawAll_().MizitoMentions || []).forEach(function (x) { if (x.mz_id && x.account === agent.name) mids.push(String(x.mz_id)); });
+  (rawAll_().Mizito || []).forEach(function (m) { if (m.ext_id && names_(m.mentioned).indexOf(agent.name) !== -1) mids.push(String(m.ext_id)); });
   var st = mzStatus_(agent.name);
-  return { account: agent.name, cutoff: setting_('mz.agent.cutoff', MZ_CUTOFF), last: st.done_at || '', known: known, version: MADAR_VERSION };
+  return { mentions: mids, account: agent.name, cutoff: setting_('mz.agent.cutoff', MZ_CUTOFF), last: st.done_at || '', known: known, version: MADAR_VERSION };
 }
 
 function mzStatusList_() {
@@ -1750,6 +1767,7 @@ function mzIngest_(body, agent) {
       made++;
     }
     if (!listed(m.mentioned, agent.name)) m.mentioned = names_(m.mentioned).concat([agent.name]).join(', ');
+    var newComments = [], freshMentions = [], changes = [], actor = '';
 
     if (t.title) {
       // the snapshot: Mizito's own facts about the task
@@ -1762,7 +1780,30 @@ function mzIngest_(body, agent) {
       }
       if (!m.title) m.title = long(t.title, 300);
       if (!m.description && t.notes) m.description = long(t.notes);
-      if (!m.link && t.link) m.link = t.link;
+      // the link follows Mizito's own (an early agent wrote one Mizito can't open: …/inbox/<task>)
+      if (t.link && (!m.link || /\/inbox\/[0-9a-f]{24}$/.test(String(m.link)))) m.link = t.link;
+      // what changed in Mizito since the last read, so the people it was brought for notice
+      var synced = cur && cur.mz_state;
+      if (synced) {
+        var ticks = function (x) { return (String(x || '').match(/✓/g) || []).length; };
+        var nextChecklist = (t.checklist || []).map(function (c) { return (c.ok ? '✓ ' : '○ ') + c.t; }).join('\n');
+        if (!!t.completed !== (cur.mz_state === 'done')) {
+          actor = t.completed ? t.completed_by || '' : '';
+          changes.push(t.completed ? 'در میزیتو انجام شد' + (actor ? ' (' + actor + ')' : '') : 'در میزیتو دوباره باز شد');
+          hist.push({ entity: 'Mizito', entity_id: m.id, field: 'mz_state', from: clip_(cur.mz_state), to: t.completed ? 'done' : 'open', by: actor || MZ_AGENT.name });
+        }
+        if (String(t.progress === undefined || t.progress === null ? '' : t.progress) !== String(cur.mz_progress) && !t.completed) {
+          changes.push('پیشرفت ' + (cur.mz_progress || 0) + '٪ ← ' + (t.progress || 0) + '٪');
+          hist.push({ entity: 'Mizito', entity_id: m.id, field: 'mz_progress', from: clip_(cur.mz_progress), to: clip_(t.progress), by: MZ_AGENT.name });
+        }
+        if (dl !== String(cur.mz_deadline || '')) {
+          changes.push(dl ? 'مهلت در میزیتو تغییر کرد' : 'مهلت در میزیتو برداشته شد');
+          hist.push({ entity: 'Mizito', entity_id: m.id, field: 'mz_deadline', from: clip_(cur.mz_deadline), to: dl, by: MZ_AGENT.name });
+        }
+        var ticked = ticks(nextChecklist) - ticks(cur.mz_checklist);
+        if (ticked > 0) changes.push(ticked + ' مورد چک‌لیست تیک خورد');
+        if ((t.assignees || []).join(', ') !== String(cur.mz_assignees || '')) changes.push('مسئولان تغییر کرد');
+      }
       m.mz_project = t.project || '';
       m.mz_owner = t.owner || '';
       m.mz_assignees = (t.assignees || []).join(', ');
@@ -1804,6 +1845,7 @@ function mzIngest_(body, agent) {
       if (mentionIds[id] || id === String(m.ext_id || '')) return;
       mentionIds[id] = 1;
       var at = ts(x.at);
+      if (cur && cur.mz_state && freshMentions.indexOf(x.by) === -1) freshMentions.push(x.by || '');
       mentions.push({ id: 'MM-' + id, item_id: m.id, by: x.by || '', at: at, note: '', status: '', mz_id: id, account: agent.name, mz_comment: x.comment || '' });
       if (at > String(m.last_mention_at || '')) { m.last_mention_at = at; m.last_mention_by = x.by || ''; }
       if (at < String(m.received_at || '9999')) m.received_at = at;
@@ -1814,10 +1856,22 @@ function mzIngest_(body, agent) {
       var row = { id: 'MC-' + c.id, item_id: m.id, by: c.by || '', at: ts(c.at), body: long(c.body), mentions: (c.mentions || []).join(', '), reply_to: c.reply_to ? 'MC-' + c.reply_to : '', files: long((c.files || []).join('\n'), 1000) };
       var old = comments[row.id];
       if (old && String(old.body) === row.body && String(old.files || '') === row.files && String(old.mentions || '') === row.mentions) return;
+      if (!old && cur && cur.mz_state) newComments.push(row);
       comments[row.id] = row;
       notes.push(row);
     });
 
+    if (newComments.length) {
+      var who = [];
+      newComments.forEach(function (c) { if (who.indexOf(c.by) === -1) who.push(c.by); });
+      changes.push(who.join('، ') + (newComments.length > 1 ? ' ' + newComments.length + ' کامنت گذاشتند' : ' کامنت گذاشت'));
+    }
+    if (freshMentions.length) changes.push(freshMentions.join('، ') + ' منشن کرد');
+    if (changes.length) {
+      var last = newComments.reduce(function (a, c) { return c.at > a ? c.at : a; }, '');
+      m.mz_change = long(changes.join(' · '), 300);
+      m.mz_changed_at = last && last > String(cur && cur.mz_changed_at || '') ? last : now;
+    }
     m.synced_at = now;
     if (cur && !items[key]) updated++;
     items[key] = m;
@@ -1864,7 +1918,7 @@ function mzIngest_(body, agent) {
   return { made: made, updated: updated, mentions: mentions.length, comments: notes.length, gone: gone };
 }
 
-var MZ_AGENT_FIELDS = ['mz_state', 'mz_done_at', 'mz_done_by', 'mz_progress', 'mz_project', 'mz_owner', 'mz_assignees', 'mz_labels', 'mz_checklist', 'mz_deadline', 'mz_last_by', 'mz_last_at', 'synced_at', 'last_mention_at', 'last_mention_by', 'received_at', 'mentioned'];
+var MZ_AGENT_FIELDS = ['mz_state', 'mz_done_at', 'mz_done_by', 'mz_progress', 'mz_project', 'mz_owner', 'mz_assignees', 'mz_labels', 'mz_checklist', 'mz_deadline', 'mz_last_by', 'mz_last_at', 'synced_at', 'mz_change', 'mz_changed_at', 'last_mention_at', 'last_mention_by', 'received_at', 'mentioned'];
 /**
  * A save from a page that loaded before the agent's last read must not take the agent's newer facts
  * back: those fields keep the sheet's values, and the task is read in full again (sig cleared) so
@@ -1877,4 +1931,21 @@ function mzKeepAgentFields_(before, row) {
   MZ_AGENT_FIELDS.forEach(function (f) { if (f in before) out[f] = before[f]; });
   out.mz_sig = '';
   return out;
+}
+
+/** Emails a person their cartable once it is sent (what to act on, with the link to the app). */
+function mailCartable_(owner, box, period, user) {
+  if (user.access !== 'super' && user.access !== 'exec') throw new Error('دسترسی ندارید');
+  var data = rawAll_();
+  var m = (data.Team || []).filter(function (x) { return x.name === owner; })[0];
+  if (!m || !m.email) return { sent: false, reason: 'ایمیلی برای ' + owner + ' ثبت نشده' };
+  var items = (data.Cartable || []).filter(function (c) { return c.owner === owner && c.box === box && c.status === 'sent'; });
+  if (!items.length) return { sent: false, reason: 'موردی در کارتابل نیست' };
+  var kinds = { approve: 'تأیید', decide: 'تصمیم', reply: 'پاسخ', review: 'بررسی', sign: 'امضا', info: 'جهت اطلاع' };
+  var rows = items.map(function (c) {
+    return '<li style="margin:6px 0"><b>' + esc_(c.title) + '</b>' + (c.kind ? ' — ' + (kinds[c.kind] || c.kind) : '') + (c.due_date ? ' · مهلت ' + esc_(c.due_date) : '') + (c.ask ? '<br><span style="color:#555">' + esc_(c.ask) + '</span>' : '') + '</li>';
+  }).join('');
+  var title = (box === 'weekly' ? 'کارتابل آخر هفته' : 'کارتابل امروز') + ' — ' + items.length + ' مورد';
+  MailApp.sendEmail({ to: m.email, subject: 'مدار: ' + title, htmlBody: mailBox_('<h3 style="margin:0 0 8px">' + esc_(title) + '</h3>', '<p>' + esc_(user.name) + ' این موارد را برای اقدام شما فرستاده است:</p><ul style="padding-inline-start:18px">' + rows + '</ul>') });
+  return { sent: true, count: items.length };
 }

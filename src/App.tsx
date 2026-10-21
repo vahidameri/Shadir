@@ -12,6 +12,7 @@ import Projects from './pages/Projects'
 import ProjectDetail from './pages/ProjectDetail'
 import Tasks from './pages/Tasks'
 import MizitoPage from './pages/Mizito'
+import CartablePage from './pages/Cartable'
 import Teams from './pages/Teams'
 import Overview from './pages/Overview'
 import OkrPage from './pages/Okr'
@@ -32,7 +33,7 @@ import { MadarLoader } from './components/Brand'
 import { usePref } from './lib/prefs'
 
 /** Department-wide pages are for the PgM and the CPTO; everyone lands on their own desk. */
-function Only({ rule, children }: { rule: 'portfolio' | 'backoffice' | 'contracts' | 'mizito'; children: React.ReactNode }) {
+function Only({ rule, children }: { rule: 'portfolio' | 'backoffice' | 'contracts' | 'mizito' | 'cartable'; children: React.ReactNode }) {
   const { access } = useStore()
   return can[rule](access) ? <>{children}</> : <Navigate to="/my" replace />
 }
@@ -110,6 +111,7 @@ export default function App() {
                 <Route path="/tasks" element={<Tasks />} />
                 <Route path="/followups" element={<FollowUps />} />
                 <Route path="/mizito" element={<Only rule="mizito"><MizitoPage /></Only>} />
+                <Route path="/cartable" element={<Only rule="cartable"><CartablePage /></Only>} />
                 <Route path="/meetings" element={<Weekly />} />
                 <Route path="/weekly" element={<Navigate to="/meetings" replace />} />
                 <Route path="/calendar" element={<CalendarPage />} />

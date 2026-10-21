@@ -7,13 +7,13 @@ import { useStore } from '../lib/store'
 import { Band, Card, Empty, FilterSelect, Overlap, SearchInput, Segmented, Sheet, StatStrip, cx } from '../components/ui'
 import { L } from '../lib/i18n'
 import { fa, fmtDate, timeAgo } from '../lib/jalali'
-import { MZ_KEYS, MZ_VIEWS, agentRun, firstMzStatus, inMzView, isMizitoLink, mzCat, mzCfg, mzFlags, mzSignals, optLabel, statusById, tierById, type MzView } from '../lib/mizito'
+import { MZ_KEYS, MZ_VIEWS, agentRun, changeUnseen, firstMzStatus, recentlyChanged, inMzView, isMizitoLink, mzCat, mzCfg, mzFlags, mzSignals, optLabel, statusById, tierById, type MzView } from '../lib/mizito'
 import { daysFromToday } from '../lib/jalali'
-import { CaptureSheet, MizitoSettings, MizitoSheet, MzLink, MzSignals, MzStatusChip, PBadge, useReminder } from '../components/MizitoParts'
+import { CaptureSheet, MzBadges, MizitoSettings, MizitoSheet, MzLink, MzSignals, MzStatusChip, PBadge, useReminder } from '../components/MizitoParts'
 import type { MizitoItem } from '../lib/types'
 
 const VIEW_LABEL: Record<MzView, [string, string]> = {
-  queue: ['صف باز', 'Open queue'], inbox: ['تازه از میزیتو', 'New from Mizito'], p0: ['P0', 'P0'], exec: ['درخواست مدیران ارشد', 'Exec asks'], breached: ['عبور از SLA', 'SLA breached'],
+  queue: ['صف باز', 'Open queue'], inbox: ['تازه از میزیتو', 'New from Mizito'], changed: ['تغییر در میزیتو', 'Changed in Mizito'], p0: ['P0', 'P0'], exec: ['درخواست مدیران ارشد', 'Exec asks'], breached: ['عبور از SLA', 'SLA breached'],
   waiting: ['منتظر / مسدود', 'Waiting / blocked'], stale: ['راکد', 'Quiet'], mine_cpto: ['', ''], mine_pgm: ['', ''], closed: ['بسته‌شده', 'Closed'], all: ['همه', 'All'],
 }
 type Group = '' | 'asker' | 'category' | 'p' | 'status' | 'assigned'
@@ -67,6 +67,8 @@ export default function MizitoPage() {
       const x = sig.get(a.id)!
       const y = sig.get(b.id)!
       const last = (m: MizitoItem) => m.last_mention_at || m.received_at || m.created_at || ''
+      // what changed in Mizito: newest change first
+      if (view === 'changed') return String(a.mz_changed_at || '') < String(b.mz_changed_at || '') ? 1 : -1
       if (sort === 'recent') return last(a) < last(b) ? 1 : -1
       if (sort === 'old') return (a.received_at || a.created_at) < (b.received_at || b.created_at) ? -1 : 1
       if (sort === 'due') return (a.due_date || '9999') < (b.due_date || '9999') ? -1 : a.due_date === b.due_date ? x.p - y.p : 1
@@ -236,6 +238,7 @@ export default function MizitoPage() {
                         <PBadge p={s.p} />
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
+                            <MzBadges m={m} />
                             {mzFlags(m).fresh && <span className="rounded-full bg-brand px-1.5 text-[0.625rem] font-medium leading-5 text-white">{L('تازه', 'New')}</span>}
                             <span className="font-medium">{m.title}</span>
                             {canEdit ? (
@@ -268,6 +271,14 @@ export default function MizitoPage() {
                             {m.assigned_to && <span>· {L('سپرده به', 'with')} {m.assigned_to}</span>}
                           </div>
                           <div className="mt-1.5"><MzSignals m={m} compact /></div>
+                          {m.mz_change && recentlyChanged(m) && (
+                            <div className={cx('mt-1.5 flex items-center gap-1.5 text-xs', changeUnseen(m) ? 'font-medium text-ink' : 'text-sub')}>
+                              {changeUnseen(m) && <span className="h-2 w-2 shrink-0 rounded-full bg-brand" title={L('تغییر تازه‌ای که هنوز ندیده‌اید', 'A change you have not seen')} />}
+                              <Bot size={12} className="shrink-0 text-sub" />
+                              <span className="min-w-0 truncate">{m.mz_change}</span>
+                              <span className="shrink-0 text-sub">· {timeAgo(new Date(String(m.mz_changed_at).replace(' ', 'T')))}</span>
+                            </div>
+                          )}
                           {m.outcome && <div className="mt-1 truncate text-xs text-sub">↳ {m.outcome}</div>}
                         </div>
                         <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>

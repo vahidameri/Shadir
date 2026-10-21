@@ -430,6 +430,9 @@ export interface MizitoItem {
   mz_last_at?: string
   mz_sig?: string
   synced_at?: string
+  /** what last changed in Mizito (comments, done, progress…) and when */
+  mz_change?: string
+  mz_changed_at?: string
 }
 
 export interface MizitoMention {
@@ -539,6 +542,8 @@ export interface DB {
   Mizito: MizitoItem[]
   MizitoMentions: MizitoMention[]
   MizitoComments: MizitoComment[]
+  Cartable: CartableItem[]
+  Todos: Todo[]
   Objectives: Objective[]
   KeyResults: KeyResult[]
   Kpis: Kpi[]
@@ -644,3 +649,46 @@ export type SheetName = keyof DB
 export type Row<S extends SheetName> = DB[S][number]
 
 export type Role = 'admin' | 'editor' | 'viewer'
+
+export type CartableBox = 'daily' | 'weekly'
+export type CartableStatus = 'draft' | 'sent' | 'done' | 'returned'
+/** One item put in front of someone (the CPTO, or the PgM) to act on: from a Mizito item, a task, a follow-up, or free text. */
+export interface CartableItem {
+  id: string
+  /** whose cartable */
+  owner: string
+  box: CartableBox
+  /** the day (daily) or the first day of the week (weekly) */
+  period: string
+  from: string
+  entity: '' | 'Mizito' | 'Tasks' | 'FollowUps'
+  entity_id: string
+  title: string
+  /** what is asked of them */
+  ask: string
+  /** approve | decide | reply | review | sign | info */
+  kind: string
+  priority: string
+  due_date: string
+  status: CartableStatus
+  /** their answer when done or sent back */
+  response: string
+  sent_at: string
+  done_at: string
+  sort: number | string
+  created_at: string
+  batch?: string
+}
+
+/** A line of a person's own to-do notes on their desk. */
+export interface Todo {
+  id: string
+  owner: string
+  text: string
+  /** '1' when ticked */
+  done: string
+  day: string
+  created_at: string
+  sort: number | string
+  batch?: string
+}

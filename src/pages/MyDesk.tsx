@@ -1,6 +1,7 @@
 import { assigneesOf, isAssignee } from '../lib/assignees'
 import { mzClosed, mzSignals } from '../lib/mizito'
 import { MzSignals, PBadge } from '../components/MizitoParts'
+import { CartableCard, TodoCard } from '../components/DeskParts'
 import { AtSign } from 'lucide-react'
 import { signals, viewCounts } from '../lib/signals'
 import { closed, isBlocked } from '../lib/columns'
@@ -225,6 +226,11 @@ export default function MyDesk() {
             </div>
           </div>
         )}
+
+        <div className={cx('grid gap-4', can.cartable(access) && '@3xl:grid-cols-2')}>
+          <TodoCard />
+          <CartableCard />
+        </div>
 
         <div className="grid grid-cols-2 gap-3 @xl:grid-cols-4">
           <RhythmTile

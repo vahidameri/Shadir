@@ -1,4 +1,4 @@
-﻿مدار — راهنمای نصب از صفر (نسخه 1.6.0)
+﻿مدار — راهنمای نصب از صفر (نسخه 1.7.0)
 =======================================
 
 مدار روی گوگل اجرا می‌شود: داده در یک Google Sheet، برنامه در Apps Script همان شیت،
@@ -37,7 +37,7 @@
  5. Index.html: کنار «Files» روی + ← HTML ← نامش را دقیقاً Index بنویسید (بدون .html) ← Enter.
     داخلش Ctrl+A ← Delete ← کل محتوای Index.html را بچسبانید. (چسباندن چند ثانیه طول می‌کشد.)
  6. Ctrl+S. کنار هیچ فایلی نباید نقطه‌ی نارنجیِ «ذخیره‌نشده» بماند.
- ✔ چک: در Code.gs با Ctrl+F عبارت MADAR_VERSION را پیدا کنید ← باید '1.6.0' باشد.
+ ✔ چک: در Code.gs با Ctrl+F عبارت MADAR_VERSION را پیدا کنید ← باید '1.7.0' باشد.
 
 
 مرحله ۳ — اجرای setup
@@ -87,7 +87,7 @@
 مرحله ۷ — چک با diagnose
 ------------------------
  فهرست توابع ← diagnose ← ▷ Run ← پایین صفحه «Execution log» باید این‌ها را نشان دهد:
-   نسخه‌ی Code.gs = 1.6.0
+   نسخه‌ی Code.gs = 1.7.0
    API_URL = آدرس مرحله ۴
    GOOGLE_CLIENT_ID = یک مقدار …apps.googleusercontent.com
    GET  → 200 · {"ok":false,"error":"وارد نشده‌اید"}
@@ -100,7 +100,7 @@
 --------------------
  1. آدرس Madar Team را باز کنید (بهتر است در پنجره‌ی Incognito: Ctrl+Shift+N).
  2. ورود: نام کاربری vahid.ameri و رمز Madar@1405، یا «ورود با حساب گوگل».
- ✔ چک: پایین صفحه‌ی ورود نوشته باشد v1.6.0.
+ ✔ چک: پایین صفحه‌ی ورود نوشته باشد v1.7.0.
  3. بک‌آفیس ← تنظیمات ← کارت Google:
       • «لینک ورود با گوگل (Madar Google)» = آدرس مرحله ۶ ← ذخیره
       • «رمز عبور تیم» را عوض کنید.
@@ -201,7 +201,8 @@
 ---------------------------------------------
  1. Code.gs و Index.html (و اگر عوض شده appsscript.json) را مثل مرحله ۲ جایگزین کنید ← Ctrl+S.
  2. یک بار setup را Run کنید (تب‌ها و ستون‌های تازه ساخته می‌شوند؛ داده‌ها دست نمی‌خورند).
-    (از 1.5.0: setup تب MizitoComments و ستون‌های تازه‌ی Mizito و MizitoMentions را می‌سازد.)
+    (از 1.5.0 و 1.6.0: setup تب‌های MizitoComments، Cartable و Todos و ستون‌های تازه‌ی Mizito و MizitoMentions را می‌سازد.)
+    (از 1.6.0: افزونه را هم به‌روز کنید: chrome://extensions ← دکمه‌ی ⟳ روی «ایجنت میزیتوی مدار» بعد از جایگزینی پوشه‌ی mizito-agent.)
     (از نسخه‌های قبل: setup تب‌های Objectives، KeyResults، Checkins، Plans و Kpis و ستون‌های تازه (team و kind در Projects،
      kr_id در Tasks، quarter در Allocations) را می‌سازد؛ بعد نوع هر مورد را «محصول» یا «پروژه» تعیین کنید.)
  3. Deploy ← Manage deployments ← Madar Team ← ✏️ ← Version: New version ← Deploy.

@@ -1,5 +1,6 @@
 // Rich detail sheet for a task or follow-up: inline-editable properties, description, comments & activity.
 import { useMemo, useState } from 'react'
+import { CartableButton } from './CartableParts'
 import { copyFollowUp } from './shared'
 import { Copy } from 'lucide-react'
 import { catOf, closed, firstOf } from '../lib/columns'
@@ -99,6 +100,7 @@ export function ItemSheet({ sheet, id, onClose }: { sheet: 'Tasks' | 'FollowUps'
               {item.reporter && ` · ${item.reporter}`}
             </span>
             <div className="flex-1" />
+            <CartableButton source={{ entity: sheet, entity_id: id, title: isTask ? String((item as { title?: string }).title || '') : String((item as { subject?: string }).subject || '') }} />
             {isTask && can.portfolio(access) && mode === 'live' && (
               <button
                 className="btn-ghost btn-sm text-sub"
