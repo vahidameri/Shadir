@@ -25,7 +25,7 @@ var SCHEMA = {
   Scope: ['id', 'project_id', 'item', 'type', 'status', 'change_note', 'date'],
   Milestones: ['id', 'project_id', 'title', 'planned_date', 'actual_date', 'status', 'owner', 'weight'],
   // sprints belong to a team; committed_points is fixed when the sprint starts, completed_points when it closes
-  Sprints: ['id', 'project_id', 'name', 'start_date', 'end_date', 'goal', 'committed_points', 'completed_points', 'status', 'team', 'started_at', 'closed_at', 'retro', 'batch'],
+  Sprints: ['id', 'project_id', 'name', 'start_date', 'end_date', 'goal', 'committed_points', 'completed_points', 'status', 'team', 'started_at', 'closed_at', 'retro', 'carried', 'batch'],
   Tasks: ['id', 'project_id', 'sprint_id', 'title', 'description', 'assignee', 'reporter', 'status', 'priority', 'due_date', 'points', 'tags', 'created_at', 'completed_at', 'track', 'depends_on', 'meeting_id', 'private', 'deadline', 'handoff_date', 'test_date', 'follow_date', 'area', 'collaborators', 'watchers', 'notify', 'start_date', 'estimate', 'checklist', 'assigned_at', 'flag', 'blocked_reason', 'blocked_by', 'blocked_since', 'updated_at', 'link', 'requested_by', 'kr_id', 'issue_type', 'key', 'ext_id', 'batch'],
   // owner = who is chasing; follow-ups are personal
   FollowUps: ['id', 'project_id', 'subject', 'person', 'channel', 'due_date', 'status', 'priority', 'notes', 'created_at', 'done_at', 'owner', 'waiting_for', 'link', 'last_ping', 'ping_count', 'ext_id', 'batch'],
@@ -512,7 +512,9 @@ function applyScope_(data, user, owners) {
   var ok = allowedProjects_(data, me);
   var inP = function (pid) { return !!pid && !!ok[pid]; };
   var listed = function (s) { return String(s || '').split(',').map(function (x) { return x.trim(); }).indexOf(me) !== -1; };
-  ['Milestones', 'Sprints', 'Scope', 'Risks', 'Updates', 'Deliverables'].forEach(function (k) { data[k] = (data[k] || []).filter(function (r) { return inP(r.project_id); }); });
+  ['Milestones', 'Scope', 'Risks', 'Updates', 'Deliverables'].forEach(function (k) { data[k] = (data[k] || []).filter(function (r) { return inP(r.project_id); }); });
+  // sprints belong to a team, not a project
+  data.Sprints = (data.Sprints || []).filter(function (r) { return !r.project_id || inP(r.project_id); });
   var myId = ((data.Team || []).filter(function (m) { return m.name === me; })[0] || {}).id;
   data.Allocations = (data.Allocations || []).filter(function (r) { return inP(r.project_id) || r.member_id === myId; });
   data.Projects = (data.Projects || []).filter(function (p) { return ok[p.id]; });
@@ -650,6 +652,17 @@ function readSheet_(sh) {
   return rows;
 }
 
+function uniqueKey_(sh, headers, key) {
+  var col = headers.indexOf('key');
+  if (col === -1 || sh.getLastRow() < 2) return key;
+  var keys = sh.getRange(2, col + 1, sh.getLastRow() - 1, 1).getValues().map(function (r) { return String(r[0]); });
+  if (keys.indexOf(key) === -1) return key;
+  var prefix = String(key).split('-')[0];
+  var max = 0;
+  keys.forEach(function (k) { var m = new RegExp('^' + prefix + '-(\\d+)$').exec(k); if (m) max = Math.max(max, Number(m[1])); });
+  return prefix + '-' + (max + 1);
+}
+
 function upsert_(name, row, user) {
   if (!row || !row.id) throw new Error('row.id is required');
   var sh = ensureSheet_(name, SCHEMA[name]);
@@ -661,6 +674,8 @@ function upsert_(name, row, user) {
       headers.push(k);
     }
   });
+  // a new task's readable key (TECH-42) must be unique across every task, not just the ones its author can see
+  if (name === 'Tasks' && row.key && findRow_(sh, row.id) <= 0) row.key = uniqueKey_(sh, headers, row.key);
   var values = headers.map(function (h) {
     var v = row[h];
     if (v === undefined || v === null) return '';

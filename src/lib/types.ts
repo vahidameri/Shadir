@@ -80,6 +80,8 @@ export interface Sprint {
   closed_at?: string
   /** retrospective notes, written when the sprint is completed */
   retro?: string
+  /** ids of the unfinished tasks moved on when it was completed (comma-separated) */
+  carried?: string
 }
 
 export type IssueType = 'story' | 'bug' | 'task' | 'spike' | ''

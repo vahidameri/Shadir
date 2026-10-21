@@ -51,6 +51,9 @@ export function krProgress(k: KeyResult) {
   const cur = Number(k.current) || 0
   if (k.kind === 'done') return cur >= 1 ? 100 : 0
   const target = Number(k.target)
+  // older rows with a start above the target ("cut X from 40 to 20") keep measuring the way down
+  const start = Number(k.start) || 0
+  if (start > target) return Math.max(0, Math.min(100, Math.round(((start - cur) / (start - target)) * 100)))
   if (!Number.isFinite(target) || target <= 0) return cur > 0 ? 100 : 0
   return Math.max(0, Math.min(100, Math.round((cur / target) * 100)))
 }

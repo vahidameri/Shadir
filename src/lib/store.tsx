@@ -329,7 +329,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const list = prev[sheet] as Row<S>[]
       if (sheet === 'Mizito') row = stampMizito(list.find((r) => r.id === row.id) as unknown as MizitoItem | undefined, row as unknown as MizitoItem) as unknown as Row<S>
       // sprint teams' work gets a readable key (TECH-42) the first time it is saved
-      if (sheet === 'Tasks' && !(row as unknown as Task).key && sprintTeam(teamOf(row as unknown as Task, prev))) row = { ...row, key: nextKey(prev) } as Row<S>
+      if (sheet === 'Tasks' && !(row as unknown as Task).key && !list.some((r) => r.id === row.id) && sprintTeam(teamOf(row as unknown as Task, prev))) row = { ...row, key: nextKey(prev) } as Row<S>
       if (sheet === 'Tasks') row = stampTask(list.find((r) => r.id === row.id) as unknown as Task | undefined, row as unknown as Task) as unknown as Row<S>
       const old = list.find((r) => r.id === row.id)
       const exists = !!old

@@ -141,8 +141,9 @@ export function CompleteSprint({ s, onClose }: { s: Sprint; onClose: () => void 
   const [busy, setBusy] = useState(false)
   const done = async () => {
     setBusy(true)
+    // close first, remembering what was unfinished, so the report still shows it after it moves on
+    await upsert('Sprints', { ...s, status: 'closed', closed_at: nowStamp(), completed_points: st.done, committed_points: st.committed, retro, carried: st.carried.map((t) => t.id).join(',') })
     for (const t of st.carried) await upsert('Tasks', { ...t, sprint_id: to })
-    await upsert('Sprints', { ...s, status: 'closed', closed_at: nowStamp(), completed_points: st.done, committed_points: st.committed, retro })
     toast(L(`${s.name} بسته شد`, `${s.name} completed`))
     onClose()
   }

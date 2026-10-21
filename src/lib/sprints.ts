@@ -70,16 +70,23 @@ export interface SprintStats {
   pct: number
 }
 
+/** Ids of the work moved on when the sprint was completed. */
+const carriedIds = (s: Sprint) => new Set(String(s.carried || '').split(',').map((x) => x.trim()).filter(Boolean))
+
 export function sprintStats(db: DB, s: Sprint, today = todayISO()): SprintStats {
-  const tasks = tasksIn(db, s)
+  // a completed sprint keeps the unfinished work it handed on
+  const gone = carriedIds(s)
+  const tasks = [...tasksIn(db, s), ...db.Tasks.filter((t) => gone.has(t.id) && t.sprint_id !== s.id)]
   const total = sum(tasks)
   const done = sum(tasks.filter(isDone))
   const started = s.started_at || (s.status !== 'planned' ? `${s.start_date} 00:00` : '')
   // scope change: work moved into or out of the sprint after it started
   const moves = started ? db.History.filter((h) => h.entity === 'Tasks' && h.field === 'sprint_id' && h.at > started) : []
-  const addedIds = new Set(moves.filter((h) => h.to === s.id).map((h) => h.entity_id))
-  const addedTasks = tasks.filter((t) => addedIds.has(t.id))
-  const removed = new Set(moves.filter((h) => h.from === s.id && h.to !== s.id).map((h) => h.entity_id)).size
+  // added: moved in after the start, or created after the start (straight onto the board)
+  const created = new Set(started ? db.History.filter((h) => h.entity === 'Tasks' && h.field === '_created' && h.at > started).map((h) => h.entity_id) : [])
+  const addedIds = new Set([...moves.filter((h) => h.to === s.id).map((h) => h.entity_id), ...created])
+  const addedTasks = tasks.filter((t) => addedIds.has(t.id) && !gone.has(t.id))
+  const removed = new Set(moves.filter((h) => h.from === s.id && h.to !== s.id && !gone.has(h.entity_id)).map((h) => h.entity_id)).size
   const committed = s.status === 'planned' ? total : Number(s.committed_points) || total
   const len = Math.max(1, daysBetween(s.start_date, s.end_date))
   const el = s.status === 'closed' ? 100 : s.status === 'planned' ? 0 : Math.max(0, Math.min(100, Math.round((daysBetween(s.start_date, today) / len) * 100)))
@@ -105,7 +112,7 @@ export function burndown(db: DB, s: Sprint, today = todayISO()) {
   const st = sprintStats(db, s, today)
   const days = Math.max(1, daysBetween(s.start_date, s.end_date))
   const addedAt = new Map<string, string>()
-  db.History.filter((h) => h.entity === 'Tasks' && h.field === 'sprint_id' && h.to === s.id).forEach((h) => addedAt.set(h.entity_id, stampDay(h.at)))
+  db.History.filter((h) => h.entity === 'Tasks' && ((h.field === 'sprint_id' && h.to === s.id) || h.field === '_created')).forEach((h) => addedAt.set(h.entity_id, stampDay(h.at)))
   const last = s.status === 'closed' ? stampDay(s.closed_at) || s.end_date : today
   const rows: { day: string; ideal: number; remaining: number | null }[] = []
   for (let i = 0; i <= days; i++) {

@@ -78,7 +78,8 @@ export function scopeDB(db: DB, me: string, access: Access): DB {
     Deliveries: out.Deliveries.filter((x) => inP(x.project_id)),
     Projects: out.Projects.filter((p) => ok.has(p.id)),
     Milestones: out.Milestones.filter((x) => inP(x.project_id)),
-    Sprints: out.Sprints.filter((x) => inP(x.project_id)),
+    // sprints belong to a team, not a project
+    Sprints: out.Sprints.filter((x) => !x.project_id || inP(x.project_id)),
     Scope: out.Scope.filter((x) => inP(x.project_id)),
     Risks: out.Risks.filter((x) => inP(x.project_id)),
     Updates: out.Updates.filter((x) => inP(x.project_id)),
