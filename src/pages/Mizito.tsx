@@ -7,7 +7,7 @@ import { useStore } from '../lib/store'
 import { Band, Card, Empty, FilterSelect, Overlap, SearchInput, Segmented, Sheet, StatStrip, cx } from '../components/ui'
 import { L } from '../lib/i18n'
 import { fa, fmtDate, timeAgo } from '../lib/jalali'
-import { MZ_KEYS, MZ_VIEWS, agentRun, changeUnseen, firstMzStatus, recentlyChanged, inMzView, isMizitoLink, mzCat, mzCfg, mzFlags, mzSignals, optLabel, statusById, tierById, type MzView } from '../lib/mizito'
+import { MZ_KEYS, MZ_VIEWS, agentRun, changeUnseen, firstFor, firstMzStatus, isExecTier, mzFlags as flagsOf, recentlyChanged, inMzView, isMizitoLink, mzCat, mzCfg, mzFlags, mzSignals, optLabel, statusById, tierById, type MzView } from '../lib/mizito'
 import { daysFromToday } from '../lib/jalali'
 import { CaptureSheet, MzBadges, MizitoSettings, MizitoSheet, MzLink, MzSignals, MzStatusChip, PBadge, useReminder } from '../components/MizitoParts'
 import type { MizitoItem } from '../lib/types'
@@ -59,7 +59,13 @@ export default function MizitoPage() {
   const leaders = db.Team.filter((m) => m.access === 'super' || m.access === 'exec').map((m) => m.name)
 
   const sig = useMemo(() => new Map(db.Mizito.map((m) => [m.id, mzSignals(db, m)])), [db])
-  const base = db.Mizito.filter((m) => (!who || m.mentioned.split(',').map((x) => x.trim()).includes(who)) && (!cat || m.category === cat) && (!q || [m.title, m.description, m.asked_by, m.assigned_to, m.outcome].some((v) => String(v || '').includes(q))))
+  const badge = get('b')
+  const hasBadge = (m: MizitoItem) => {
+    const key = flagsOf(m).keyProject
+    const exec = isExecTier(mzSignals(db, m).tier)
+    return badge === 'key' ? key : badge === 'exec' ? exec : badge === 'any' ? key || exec : true
+  }
+  const base = db.Mizito.filter((m) => (!who || m.mentioned.split(',').map((x) => x.trim()).includes(who)) && (!cat || m.category === cat) && hasBadge(m) && (!q || [m.title, m.description, m.asked_by, m.assigned_to, m.outcome].some((v) => String(v || '').includes(q))))
   const counts = Object.fromEntries(MZ_VIEWS.map((v) => [v, base.filter((m) => inMzView(db, m, v, sig.get(m.id))).length])) as Record<MzView, number>
   const list = base
     .filter((m) => inMzView(db, m, view, sig.get(m.id)))
@@ -67,10 +73,13 @@ export default function MizitoPage() {
       const x = sig.get(a.id)!
       const y = sig.get(b.id)!
       const last = (m: MizitoItem) => m.last_mention_at || m.received_at || m.created_at || ''
+      // with a person picked, "oldest" is when the assistant first wrote to that person
+      const first = (m: MizitoItem) => firstFor(m, who)
       // what changed in Mizito: newest change first
       if (view === 'changed') return String(a.mz_changed_at || '') < String(b.mz_changed_at || '') ? 1 : -1
       if (sort === 'recent') return last(a) < last(b) ? 1 : -1
-      if (sort === 'old') return (a.received_at || a.created_at) < (b.received_at || b.created_at) ? -1 : 1
+      if (sort === 'old') return first(a) < first(b) ? -1 : 1
+      if (sort === 'new') return first(a) < first(b) ? 1 : -1
       if (sort === 'due') return (a.due_date || '9999') < (b.due_date || '9999') ? -1 : a.due_date === b.due_date ? x.p - y.p : 1
       return x.p - y.p || (x.slaLeft ?? 1e9) - (y.slaLeft ?? 1e9) || (x.toDue ?? 1e9) - (y.toDue ?? 1e9) || y.score - x.score || (last(a) < last(b) ? 1 : -1)
     })
@@ -165,12 +174,23 @@ export default function MizitoPage() {
           <Segmented value={(who || '') as string} onChange={(v) => set('who', v)} options={[{ value: '', label: L('همه', 'Everyone') }, ...leaders.map((n) => ({ value: n, label: n === me ? L(`${n} (من)`, `${n} (me)`) : n }))]} />
           <FilterSelect value={cat} onChange={(v) => set('cat', v)} placeholder={L('همه‌ی دسته‌ها', 'All categories')} options={c.categories.map((x) => ({ value: x.id, label: optLabel(x) }))} />
           <FilterSelect
+            value={badge}
+            onChange={(v) => set('b', v)}
+            placeholder={L('همه (با و بی بج)', 'All (any badge)')}
+            options={[
+              { value: 'key', label: L(`فقط ${c.keyProjects[0] || 'پروژه‌های کلیدی'}`, `Only ${c.keyProjects[0] || 'key projects'}`) },
+              { value: 'exec', label: L('فقط مدیران ارشد', 'Only senior asks') },
+              { value: 'any', label: L('هر دو بج (میز شاد یا مدیر ارشد)', 'Either badge') },
+            ]}
+          />
+          <FilterSelect
             value={sort === 'p' ? '' : sort}
             onChange={(v) => set('s', v)}
             placeholder={L('مرتب: اولویت و SLA', 'Sort: priority & SLA')}
             options={[
               { value: 'recent', label: L('مرتب: آخرین منشن', 'Sort: latest mention') },
-              { value: 'old', label: L('مرتب: قدیمی‌ترین', 'Sort: oldest first') },
+              { value: 'old', label: L('مرتب: قدیمی‌ترین پیام دستیار', 'Sort: oldest assistant message') },
+              { value: 'new', label: L('مرتب: جدیدترین پیام دستیار', 'Sort: newest assistant message') },
               { value: 'due', label: L('مرتب: ددلاین', 'Sort: deadline') },
             ]}
           />
@@ -266,7 +286,7 @@ export default function MizitoPage() {
                             {m.mz_project && <span>· {m.mz_project}</span>}
                             {m.category && <span>· {optLabel(c.categories.find((x) => x.id === m.category))}</span>}
                             {m.action && <span>· {optLabel(c.actions.find((x) => x.id === m.action))}</span>}
-                            <span>· {L('منشن', 'mentioned')} {fmtDate(m.received_at || m.created_at)}</span>
+                            <span>· {L('منشن', 'mentioned')} {fmtDate(firstFor(m, who))}</span>
                             {s.mentions > 1 && <span>· {L(`${fa(s.mentions)} بار منشن`, `${s.mentions} mentions`)}</span>}
                             {m.assigned_to && <span>· {L('سپرده به', 'with')} {m.assigned_to}</span>}
                           </div>

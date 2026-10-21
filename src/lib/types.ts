@@ -433,6 +433,8 @@ export interface MizitoItem {
   /** what last changed in Mizito (comments, done, progress…) and when */
   mz_change?: string
   mz_changed_at?: string
+  /** "name=YYYY-MM-DD HH:mm" per line: when the Mizito assistant first wrote to each person about it */
+  mz_first?: string
 }
 
 export interface MizitoMention {

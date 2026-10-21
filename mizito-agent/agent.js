@@ -16,7 +16,35 @@
     if (e.source !== window || !e.data || !e.data.__madar) return
     if (e.data.type === 'token' && e.data.token) token = e.data.token
     if (e.data.type === 'ping') ping()
+    if (e.data.type === 'link') learnLink(e.data)
   })
+
+  // ---- the task link, exactly as Mizito's «لینک وظیفه» gives it ----
+  // When the person copies a task's link from that menu, the hook hands over the link, the task that
+  // was open and the calls just made. If the link carries the task id, it is a pattern (the id is
+  // swapped per task); if a call returned it, that call is repeated for each task.
+  async function learnLink(d) {
+    const text = String(d.text || '').trim()
+    const task = String(d.task || '')
+    let recipe = null
+    if (task && text.includes(task)) {
+      recipe = { kind: 'pattern', pattern: text.split(task).join('{id}') }
+    } else {
+      const tail = text.replace(/^.*#/, '#')
+      const call = [...(d.calls || [])].reverse().find((c) => c.text && (c.text.includes(text) || c.text.includes(tail)))
+      if (call) {
+        let body = call.body || '{}'
+        if (task) body = body.split(task).join('{id}')
+        recipe = { kind: 'call', path: call.path, body }
+      }
+    }
+    const learned = { at: Date.now(), sample: text, task, recipe }
+    await chrome.storage.local.set({ linkRecipe: learned })
+    chrome.runtime.sendMessage({ type: 'progress', text: recipe ? 'لینک وظیفه یاد گرفته شد' : 'لینک کپی شد ولی الگویش پیدا نشد؛ یک بار دیگر از داخل یک تسک «لینک وظیفه» را بزنید' }).catch(() => {})
+    // links go to Madar with the next read: start one now
+    if (recipe) chrome.runtime.sendMessage({ type: 'request', reason: 'link', force: true }).catch(() => {})
+  }
+  const linkVersion = (r) => (r && r.recipe ? (r.recipe.kind === 'pattern' ? r.recipe.pattern : r.recipe.path + r.recipe.body).length + ':' + r.at : 'none')
   // until the page makes its first call: Mizito keeps its session key in local storage
   function storedToken() {
     try {
@@ -38,8 +66,9 @@
   }
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
-  async function api(path, body) {
-    if (!READ.has(path)) throw new Error('blocked: ' + path)
+  async function api(path, body, allowed) {
+    // the one exception: the call Mizito itself makes for «لینک وظیفه», learnt from the person's own click
+    if (!READ.has(path) && path !== allowed) throw new Error('blocked: ' + path)
     const key = token || storedToken()
     if (!key) throw new Error('نشست میزیتو پیدا نشد؛ صفحه‌ی میزیتو را یک بار رفرش کنید')
     for (let attempt = 0; ; attempt++) {
@@ -107,8 +136,21 @@
 
     progress('آماده‌سازی…')
     const me = await api('workspace/userId', { regId: null })
-    // Mizito's own task link (the one "لینک وظیفه" copies): <workspace>_sl<task>
-    const linkOf = (id) => location.origin + '/#/ws/tasks/inbox/' + (me && me.wid ? me.wid + '_sl' : '') + id
+    // the task link: learnt from «لینک وظیفه»; until then, Mizito's shape <workspace>_sl<task>
+    const { linkRecipe } = await chrome.storage.local.get('linkRecipe')
+    const recipe = linkRecipe && linkRecipe.recipe
+    const linkV = linkVersion(linkRecipe)
+    const linkOf = async (id) => {
+      try {
+        if (recipe && recipe.kind === 'pattern') return recipe.pattern.split('{id}').join(id)
+        if (recipe && recipe.kind === 'call') {
+          const r = await api(recipe.path, JSON.parse(recipe.body.split('{id}').join(id)), recipe.path)
+          const m = JSON.stringify(r).match(/(https?:\/\/[^"\\]*)?#\/ws\/[^"\\\s]+/)
+          if (m) return m[0].startsWith('http') ? m[0] : location.origin + '/' + m[0]
+        }
+      } catch (e) {}
+      return location.origin + '/#/ws/tasks/inbox/' + (me && me.wid ? me.wid + '_sl' : '') + id
+    }
     const users = {}
     // Arabic ي/ك typed in some profiles become Persian, so names match Madar's people
     const clean = (s) => String(s || '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/\s+/g, ' ').trim()
@@ -122,11 +164,12 @@
       ;(l.labels || l || []).forEach((x) => x && x._id && (labels[x._id] = x.title))
     } catch (e) {}
 
-    const tasks = new Map() // key → { t: latest snapshot, mentions: [] }
+    // key → { t: latest snapshot, mentions, first: the assistant's first message about it, assistant }
+    const tasks = new Map()
     const take = (t) => {
       if (!t || !t._id || t.deleted) return null
       const cur = tasks.get(t._id)
-      if (!cur) tasks.set(t._id, { t, mentions: [] })
+      if (!cur) tasks.set(t._id, { t, mentions: [], first: '', assistant: false })
       else if (ms(t.modified_at) >= ms(cur.t.modified_at)) cur.t = { ...cur.t, ...t, last_comment: t.last_comment || cur.t.last_comment }
       return tasks.get(t._id)
     }
@@ -152,6 +195,10 @@
           // every task the assistant talks about comes in; a mention is also kept as a mention
           if (msg.deleted || !media || !media.task || at < since) continue
           const slot = take(media.task)
+          if (slot) {
+            slot.assistant = true
+            if (!slot.first || ms(msg.date) < ms(slot.first)) slot.first = msg.date
+          }
           if (slot && media._ === 'messageMediaMentionInTask') {
             slot.mentions.push({ id: msg._id, by: name(media.from_user), at: msg.date, comment: media.comment || '' })
             mentionCount++
@@ -186,10 +233,11 @@
     }
 
     // 3. what changed: the full snapshot and its comments; a task that did not change only adds its mentions
-    const sigOf = (t) => `${t.modified_at || ''}|${t.completed ? 1 : 0}`
+    // what Madar holds is decided by the assistant's messages; the inbox only refreshes those tasks
+    const sigOf = (t) => `${t.modified_at || ''}|${t.completed ? 1 : 0}|${linkV}|a2`
     const out = []
     let commentsRead = 0
-    const list = [...tasks.values()]
+    const list = [...tasks.values()].filter((x) => x.assistant)
     for (let i = 0; i < list.length; i++) {
       const { t } = list[i]
       const mentions = list[i].mentions.filter((x) => !knownMentions.has(x.id))
@@ -202,7 +250,8 @@
         key: t._id,
         title: t.title || '',
         notes: t.notes || '',
-        link: linkOf(t._id),
+        link: await linkOf(t._id),
+        first_at: list[i].first,
         project: projects[t.project] || '',
         owner: name(t.owner),
         assignees: (t.assignee || []).map(name).filter(Boolean),
@@ -254,8 +303,8 @@
       progress(`ارسال به مدار: ${Math.min(i + BATCH, out.length)} از ${out.length}`)
       await madar({ action: 'mzIngest', items: out.slice(i, i + BATCH), version: VERSION })
     }
-    const stats = { tasks: tasks.size, sent: out.length, mentions: mentionCount, comments: commentsRead, pages: pages + 1, open: seen.length, uid: me && me.uid }
-    await madar({ action: 'mzIngest', items: [], final: true, full: true, seen: inboxDone && mentionsDone ? [...new Set([...seen, ...list.filter((x) => !x.t.completed).map((x) => x.t._id)])] : undefined, stats, version: VERSION })
+    const stats = { tasks: list.length, sent: out.length, mentions: mentionCount, comments: commentsRead, pages: pages + 1, open: seen.length, uid: me && me.uid }
+    await madar({ action: 'mzIngest', items: [], final: true, full: true, seen: inboxDone && mentionsDone ? [...new Set([...seen, ...list.filter((x) => !x.t.completed).map((x) => x.t._id)])] : undefined, assistant: mentionsDone ? list.map((x) => x.t._id) : undefined, link: linkRecipe ? (recipe ? 'learned' : 'failed') : 'none', stats, version: VERSION })
     return stats
   }
 

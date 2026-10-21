@@ -67,7 +67,7 @@ export function CartableAdd({ source, item, onClose, owner: initialOwner, box: i
     </label>
   )
   return (
-    <Sheet open onClose={onClose} header={<h2 className="font-semibold">{item ? L('ویرایش مورد کارتابل', 'Edit cartable item') : L('افزودن به کارتابل', 'Add to a cartable')}</h2>} footer={<><div className="flex-1" /><button className="btn-ghost btn-sm" onClick={onClose}>{L('انصراف', 'Cancel')}</button><button className="btn-primary btn-sm" onClick={save}><Inbox size={14} /> {item ? L('ذخیره', 'Save') : L('افزودن', 'Add')}</button></>}>
+    <Sheet open onClose={onClose} header={<h2 className="font-semibold">{item ? L('ویرایش مورد کارتابل', 'Edit cartable item') : owner === me ? L('افزودن به کارتابل من', 'Add to my cartable') : L(`افزودن به کارتابل ${owner}`, `Add to ${owner}’s cartable`)}</h2>} footer={<><div className="flex-1" /><button className="btn-ghost btn-sm" onClick={onClose}>{L('انصراف', 'Cancel')}</button><button className="btn-primary btn-sm" onClick={save}><Inbox size={14} /> {item ? L('ذخیره', 'Save') : owner === me ? L('به کارتابل من', 'To my cartable') : L(`به کارتابل ${owner}`, `To ${owner}’s cartable`)}</button></>}>
       <div className="space-y-4 p-5">
         {!item && (
           <div className="flex flex-wrap items-center gap-3">
@@ -104,19 +104,23 @@ export function CartableAdd({ source, item, onClose, owner: initialOwner, box: i
   )
 }
 
-/** "To a cartable" for the PgM and the CPTO, on a Mizito item, a task or a follow-up. */
+/** "To X's cartable": one button per cartable (the CPTO's, mine), so where it goes is never a guess. */
 export function CartableButton({ source, className }: { source: Source; className?: string }) {
-  const { access, db } = useStore()
-  const [open, setOpen] = useState(false)
+  const { access, db, me } = useStore()
+  const [target, setTarget] = useState('')
   if (!can.cartable(access)) return null
-  const there = db.Cartable.filter((c) => c.entity === source.entity && c.entity_id === source.entity_id && c.status !== 'done')
+  // the CPTO's first for the PgM, my own first for the CPTO
+  const owners = cartableOwners(db).sort((a, b) => Number(a === me) - Number(b === me))
+  const there = (n: string) => db.Cartable.some((c) => c.owner === n && c.entity === source.entity && c.entity_id === source.entity_id && (c.status === 'sent' || c.status === 'draft'))
   return (
     <>
-      <button className={cx('btn-outline btn-sm', className)} onClick={() => setOpen(true)}>
-        <Inbox size={14} /> {L('به کارتابل', 'To a cartable')}
-        {there.length > 0 && <span className="rounded-full bg-brand/15 px-1.5 text-[0.625rem] text-brand">{L(`در کارتابل ${there[0].owner}`, `in ${there[0].owner}’s`)}</span>}
-      </button>
-      {open && <CartableAdd source={source} onClose={() => setOpen(false)} />}
+      {owners.map((n) => (
+        <button key={n} className={cx('btn-outline btn-sm', className)} onClick={() => setTarget(n)} title={there(n) ? L('همین حالا در این کارتابل است', 'Already in this cartable') : undefined}>
+          <Inbox size={14} /> {n === me ? L('به کارتابل من', 'To my cartable') : L(`به کارتابل ${n.split(' ')[0]}`, `To ${n.split(' ')[0]}’s cartable`)}
+          {there(n) && <Check size={12} className="text-good" />}
+        </button>
+      ))}
+      {target && <CartableAdd source={source} owner={target} onClose={() => setTarget('')} />}
     </>
   )
 }

@@ -1,6 +1,8 @@
 // Runs inside the Mizito page itself (MAIN world). It only listens: it hands the page's own session
-// key (the x-token header Mizito's app sends) to the agent, and says when a new mention arrives on
-// Mizito's live connection. It never changes a request.
+// key (the x-token header Mizito's app sends) to the agent, says when a new mention arrives on
+// Mizito's live connection, and when someone copies a task's link with Mizito's own «لینک وظیفه»
+// it tells the agent the link and the calls just made, so the agent learns how Mizito builds it.
+// It never changes a request.
 (() => {
   if (window.__madarHook) return
   window.__madarHook = true
@@ -12,6 +14,70 @@
       tell({ type: 'token', token: last })
     }
   }
+  // the last calls the page made (path, body, answer), and the last task it opened
+  const recent = []
+  let lastTask = ''
+  const taskOf = (body) => {
+    try {
+      const b = typeof body === 'string' ? JSON.parse(body) : body || {}
+      if (b.tid) return String(b.tid)
+      const jwt = String(b.token || '')
+      if (jwt.split('.').length === 3) {
+        const p = JSON.parse(atob(jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+        if (p && p.task) return String(p.task)
+      }
+    } catch (e) {}
+    return ''
+  }
+  const remember = (url, body, text) => {
+    const path = String(url || '').replace(/^.*\/api\/api\//, '')
+    if (!/^[\w/]+$/.test(path)) return
+    const t = taskOf(body)
+    if (t) lastTask = t
+    recent.push({ path, body: typeof body === 'string' ? body : '', text: String(text || '').slice(0, 4000), at: Date.now() })
+    if (recent.length > 40) recent.shift()
+  }
+  const xOpen = XMLHttpRequest.prototype.open
+  XMLHttpRequest.prototype.open = function (method, url) {
+    this.__madarUrl = url
+    return xOpen.apply(this, arguments)
+  }
+  const xSend = XMLHttpRequest.prototype.send
+  XMLHttpRequest.prototype.send = function (body) {
+    const url = this.__madarUrl
+    if (url && String(url).indexOf('/api/api/') !== -1) {
+      this.addEventListener('load', () => {
+        try {
+          remember(url, body, typeof this.response === 'string' ? this.response : this.responseText)
+        } catch (e) {
+          remember(url, body, '')
+        }
+      })
+    }
+    return xSend.apply(this, arguments)
+  }
+  // a copied task link: from navigator.clipboard or from a copy command over a selection
+  const copied = (text) => {
+    text = String(text || '').trim()
+    if (/\/#\/ws\//.test(text)) tell({ type: 'link', text, task: lastTask, calls: recent.filter((c) => Date.now() - c.at < 20000) })
+  }
+  try {
+    const cb = navigator.clipboard
+    if (cb && cb.writeText) {
+      const w = cb.writeText.bind(cb)
+      cb.writeText = (t) => (copied(t), w(t))
+    }
+  } catch (e) {}
+  document.addEventListener(
+    'copy',
+    () => {
+      const a = document.activeElement
+      const sel = String(window.getSelection ? window.getSelection() : '')
+      copied(sel || (a && 'value' in a ? String(a.value).slice(a.selectionStart || 0, a.selectionEnd || undefined) : ''))
+    },
+    true,
+  )
+
   const setHeader = XMLHttpRequest.prototype.setRequestHeader
   XMLHttpRequest.prototype.setRequestHeader = function (name, value) {
     if (String(name).toLowerCase() === 'x-token') token(value)

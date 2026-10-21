@@ -653,6 +653,14 @@ export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }
               <div className="eyebrow mb-1 mt-5 flex items-center gap-1.5 px-2.5"><Bot size={12} /> {L('در میزیتو', 'In Mizito')}</div>
               {prop(L('وضعیت', 'State'), <span className={cx(m.mz_state === 'done' ? 'text-good' : m.mz_state === 'gone' ? 'text-sub' : '')}>{m.mz_state === 'done' ? L('انجام‌شده', 'Done') : m.mz_state === 'gone' ? L('دیگر دیده نمی‌شود', 'No longer seen') : L('باز', 'Open')}{m.mz_progress !== '' && m.mz_progress !== undefined && m.mz_state !== 'done' && <span className="text-sub num"> · {fa(Number(m.mz_progress) || 0)}٪</span>}</span>)}
               {m.mz_done_at && prop(L('انجام شد', 'Done'), <span className="text-sub">{fmtDate(m.mz_done_at)}{m.mz_done_by && ` · ${m.mz_done_by}`}</span>)}
+              {m.mz_first && prop(L('اولین پیام دستیار', 'First assistant message'), (
+                <span className="flex flex-col leading-6">
+                  {String(m.mz_first).split('\n').filter((x) => x.includes('=')).map((line) => {
+                    const i = line.lastIndexOf('=')
+                    return <span key={line}>{line.slice(0, i)}: <span className="text-sub">{fmtDate(line.slice(i + 1))} {line.slice(i + 12, i + 17)}</span></span>
+                  })}
+                </span>
+              ))}
               {m.mz_project && prop(L('پروژه', 'Project'), <span>{m.mz_project}</span>)}
               {m.mz_owner && prop(L('سازنده', 'Created by'), <span>{m.mz_owner}</span>)}
               {m.mz_assignees && prop(L('مسئولان', 'Assignees'), <span className="leading-5">{m.mz_assignees}</span>)}
@@ -666,7 +674,7 @@ export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }
               <button className="btn-outline btn-sm w-full" onClick={() => open('FollowUps', { person: m.assigned_to || m.asked_by, subject: L(`میزیتو: ${m.title}`, `Mizito: ${m.title}`), notes: m.link, priority: s.p <= 1 ? 'high' : 'medium' })}>
                 <Plus size={14} /> {L('ساخت پیگیری', 'Create a follow-up')}
               </button>
-              <CartableButton className="mt-2 w-full" source={{ entity: 'Mizito', entity_id: m.id, title: m.title }} />
+              <div className="mt-2 grid gap-2"><CartableButton className="w-full" source={{ entity: 'Mizito', entity_id: m.id, title: m.title }} /></div>
             </div>
           )}
         </aside>
@@ -767,6 +775,7 @@ function AgentCard({ admin }: { admin: boolean }) {
                       <span>{L(`آخرین خواندن کامل: ${when(r.full)}`, `Last full read: ${when(r.full)}`)}</span>
                       {r.run?.tasks !== undefined && <span className="num">{L(`${fa(r.run.tasks || 0)} تسک · ${fa(r.run.mentions || 0)} منشن`, `${r.run.tasks} tasks · ${r.run.mentions || 0} mentions`)}</span>}
                       {r.version && <span dir="ltr">v{r.version}</span>}
+                      <span className={r.link === 'learned' ? 'text-good' : 'text-warn'}>{r.link === 'learned' ? L('لینک وظیفه: یاد گرفته شد', 'Task link: learnt') : L('لینک وظیفه هنوز یاد گرفته نشده (در میزیتو یک بار «لینک وظیفه» را بزنید)', 'Task link not learnt yet (click «لینک وظیفه» once in Mizito)')}</span>
                     </>
                   ) : (
                     <span>{r.revoked ? L('کلید باطل شده', 'Key revoked') : L('هنوز کلیدی ساخته نشده', 'No key yet')}</span>

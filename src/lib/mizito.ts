@@ -399,6 +399,8 @@ export interface AgentRun {
   key_at?: string
   revoked?: string
   version?: string
+  /** the task link: learned | failed | none */
+  link?: string
   run?: { tasks?: number; mentions?: number; comments?: number; pages?: number }
 }
 export function agentRun(raw?: string): AgentRun {
@@ -408,4 +410,15 @@ export function agentRun(raw?: string): AgentRun {
   } catch {
     return {}
   }
+}
+
+/** When the Mizito assistant first wrote to a person about the item (the agent keeps one line per person). */
+export function firstFor(m: MizitoItem, who?: string) {
+  if (who) {
+    for (const line of String(m.mz_first || '').split('\n')) {
+      const i = line.lastIndexOf('=')
+      if (i > 0 && line.slice(0, i).trim() === who) return line.slice(i + 1).trim()
+    }
+  }
+  return m.received_at || m.created_at || ''
 }

@@ -7,7 +7,7 @@ const ago = (t) => {
 }
 
 async function render() {
-  const { conn, status = {} } = await chrome.storage.local.get(['conn', 'status'])
+  const { conn, status = {}, linkRecipe } = await chrome.storage.local.get(['conn', 'status', 'linkRecipe'])
   $('connect').classList.toggle('hidden', !!conn)
   $('ready').classList.toggle('hidden', !conn)
   const since = conn && conn.cutoff ? new Intl.DateTimeFormat('fa-IR-u-ca-persian', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(conn.cutoff + 'T12:00')) : ''
@@ -26,6 +26,15 @@ async function render() {
   $('t-tasks').textContent = fa(s.tasks || 0)
   $('t-mentions').textContent = fa(s.mentions || 0)
   $('t-sent').textContent = fa(s.sent || 0)
+  // the task link is learnt from one «لینک وظیفه» click in Mizito
+  const learned = linkRecipe && linkRecipe.recipe
+  $('linkbox').classList.toggle('todo', !learned)
+  $('link-title').textContent = learned ? 'لینک وظیفه یاد گرفته شد ✓' : 'لینک تسک‌ها هنوز یاد گرفته نشده'
+  $('link-sub').textContent = learned
+    ? `همه‌ی لینک‌ها مثل «لینک وظیفه»ی خود میزیتو ساخته می‌شوند. اگر میزیتو عوض شد، دوباره یک بار «لینک وظیفه» را بزنید.`
+    : linkRecipe
+      ? 'لینک کپی شد ولی الگویش پیدا نشد؛ یک تسک را باز کنید و دوباره از منوی ⋮ «لینک وظیفه» را بزنید.'
+      : 'در میزیتو یک تسک را باز کنید، منوی ⋮ (سه‌نقطه) ← «لینک وظیفه» را بزنید. ایجنت از همان یاد می‌گیرد و لینک همه‌ی تسک‌ها را درست می‌کند.'
   $('error').textContent = failed ? status.error : ''
   $('error').classList.toggle('hidden', !failed)
 }

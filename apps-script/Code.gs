@@ -18,7 +18,7 @@
  *   viewer — read only (leadership)
  */
 
-var MADAR_VERSION = '1.7.0'; // shown on the login page and by diagnose()
+var MADAR_VERSION = '1.8.0'; // shown on the login page and by diagnose()
 
 var SCHEMA = {
   Projects: ['id', 'code', 'name', 'description', 'category', 'owner', 'client', 'liaison', 'liaison_contact', 'status', 'priority', 'phase', 'start_date', 'end_date', 'progress', 'health_override', 'objective', 'paused_at', 'pause_reason', 'delivery_day', 'last_delivery', 'archived', 'archived_at', 'links', 'team', 'kind', 'batch'],
@@ -65,7 +65,7 @@ var SCHEMA = {
   // source = agent when the Mizito agent brought it; review = new (waiting for a look) | ignored.
   // mz_* columns mirror the task in Mizito and are written by the agent only.
   Mizito: ['id', 'mz_key', 'link', 'title', 'description', 'docs', 'asked_by', 'mentioned', 'category', 'action', 'status', 'priority_override', 'override_reason', 'urgent', 'assigned_to', 'due_date', 'received_at', 'last_mention_at', 'last_mention_by', 'outcome', 'notes', 'created_at', 'updated_at', 'closed_at', 'ext_id', 'batch',
-    'source', 'review', 'mz_state', 'mz_done_at', 'mz_done_by', 'mz_progress', 'mz_project', 'mz_owner', 'mz_assignees', 'mz_labels', 'mz_checklist', 'mz_deadline', 'mz_last_by', 'mz_last_at', 'mz_sig', 'synced_at', 'mz_change', 'mz_changed_at'],
+    'source', 'review', 'mz_state', 'mz_done_at', 'mz_done_by', 'mz_progress', 'mz_project', 'mz_owner', 'mz_assignees', 'mz_labels', 'mz_checklist', 'mz_deadline', 'mz_last_by', 'mz_last_at', 'mz_sig', 'synced_at', 'mz_change', 'mz_changed_at', 'mz_first'],
   // account = whose Mizito the agent read it in; mz_id = the mention's id there, mz_comment = the comment that mentioned
   MizitoMentions: ['id', 'item_id', 'by', 'at', 'note', 'status', 'batch', 'mz_id', 'account', 'mz_comment'],
   // the conversation on a Mizito task, as the agent read it (one row per Mizito comment)
@@ -1786,8 +1786,19 @@ function mzIngest_(body, agent) {
       }
       if (!m.title) m.title = long(t.title, 300);
       if (!m.description && t.notes) m.description = long(t.notes);
-      // the link follows Mizito's own (an early agent wrote one Mizito can't open: …/inbox/<task>)
-      if (t.link && (!m.link || /\/inbox\/[0-9a-f]{24}$/.test(String(m.link)))) m.link = t.link;
+      // the link is Mizito's own («لینک وظیفه», learnt by the agent); a link typed by hand stays
+      if (t.link && t.link !== m.link && (m.source === 'agent' || !m.link || /\/inbox\/[0-9a-f]{24}$/.test(String(m.link)))) m.link = t.link;
+      // when the assistant first wrote to each person about it; the earliest is "mentioned in Mizito"
+      if (t.first_at) {
+        var firsts = mzFirsts_(m.mz_first);
+        var f = ts(t.first_at);
+        if (f) firsts[agent.name] = f; // every read goes back to the cutoff, so this is that person's first
+        m.mz_first = Object.keys(firsts).map(function (k) { return k + '=' + firsts[k]; }).join('\n');
+        if (m.source === 'agent') {
+          var earliest = Object.keys(firsts).reduce(function (a, k) { return !a || firsts[k] < a ? firsts[k] : a; }, '');
+          if (earliest) m.received_at = earliest;
+        }
+      }
       // what changed in Mizito since the last read, so the people it was brought for notice
       var synced = cur && cur.mz_state;
       if (synced) {
@@ -1856,7 +1867,7 @@ function mzIngest_(body, agent) {
       if (cur && cur.mz_state && listed(cur.mentioned, agent.name) && at > String(cur.synced_at || '') && freshMentions.indexOf(x.by) === -1) freshMentions.push(x.by || '');
       mentions.push({ id: 'MM-' + id, item_id: m.id, by: x.by || '', at: at, note: '', status: '', mz_id: id, account: agent.name, mz_comment: x.comment || '' });
       if (at > String(m.last_mention_at || '')) { m.last_mention_at = at; m.last_mention_by = x.by || ''; }
-      if (at < String(m.received_at || '9999')) m.received_at = at;
+      if (m.source !== 'agent' && at < String(m.received_at || '9999')) m.received_at = at;
     });
 
     (t.comments || []).forEach(function (c) {
@@ -1905,6 +1916,32 @@ function mzIngest_(body, agent) {
     });
   }
 
+  // what Madar holds follows the assistant's messages: a task the agent brought only from the inbox
+  // (earlier versions) and nobody has touched goes away once a complete read shows no message about it
+  var removed = [];
+  if (Array.isArray(body.assistant)) {
+    var said = {};
+    body.assistant.forEach(function (k) { said[String(k)] = 1; });
+    var inCart = {};
+    (data.Cartable || []).forEach(function (c) { if (c.entity === 'Mizito') inCart[c.entity_id] = 1; });
+    var hasMentions = {};
+    (data.MizitoMentions || []).forEach(function (x) { hasMentions[x.item_id] = 1; });
+    (data.Mizito || []).forEach(function (m) {
+      var key = String(m.mz_key || '').replace(/^.*_sl/i, '');
+      if (!key || said[key] || items[key] || m.source !== 'agent' || m.ext_id || hasMentions[m.id] || inCart[m.id]) return;
+      var others = Object.keys(mzFirsts_(m.mz_first)).filter(function (k) { return k !== agent.name; });
+      if (others.length || names_(m.mentioned).some(function (n) { return n !== agent.name; })) return;
+      if (m.review !== 'new' || m.category || m.action || m.notes || m.outcome || m.priority_override || String(m.urgent) === '1' || m.assigned_to) return;
+      removed.push(m.id);
+    });
+    if (removed.length) {
+      deleteRows_('Mizito', removed);
+      var gone = {};
+      removed.forEach(function (id) { gone[id] = 1; });
+      deleteRows_('MizitoComments', (data.MizitoComments || []).filter(function (c) { return gone[c.item_id]; }).map(function (c) { return c.id; }));
+    }
+  }
+
   var rows = Object.keys(items).map(function (k) { return items[k]; });
   writeRows_('Mizito', rows);
   writeRows_('MizitoMentions', mentions);
@@ -1921,12 +1958,13 @@ function mzIngest_(body, agent) {
     patch.done_at = now;
     patch.run = body.stats || {};
     patch.full = body.full ? now : st.full || '';
+    patch.link = String(body.link || '');
   }
   mzSetStatus_(agent.name, patch);
-  return { made: made, updated: updated, mentions: mentions.length, comments: notes.length, gone: gone };
+  return { made: made, updated: updated, mentions: mentions.length, comments: notes.length, gone: gone, removed: removed.length };
 }
 
-var MZ_AGENT_FIELDS = ['mz_state', 'mz_done_at', 'mz_done_by', 'mz_progress', 'mz_project', 'mz_owner', 'mz_assignees', 'mz_labels', 'mz_checklist', 'mz_deadline', 'mz_last_by', 'mz_last_at', 'synced_at', 'mz_change', 'mz_changed_at', 'last_mention_at', 'last_mention_by', 'received_at', 'mentioned'];
+var MZ_AGENT_FIELDS = ['mz_state', 'mz_done_at', 'mz_done_by', 'mz_progress', 'mz_project', 'mz_owner', 'mz_assignees', 'mz_labels', 'mz_checklist', 'mz_deadline', 'mz_last_by', 'mz_last_at', 'synced_at', 'mz_change', 'mz_changed_at', 'mz_first', 'last_mention_at', 'last_mention_by', 'received_at', 'mentioned'];
 /**
  * A save from a page that loaded before the agent's last read must not take the agent's newer facts
  * back: those fields keep the sheet's values, and the task is read in full again (sig cleared) so
@@ -1956,4 +1994,26 @@ function mailCartable_(owner, box, period, user) {
   var title = (box === 'weekly' ? 'کارتابل آخر هفته' : 'کارتابل امروز') + ' — ' + items.length + ' مورد';
   MailApp.sendEmail({ to: m.email, subject: 'مدار: ' + title, htmlBody: mailBox_('<h3 style="margin:0 0 8px">' + esc_(title) + '</h3>', '<p>' + esc_(user.name) + ' این موارد را برای اقدام شما فرستاده است:</p><ul style="padding-inline-start:18px">' + rows + '</ul>') });
   return { sent: true, count: items.length };
+}
+
+/** "name=YYYY-MM-DD HH:mm" lines → { name: time } */
+function mzFirsts_(raw) {
+  var out = {};
+  String(raw || '').split('\n').forEach(function (line) {
+    var i = line.lastIndexOf('=');
+    if (i > 0) out[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+  });
+  return out;
+}
+
+/** Removes rows by id (bottom first, so the row numbers stay right). */
+function deleteRows_(name, ids) {
+  if (!ids || !ids.length) return;
+  var sh = SpreadsheetApp.getActive().getSheetByName(name);
+  if (!sh || sh.getLastRow() < 2) return;
+  var want = {};
+  ids.forEach(function (id) { want[String(id)] = 1; });
+  var col = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
+  for (var i = col.length - 1; i >= 0; i--) if (want[String(col[i][0])]) sh.deleteRow(i + 2);
+  bumpVersion_();
 }
