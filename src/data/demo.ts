@@ -20,6 +20,6 @@ export function buildDemo(): DB {
   }))
   return {
     Projects: [], Team, Scope: [], Milestones: [], Sprints: [], Tasks: [], FollowUps: [], Risks: [], Allocations: [], Updates: [], Comments: [],
-    Deliverables: [], Meetings: [], Files: [], Config: [], Contracts: [], Handoffs: [], Deliveries: [], History: [], Contacts: [], Mizito: [], MizitoMentions: [], Objectives: [], KeyResults: [], Kpis: [], Checkins: [], Plans: [],
+    Deliverables: [], Meetings: [], Files: [], Config: [], Contracts: [], Handoffs: [], Deliveries: [], History: [], Contacts: [], Mizito: [], MizitoMentions: [], MizitoComments: [], Objectives: [], KeyResults: [], Kpis: [], Checkins: [], Plans: [],
   }
 }

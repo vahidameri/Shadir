@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<title>ایجنت میزیتوی مدار</title>
+<style>
+  :root { --ink: #1d2a30; --sub: #6b7a80; --line: #e3e8ea; --bg: #fff; --muted: #f3f6f7; --brand: #2f6f9f; --bad: #c4314b; --good: #2e7d5b; }
+  @media (prefers-color-scheme: dark) { :root { --ink: #e6edf0; --sub: #93a3a9; --line: #2b383e; --bg: #141c20; --muted: #1c272c; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; width: 340px; background: var(--bg); color: var(--ink); font: 13px/1.7 Tahoma, "Segoe UI", system-ui, sans-serif; }
+  header { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  header img { width: 28px; height: 28px; border-radius: 8px; }
+  header b { display: block; font-size: 14px; }
+  header small { color: var(--sub); }
+  main { padding: 14px 16px; }
+  textarea { width: 100%; min-height: 70px; padding: 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--muted); color: var(--ink); font: 11px monospace; direction: ltr; resize: vertical; }
+  button { height: 34px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); color: var(--ink); font: inherit; cursor: pointer; }
+  button.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .card { background: var(--muted); border-radius: 12px; padding: 10px 12px; margin-top: 10px; }
+  .sub { color: var(--sub); font-size: 12px; }
+  .err { color: var(--bad); font-size: 12px; }
+  .ok { color: var(--good); }
+  .link { background: none; border: 0; padding: 0; height: auto; color: var(--sub); text-decoration: underline; font-size: 12px; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <img src="icons/icon48.png" alt="" />
+  <div><b>ایجنت میزیتوی مدار</b><small id="who">به مدار وصل نیست</small></div>
+</header>
+<main>
+  <section id="connect" class="hidden">
+    <p class="sub">در مدار به «میزیتو ← تنظیمات ← ایجنت میزیتو» بروید، برای خودتان «ساخت کلید» بزنید و کد اتصال را اینجا بچسبانید.</p>
+    <textarea id="code" placeholder="madar:…"></textarea>
+    <div class="row"><button class="primary" id="go">اتصال</button></div>
+    <div id="cerr" class="err"></div>
+  </section>
+  <section id="ready" class="hidden">
+    <div class="row">
+      <button class="primary" id="now">همگام‌سازی الان</button>
+      <button id="full">خواندن کامل از ابتدا</button>
+    </div>
+    <div class="card">
+      <div id="state"></div>
+      <div id="progress" class="sub"></div>
+      <div id="stats" class="sub"></div>
+      <div id="error" class="err"></div>
+    </div>
+    <p class="sub">هر ۱۵ دقیقه، و هر بار که منشن تازه‌ای برسد، تغییرات خوانده می‌شود؛ روزی یک بار همه‌چیز تا تاریخ شروع بازبینی می‌شود. کافی است یک تب میزیتو باز باشد. در میزیتو چیزی نوشته نمی‌شود.</p>
+    <button class="link" id="out">قطع اتصال</button>
+  </section>
+</main>
+<script src="popup.js"></script>
+</body>
+</html>

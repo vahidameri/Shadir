@@ -2,7 +2,7 @@
 // One row per Mizito task (the link's task id is the key); every new mention threads into it.
 // Priority is computed from who asked (their tier), the deadline, the SLA and the urgent flag —
 // every list, weight and threshold here is a setting (Config keys mz.*), edited in the back office.
-import type { Contact, DB, MizitoItem, MizitoMention } from './types'
+import type { Contact, DB, MizitoComment, MizitoItem, MizitoMention } from './types'
 import { daysFromToday, todayISO } from './jalali'
 import { L, type T2 } from './i18n'
 
@@ -16,7 +16,11 @@ export const MZ_KEYS = {
   thresholds: 'mz.thresholds', // JSON {p0, p1, p2}
   staleDays: 'mz.stale_days',
   template: 'mz.template', // reminder text with {name} {title} {days} {link} {asked_by}
+  cutoff: 'mz.agent.cutoff', // the agent reads tasks with activity since this day (ISO)
+  agent: 'mz.agent.', // + a person's name: their agent's last run (written by the server)
 } as const
+/** 1 Tir 1405 */
+export const MZ_CUTOFF = '2026-06-22'
 
 export interface Tier { id: string; fa: string; en: string; sla: number; weight: number; color: string }
 export type MzCat = 'open' | 'waiting' | 'blocked' | 'done' | 'cancelled'
@@ -117,7 +121,7 @@ export const firstMzStatus = (cat: MzCat) => cfg.statuses.find((s) => s.cat === 
 // ------------------------------------------------------------------ index
 // Lookups the queue makes for every row (mentions of an item, a person's registry row) are built
 // once per data version instead of scanning the lists each time.
-interface MzIndex { mentions: Map<string, MizitoMention[]>; contacts: Map<string, Contact> }
+interface MzIndex { mentions: Map<string, MizitoMention[]>; comments: Map<string, MizitoComment[]>; contacts: Map<string, Contact> }
 const indexes = new WeakMap<DB, MzIndex>()
 function indexOf(db: DB): MzIndex {
   let ix = indexes.get(db)
@@ -125,12 +129,15 @@ function indexOf(db: DB): MzIndex {
     const mentions = new Map<string, MizitoMention[]>()
     for (const x of db.MizitoMentions) mentions.set(x.item_id, [...(mentions.get(x.item_id) || []), x])
     mentions.forEach((l) => l.sort((a, b) => (a.at < b.at ? -1 : 1)))
+    const comments = new Map<string, MizitoComment[]>()
+    for (const x of db.MizitoComments || []) comments.set(x.item_id, [...(comments.get(x.item_id) || []), x])
+    comments.forEach((l) => l.sort((a, b) => (a.at < b.at ? -1 : 1)))
     const contacts = new Map<string, Contact>()
     for (const c of db.Contacts) {
       if (c.name_en) contacts.set(c.name_en, c)
       contacts.set(c.name, c)
     }
-    ix = { mentions, contacts }
+    ix = { mentions, comments, contacts }
     indexes.set(db, ix)
   }
   return ix
@@ -168,6 +175,27 @@ const stampMs = (s: string) => {
   return Number.isFinite(t) ? t : 0
 }
 export const mentionsOf = (db: DB, id: string): MizitoMention[] => indexOf(db).mentions.get(id) || []
+/** The conversation on the task in Mizito, as the agent read it (oldest first). */
+export const commentsOf = (db: DB, id: string): MizitoComment[] => indexOf(db).comments.get(id) || []
+const people = (s?: string) => String(s || '').split(',').map((x) => x.trim()).filter(Boolean)
+/** The last word in Mizito came from one of the people it was brought for: the ball is with others. */
+export const answered = (m: MizitoItem) => !!m.mz_last_by && people(m.mentioned).includes(m.mz_last_by) && String(m.mz_last_at || '') >= String(m.last_mention_at || '')
+
+/** What the agent knows that a person should look at. */
+export function mzFlags(m: MizitoItem) {
+  const closed = mzClosed(m)
+  return {
+    agent: m.source === 'agent',
+    fresh: m.review === 'new' && !closed,
+    /** 100% in Mizito but nobody closed it */
+    finished: m.mz_state === 'open' && Number(m.mz_progress) >= 100 && !closed,
+    /** closed in Madar while Mizito still has it open */
+    openThere: m.mz_state === 'open' && closed && m.review !== 'ignored',
+    /** no longer in this person's Mizito (done, removed or handed off) while open here */
+    gone: m.mz_state === 'gone' && !closed,
+    answered: !closed && answered(m),
+  }
+}
 /** Everyone who mentioned it: the asker and every re-mention. */
 export const askersOf = (db: DB, m: MizitoItem) => [...new Set([m.asked_by, ...mentionsOf(db, m.id).map((x) => x.by)].filter(Boolean))]
 /** The highest tier among the people who asked. */
@@ -218,7 +246,10 @@ function computeSignals(db: DB, m: MizitoItem, now: number): MzSignals {
   const open = !mzClosed(m)
   const cat = mzCat(m.status)
   const last = stampMs(m.last_mention_at || m.received_at || m.created_at)
-  const slaLeft = open && cat === 'open' && last && tier ? Math.round(tier.sla - (now - last) / 3600000) : null
+  // the SLA is for asks: a task the agent brought only because it is assigned (no mention) has no clock,
+  // and an answer in Mizito after the last mention stops it
+  const asked = m.source !== 'agent' || !!m.ext_id || mentions > 1
+  const slaLeft = open && cat === 'open' && last && tier && asked && !answered(m) ? Math.round(tier.sla - (now - last) / 3600000) : null
   const breached = slaLeft !== null && slaLeft < 0
   const touched = Math.max(last, stampMs(m.updated_at))
   const quietDays = touched ? Math.floor((now - touched) / 86400000) : 0
@@ -254,8 +285,8 @@ export const P_HINT: T2[] = [
   ['خوب است انجام شود', 'Good to do'],
 ]
 
-export type MzView = 'queue' | 'p0' | 'exec' | 'breached' | 'waiting' | 'stale' | 'mine_cpto' | 'mine_pgm' | 'closed' | 'all'
-export const MZ_VIEWS: MzView[] = ['queue', 'p0', 'exec', 'breached', 'waiting', 'stale', 'closed', 'all']
+export type MzView = 'queue' | 'inbox' | 'p0' | 'exec' | 'breached' | 'waiting' | 'stale' | 'mine_cpto' | 'mine_pgm' | 'closed' | 'all'
+export const MZ_VIEWS: MzView[] = ['queue', 'inbox', 'p0', 'exec', 'breached', 'waiting', 'stale', 'closed', 'all']
 
 /** The two highest tiers count as "exec asks". */
 const isExecTier = (t?: Tier) => !!t && [...cfg.tiers].sort((a, b) => b.weight - a.weight).slice(0, 2).some((x) => x.id === t.id)
@@ -269,6 +300,8 @@ export function inMzView(db: DB, m: MizitoItem, v: MzView, s = mzSignals(db, m))
       return mzClosed(m)
     case 'queue':
       return !mzClosed(m)
+    case 'inbox':
+      return m.review === 'new' && !mzClosed(m)
     case 'p0':
       return !mzClosed(m) && s.p === 0
     case 'exec':
@@ -320,4 +353,24 @@ export function stampMizito(prev: MizitoItem | undefined, next: MizitoItem): Miz
   out.closed_at = closed ? out.closed_at || prev?.closed_at || now : ''
   out.updated_at = now
   return out
+}
+
+export interface AgentRun {
+  /** last batch received, last finished run, last full read */
+  at?: string
+  done_at?: string
+  full?: string
+  error?: string
+  key_at?: string
+  revoked?: string
+  version?: string
+  run?: { tasks?: number; mentions?: number; comments?: number; pages?: number }
+}
+export function agentRun(raw?: string): AgentRun {
+  try {
+    const v = raw ? JSON.parse(raw) : {}
+    return v && typeof v === 'object' ? v : {}
+  } catch {
+    return {}
+  }
 }

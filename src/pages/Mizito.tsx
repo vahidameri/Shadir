@@ -2,24 +2,24 @@
 // priority (P0 first, then SLA, then deadline). Re-mentions thread into the same row.
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { AtSign, Copy, Plus, Rows3, Settings2 } from 'lucide-react'
+import { AtSign, Bot, Check, Copy, Plus, Rows3, Settings2, X } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { Band, Card, Empty, FilterSelect, Overlap, SearchInput, Segmented, Sheet, StatStrip, cx } from '../components/ui'
 import { L } from '../lib/i18n'
-import { fa, fmtDate } from '../lib/jalali'
-import { MZ_VIEWS, inMzView, isMizitoLink, mzCat, mzCfg, mzSignals, optLabel, statusById, tierById, type MzView } from '../lib/mizito'
+import { fa, fmtDate, timeAgo } from '../lib/jalali'
+import { MZ_KEYS, MZ_VIEWS, agentRun, firstMzStatus, inMzView, isMizitoLink, mzCat, mzCfg, mzFlags, mzSignals, optLabel, statusById, tierById, type MzView } from '../lib/mizito'
 import { daysFromToday } from '../lib/jalali'
 import { CaptureSheet, MizitoSettings, MizitoSheet, MzLink, MzSignals, MzStatusChip, PBadge, useReminder } from '../components/MizitoParts'
 import type { MizitoItem } from '../lib/types'
 
 const VIEW_LABEL: Record<MzView, [string, string]> = {
-  queue: ['صف باز', 'Open queue'], p0: ['P0', 'P0'], exec: ['درخواست مدیران ارشد', 'Exec asks'], breached: ['عبور از SLA', 'SLA breached'],
+  queue: ['صف باز', 'Open queue'], inbox: ['تازه از میزیتو', 'New from Mizito'], p0: ['P0', 'P0'], exec: ['درخواست مدیران ارشد', 'Exec asks'], breached: ['عبور از SLA', 'SLA breached'],
   waiting: ['منتظر / مسدود', 'Waiting / blocked'], stale: ['راکد', 'Quiet'], mine_cpto: ['', ''], mine_pgm: ['', ''], closed: ['بسته‌شده', 'Closed'], all: ['همه', 'All'],
 }
 type Group = '' | 'asker' | 'category' | 'p' | 'status' | 'assigned'
 
 export default function MizitoPage() {
-  const { db, canEdit, access, me, upsert, toast } = useStore()
+  const { db, canEdit, access, me, upsert, toast, setting } = useStore()
   const [params, setParams] = useSearchParams()
   const get = (k: string) => params.get(k) || ''
   const set = (k: string, v: string) => {
@@ -92,6 +92,16 @@ export default function MizitoPage() {
     if (ids.length > 1) toast(L(`وضعیت ${fa(ids.length)} مورد به‌روز شد`, `${ids.length} items updated`))
     setPicked(new Set())
   }
+  // the agent's new items: keep (it joins the queue as is) or set aside (cancelled, never reopened by the agent)
+  const review = async (ids: string[], keep: boolean) => {
+    for (const id of ids) {
+      const m = db.Mizito.find((x) => x.id === id)
+      if (m) await upsert('Mizito', keep ? { ...m, review: '' } : { ...m, review: 'ignored', status: firstMzStatus('cancelled') })
+    }
+    toast(keep ? L(`${fa(ids.length)} مورد به صف اضافه شد`, `${ids.length} added to the queue`) : L(`${fa(ids.length)} مورد کنار گذاشته شد`, `${ids.length} set aside`))
+    setPicked(new Set())
+  }
+  const runs = leaders.map((n) => ({ name: n, run: agentRun(setting(MZ_KEYS.agent + n)) })).filter((x) => x.run.key_at && !x.run.revoked)
   const togglePick = (id: string) => setPicked((p) => {
     const n = new Set(p)
     if (n.has(id)) n.delete(id)
@@ -101,7 +111,17 @@ export default function MizitoPage() {
   return (
     <>
       <Band
-        eyebrow={<span className="inline-flex items-center gap-1.5"><AtSign size={12} /> {c.base.replace(/^https?:\/\//, '')}</span>}
+        eyebrow={
+          <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="inline-flex items-center gap-1.5"><AtSign size={12} /> {c.base.replace(/^https?:\/\//, '')}</span>
+            {runs.map((x) => (
+              <span key={x.name} className={cx('inline-flex items-center gap-1', x.run.error && 'text-red-200')} title={x.run.error || ''}>
+                <Bot size={12} /> {x.name}: {x.run.at ? L(`همگام ${timeAgo(new Date(x.run.at.replace(' ', 'T')))}`, `synced ${timeAgo(new Date(x.run.at.replace(' ', 'T')))}`) : L('هنوز همگام نشده', 'not synced yet')}
+                {x.run.error && ' ⚠'}
+              </span>
+            ))}
+          </span>
+        }
         title={L('میزیتو', 'Mizito')}
         actions={
           <>
@@ -176,7 +196,23 @@ export default function MizitoPage() {
             {c.statuses.map((x) => (
               <button key={x.id} className={cx('btn-sm', x.cat === 'done' ? 'btn-primary' : 'btn-outline')} onClick={() => setStatus([...picked], x.id)}>{optLabel(x)}</button>
             ))}
+            {[...picked].some((id) => db.Mizito.find((x) => x.id === id)?.review === 'new') && (
+              <>
+                <span className="mx-1 h-5 w-px bg-line" />
+                <button className="btn-outline btn-sm" onClick={() => review([...picked], true)}><Check size={14} /> {L('به صف', 'To the queue')}</button>
+                <button className="btn-outline btn-sm" onClick={() => review([...picked], false)}><X size={14} /> {L('کنار گذاشتن', 'Set aside')}</button>
+              </>
+            )}
             <button className="btn-ghost btn-sm ms-auto" onClick={() => setPicked(new Set())}>{L('لغو انتخاب', 'Clear')}</button>
+          </div>
+        )}
+        {view === 'inbox' && list.length > 0 && canEdit && (
+          <div className="mb-3 flex flex-wrap items-center gap-3 rounded-2xl border border-brand/20 bg-brand-soft/30 px-4 py-3 text-sm">
+            <Bot size={18} className="shrink-0 text-brand" />
+            <span className="min-w-0 flex-1 leading-6">
+              {L('این‌ها را ایجنت از میزیتو آورده و هنوز نگاهشان نکرده‌اید. در صف هستند؛ دسته و نوع اقدام را بدهید و «به صف» بزنید، یا اگر به ما مربوط نیست کنار بگذارید.', 'The agent brought these from Mizito and nobody has looked at them yet. They are already in the queue; give them a category and action and keep them, or set them aside.')}
+            </span>
+            <button className="btn-primary btn-sm" onClick={() => review(list.map((m) => m.id), true)}><Check size={14} /> {L(`همه به صف (${fa(list.length)})`, `Keep all (${list.length})`)}</button>
           </div>
         )}
         <Card pad={false}>
@@ -200,6 +236,7 @@ export default function MizitoPage() {
                         <PBadge p={s.p} />
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
+                            {mzFlags(m).fresh && <span className="rounded-full bg-brand px-1.5 text-[0.625rem] font-medium leading-5 text-white">{L('تازه', 'New')}</span>}
                             <span className="font-medium">{m.title}</span>
                             {canEdit ? (
                               <select
@@ -223,6 +260,7 @@ export default function MizitoPage() {
                                 {s.tier && <span>({optLabel(s.tier)})</span>}
                               </span>
                             )}
+                            {m.mz_project && <span>· {m.mz_project}</span>}
                             {m.category && <span>· {optLabel(c.categories.find((x) => x.id === m.category))}</span>}
                             {m.action && <span>· {optLabel(c.actions.find((x) => x.id === m.action))}</span>}
                             <span>· {L('منشن', 'mentioned')} {fmtDate(m.received_at || m.created_at)}</span>
@@ -233,6 +271,12 @@ export default function MizitoPage() {
                           {m.outcome && <div className="mt-1 truncate text-xs text-sub">↳ {m.outcome}</div>}
                         </div>
                         <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          {canEdit && mzFlags(m).fresh && (
+                            <>
+                              <button className="icon-btn h-8 w-8 hover:text-good" onClick={() => review([m.id], true)} title={L('به صف', 'To the queue')} aria-label={L('به صف', 'To the queue')}><Check size={15} /></button>
+                              <button className="icon-btn h-8 w-8 hover:text-bad" onClick={() => review([m.id], false)} title={L('کنار گذاشتن', 'Set aside')} aria-label={L('کنار گذاشتن', 'Set aside')}><X size={15} /></button>
+                            </>
+                          )}
                           <button className="icon-btn h-8 w-8 opacity-0 transition group-hover:opacity-100" onClick={() => remind(m)} title={L('کپی متن یادآوری', 'Copy reminder')} aria-label={L('کپی متن یادآوری', 'Copy reminder')}>
                             <Copy size={14} />
                           </button>

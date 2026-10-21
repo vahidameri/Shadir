@@ -34,7 +34,7 @@ interface Field {
   placeholder?: T2
 }
 
-export type EditableSheet = Exclude<SheetName, 'Comments' | 'Files' | 'Config' | 'Handoffs' | 'Deliveries' | 'History' | 'MizitoMentions' | 'Checkins'>
+export type EditableSheet = Exclude<SheetName, 'Comments' | 'Files' | 'Config' | 'Handoffs' | 'Deliveries' | 'History' | 'MizitoMentions' | 'MizitoComments' | 'Checkins'>
 
 const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields: Field[]; defaults: () => Record<string, unknown> }> = {
   Tasks: {

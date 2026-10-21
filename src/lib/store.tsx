@@ -79,7 +79,7 @@ const NUMERIC: Partial<Record<SheetName, string[]>> = {
 }
 
 function emptyDB(): DB {
-  return { Projects: [], Scope: [], Milestones: [], Sprints: [], Tasks: [], FollowUps: [], Risks: [], Team: [], Allocations: [], Updates: [], Comments: [], Deliverables: [], Meetings: [], Files: [], Config: [], Contracts: [], Handoffs: [], Deliveries: [], History: [], Contacts: [], Mizito: [], MizitoMentions: [], Objectives: [], KeyResults: [], Kpis: [], Checkins: [], Plans: [] }
+  return { Projects: [], Scope: [], Milestones: [], Sprints: [], Tasks: [], FollowUps: [], Risks: [], Team: [], Allocations: [], Updates: [], Comments: [], Deliverables: [], Meetings: [], Files: [], Config: [], Contracts: [], Handoffs: [], Deliveries: [], History: [], Contacts: [], Mizito: [], MizitoMentions: [], MizitoComments: [], Objectives: [], KeyResults: [], Kpis: [], Checkins: [], Plans: [] }
 }
 
 // Sheets return numbers as numbers or strings, dates as ISO strings. Normalize once here.
@@ -469,7 +469,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [config, mode],
   )
 
-  const BULK_SHEETS: SheetName[] = ['Tasks', 'FollowUps', 'Mizito', 'MizitoMentions', 'Contacts', 'Team', 'Projects', 'History', 'Comments', 'Allocations', 'Objectives', 'KeyResults', 'Kpis', 'Checkins', 'Sprints', 'Plans']
+  const BULK_SHEETS: SheetName[] = ['Tasks', 'FollowUps', 'Mizito', 'MizitoMentions', 'MizitoComments', 'Contacts', 'Team', 'Projects', 'History', 'Comments', 'Allocations', 'Objectives', 'KeyResults', 'Kpis', 'Checkins', 'Sprints', 'Plans']
   const bulk = useCallback(
     async <S extends SheetName>(sheet: S, rows: Row<S>[]) => {
       if (!rows.length) return

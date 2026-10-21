@@ -48,7 +48,7 @@ export function scopeDB(db: DB, me: string, access: Access): DB {
     : db.FollowUps.filter((f) => f.owner === me || f.person === me)
   let out: DB = { ...db, FollowUps }
   if (!can.contracts(access)) out = { ...out, Contracts: [], Files: out.Files.filter((f) => f.entity !== 'Contracts') }
-  if (!can.mizito(access)) out = { ...out, Mizito: [], MizitoMentions: [], Contacts: [], History: out.History.filter((h) => h.entity !== 'Mizito'), Files: out.Files.filter((f) => f.entity !== 'Mizito') }
+  if (!can.mizito(access)) out = { ...out, Mizito: [], MizitoMentions: [], MizitoComments: [], Contacts: [], History: out.History.filter((h) => h.entity !== 'Mizito'), Files: out.Files.filter((f) => f.entity !== 'Mizito') }
   if (isLeader(access)) return out
 
   const ok = relatedProjects(db, me)

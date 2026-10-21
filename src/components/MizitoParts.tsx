@@ -3,7 +3,7 @@
 // weights, thresholds, reminder template).
 import { useMemo, useState } from 'react'
 import { Attachments } from './Files'
-import { AtSign, Ban, Check, Clock, Copy, ExternalLink, FileText, Flame, Hourglass, Link2, MessageSquarePlus, MoonStar, Plus, Settings2, Trash2, UserRound, X } from 'lucide-react'
+import { AtSign, Ban, Bot, Check, CheckCheck, Clock, Copy, ExternalLink, FileText, Flame, Hourglass, KeyRound, Link2, MessageSquarePlus, MoonStar, Paperclip, Plus, Reply, Settings2, Trash2, UserRound, X } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { useEditor } from './Editor'
 import { SaveClose } from './SaveClose'
@@ -16,10 +16,10 @@ import { uid } from '../lib/api'
 import { historyOf } from '../lib/history'
 import { historyText } from './TaskTracking'
 import {
-  MZ_KEYS, P_COLOR, P_HINT, allPeople, askersOf, firstMzStatus, isMizitoLink, mentionsOf, mzCat, mzCfg, mzClosed, mzKeyOf, mzSignals, nowStampMz, optLabel, reminderText, statusById, tierOf,
+  MZ_CUTOFF, MZ_KEYS, P_COLOR, P_HINT, agentRun, allPeople, askersOf, commentsOf, firstMzStatus, isMizitoLink, mentionsOf, mzCat, mzCfg, mzClosed, mzFlags, mzKeyOf, mzSignals, nowStampMz, optLabel, reminderText, statusById, tierOf,
   type MzCat, type MzOption, type MzStatus,
 } from '../lib/mizito'
-import type { MizitoItem, MizitoMention } from '../lib/types'
+import type { MizitoComment, MizitoItem, MizitoMention } from '../lib/types'
 
 const toDate = (s: string) => new Date(String(s).replace(' ', 'T'))
 /** When something happened in Mizito: a date and a time, stored as "YYYY-MM-DD HH:mm". */
@@ -56,8 +56,14 @@ export function MzSignals({ m, compact }: { m: MizitoItem; compact?: boolean }) 
   const { db } = useStore()
   const s = mzSignals(db, m)
   const h = (n: number) => (Math.abs(n) >= 48 ? L(`${fa(Math.round(Math.abs(n) / 24))} روز`, `${Math.round(Math.abs(n) / 24)}d`) : L(`${fa(Math.abs(n))} ساعت`, `${Math.abs(n)}h`))
+  const f = mzFlags(m)
   return (
     <span className="flex flex-wrap items-center gap-1">
+      {f.finished && <span className={cx(chip, 'bg-good/10 text-good')} title={L('پیشرفت در میزیتو ۱۰۰٪ است ولی بسته نشده', 'At 100% in Mizito but not closed')}><CheckCheck size={11} /> {L('۱۰۰٪؛ فقط باید بسته شود', '100%: only needs closing')}</span>}
+      {f.openThere && <span className={cx(chip, 'bg-warn/10 text-warn')}><Bot size={11} /> {L('در میزیتو هنوز باز است', 'Still open in Mizito')}</span>}
+      {f.gone && <span className={cx(chip, 'bg-muted text-sub')} title={L('در آخرین خواندن کامل، این تسک در میزیتوی صاحبش دیده نشد (بسته، حذف یا واگذار شده)', 'Not seen in the last full read (closed, removed or handed off)')}><Bot size={11} /> {L('دیگر در میزیتو دیده نمی‌شود', 'No longer seen in Mizito')}</span>}
+      {f.answered && !compact && <span className={cx(chip, 'bg-violet-500/10 text-violet-600')}><Reply size={11} /> {L(`آخرین پاسخ: ${m.mz_last_by}`, `Last reply: ${m.mz_last_by}`)}</span>}
+      {f.answered && compact && <span className={cx(chip, 'bg-violet-500/10 text-violet-600')} title={L(`آخرین پاسخ در میزیتو از ${m.mz_last_by}`, `Last reply in Mizito by ${m.mz_last_by}`)}><Reply size={11} /> {L('پاسخ داده‌ایم', 'Answered')}</span>}
       {m.urgent === '1' && (
         <span className={cx(chip, 'bg-bad/10 font-medium text-bad')}>
           <Flame size={11} /> {L('فوری', 'Urgent')}
@@ -287,6 +293,31 @@ export function CaptureSheet({ onClose, onOpen, initialLink = '' }: { onClose: (
 }
 
 // ------------------------------------------------------------------ the item
+/** One comment of the Mizito conversation: who, when, what it answers, the text, who it mentions, files. */
+function MzCommentLine({ c, m, all }: { c: MizitoComment; m: MizitoItem; all: MizitoComment[] }) {
+  const ours = m.mentioned.split(',').map((x) => x.trim()).filter(Boolean)
+  const tagged = c.mentions.split(',').map((x) => x.trim()).filter(Boolean)
+  const parent = c.reply_to ? all.find((x) => x.id === c.reply_to) : undefined
+  const files = String(c.files || '').split('\n').filter(Boolean)
+  const mine = ours.includes(c.by)
+  return (
+    <li className="relative">
+      <span className="absolute -start-[37px] top-0"><Avatar name={c.by || '?'} size="sm" ring /></span>
+      <div className="text-sm">
+        <b className="font-medium">{c.by}</b> <span className="text-sub">{fmtDate(c.at)} {c.at.slice(11, 16)} · {timeAgo(toDate(c.at))}</span>
+      </div>
+      {parent && <div className="mt-1 truncate border-s-2 border-line-strong ps-2 text-xs text-sub"><Reply size={11} className="inline" /> {parent.by}: {parent.body.slice(0, 120)}</div>}
+      <div className={cx('mt-1 whitespace-pre-wrap rounded-2xl rounded-ss-md px-4 py-2 text-sm leading-7', mine ? 'bg-ink/[0.06]' : 'bg-muted')}>{c.body || <span className="text-sub">{L('(بدون متن)', '(no text)')}</span>}</div>
+      {(tagged.length > 0 || files.length > 0) && (
+        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[0.6875rem] text-sub">
+          {tagged.map((n) => <span key={n} className={cx('rounded-full px-1.5', ours.includes(n) ? 'bg-brand/10 font-medium text-brand' : 'bg-muted')}>@{n}</span>)}
+          {files.map((f) => <span key={f} className="inline-flex items-center gap-1 rounded-full bg-muted px-1.5"><Paperclip size={10} /> {f}</span>)}
+        </div>
+      )}
+    </li>
+  )
+}
+
 export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }) {
   const { db, upsert, remove, toast, canEdit } = useStore()
   const { open } = useEditor()
@@ -296,11 +327,16 @@ export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }
   const [by, setBy] = useState('')
   const [at, setAt] = useState(nowStampMz)
   const [confirmDel, setConfirmDel] = useState(false)
+  const [allThread, setAllThread] = useState(false)
   const thread = useMemo(() => {
     if (!m) return []
-    const ms = mentionsOf(db, m.id).map((x) => ({ kind: 'm' as const, at: x.at, x }))
+    // the Mizito conversation (from the agent); a mention made by one of these comments shows on the comment itself
+    const cs = commentsOf(db, m.id)
+    const said = new Set(cs.map((c) => c.id))
+    const ms = mentionsOf(db, m.id).filter((x) => !(x.mz_comment && said.has(`MC-${x.mz_comment}`))).map((x) => ({ kind: 'm' as const, at: x.at, x }))
     const hs = historyOf(db, 'Mizito', m.id).filter((h) => h.field !== '_created').map((h) => ({ kind: 'h' as const, at: h.at, h }))
-    return [...ms, ...hs].sort((a, b) => (a.at < b.at ? -1 : 1))
+    const cms = cs.map((c) => ({ kind: 'c' as const, at: c.at, c }))
+    return [...ms, ...hs, ...cms].sort((a, b) => (a.at < b.at ? -1 : 1))
   }, [db, m])
   if (!m) return null
   const s = mzSignals(db, m)
@@ -381,6 +417,14 @@ export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }
             {L(...P_HINT[s.p])}
           </div>
 
+          {canEdit && mzFlags(m).fresh && (
+            <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-brand/20 bg-brand-soft/30 px-3 py-2 text-xs">
+              <Bot size={15} className="text-brand" />
+              <span className="flex-1">{L('ایجنت این را از میزیتو آورده. دسته و نوع اقدام را بدهید و نگهش دارید، یا کنارش بگذارید.', 'The agent brought this from Mizito. Give it a category and action and keep it, or set it aside.')}</span>
+              <button className="btn-primary btn-sm" onClick={() => patch({ review: '' })}><Check size={14} /> {L('به صف', 'To the queue')}</button>
+              <button className="btn-outline btn-sm" onClick={() => patch({ review: 'ignored', status: firstMzStatus('cancelled') })}><X size={14} /> {L('کنار گذاشتن', 'Set aside')}</button>
+            </div>
+          )}
           {canEdit && (
             <div className="mt-4 flex flex-wrap gap-2">
               <div role="radiogroup" aria-label={L('وضعیت', 'Status')} className="flex flex-wrap gap-1.5">
@@ -410,6 +454,20 @@ export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }
             className="mt-5 w-full resize-none rounded-xl bg-transparent text-sm leading-7 outline-none placeholder:text-sub/60 focus:bg-muted/50 focus:p-3"
           />
 
+          {m.mz_checklist && (
+            <div className="mt-4">
+              <div className="eyebrow mb-2">{L('چک‌لیست در میزیتو', 'Checklist in Mizito')}</div>
+              <ul className="space-y-1 text-sm">
+                {String(m.mz_checklist).split('\n').filter(Boolean).map((line, i) => (
+                  <li key={i} className={cx('flex items-start gap-2', line.startsWith('✓') && 'text-sub line-through')}>
+                    <span className={cx('mt-1 grid h-4 w-4 shrink-0 place-items-center rounded border', line.startsWith('✓') ? 'border-good bg-good text-white' : 'border-line-strong')}>{line.startsWith('✓') && <Check size={10} />}</span>
+                    {line.slice(2)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="mt-4">
             <div className="eyebrow mb-2 flex items-center gap-1.5"><FileText size={12} /> {L('مستندات', 'Documents')}</div>
             {docs.length ? (
@@ -437,19 +495,27 @@ export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }
           </div>
 
           <div className="mt-8">
-            <div className="eyebrow mb-4 flex items-center gap-2"><AtSign size={13} /> {L('ترد منشن‌ها و تغییرات', 'Mentions & changes')}</div>
+            <div className="eyebrow mb-4 flex items-center gap-2">
+              <AtSign size={13} /> {commentsOf(db, m.id).length ? L('گفتگو در میزیتو، منشن‌ها و تغییرات', 'Mizito conversation, mentions & changes') : L('ترد منشن‌ها و تغییرات', 'Mentions & changes')}
+              {m.synced_at && <span className="font-normal normal-case text-sub">· {L(`خوانده‌شده ${timeAgo(toDate(m.synced_at))}`, `read ${timeAgo(toDate(m.synced_at))}`)}</span>}
+            </div>
+            {!allThread && thread.length > 25 && (
+              <button className="mb-3 text-xs text-brand hover:underline" onClick={() => setAllThread(true)}>{L(`نمایش ${fa(thread.length - 25)} مورد قدیمی‌تر`, `Show ${thread.length - 25} older`)}</button>
+            )}
             <ol className="relative space-y-4 border-s border-line ps-6">
               <li className="relative">
                 <span className="absolute -start-[37px] top-0"><Avatar name={m.asked_by || '?'} size="sm" ring /></span>
                 <div className="text-sm"><b className="font-medium">{m.asked_by || L('نامشخص', 'Unknown')}</b> <span className="text-sub">{L('مطرح کرد / منشن کرد', 'raised it')} · {fmtDate(m.received_at)} {m.received_at.slice(11, 16)}</span></div>
                 {m.notes && <div className="mt-1 whitespace-pre-wrap rounded-2xl rounded-ss-md bg-muted px-4 py-2 text-sm leading-7">{m.notes}</div>}
               </li>
-              {thread.map((t) =>
-                t.kind === 'm' ? (
+              {(allThread ? thread : thread.slice(-25)).map((t) =>
+                t.kind === 'c' ? (
+                  <MzCommentLine key={t.c.id} c={t.c} m={m} all={commentsOf(db, m.id)} />
+                ) : t.kind === 'm' ? (
                   <li key={t.x.id} className="relative">
                     <span className="absolute -start-[37px] top-0"><Avatar name={t.x.by || '?'} size="sm" ring /></span>
                     <div className="text-sm">
-                      <b className="font-medium">{t.x.by}</b> <span className="text-sub">{L('دوباره منشن کرد', 'mentioned again')} · {fmtDate(t.x.at)} {t.x.at.slice(11, 16)} · {timeAgo(toDate(t.x.at))}</span>
+                      <b className="font-medium">{t.x.by}</b> <span className="text-sub">{t.x.account ? L(`${t.x.account} را منشن کرد`, `mentioned ${t.x.account}`) : L('دوباره منشن کرد', 'mentioned again')} · {fmtDate(t.x.at)} {t.x.at.slice(11, 16)} · {timeAgo(toDate(t.x.at))}</span>
                       {t.x.status && <span className="ms-2"><MzStatusChip id={t.x.status} /></span>}
                     </div>
                     {t.x.note && <div className="mt-1 whitespace-pre-wrap rounded-2xl rounded-ss-md bg-brand-soft/40 px-4 py-2 text-sm leading-7">{t.x.note}</div>}
@@ -533,6 +599,19 @@ export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }
           {prop(L('گذشته', 'Age'), <span className="text-sub">{L(`${fa(s.ageDays)} روز از منشن`, `${s.ageDays}d since the mention`)}</span>)}
           {prop(L('ثبت در مدار', 'Logged in Madar'), <span className="text-sub">{fmtDate(m.created_at)}</span>)}
           {m.closed_at && prop(L('بسته شد', 'Closed'), <span className="text-sub">{fmtDayMonth(m.closed_at)}</span>)}
+          {m.mz_state && (
+            <>
+              <div className="eyebrow mb-1 mt-5 flex items-center gap-1.5 px-2.5"><Bot size={12} /> {L('در میزیتو', 'In Mizito')}</div>
+              {prop(L('وضعیت', 'State'), <span className={cx(m.mz_state === 'done' ? 'text-good' : m.mz_state === 'gone' ? 'text-sub' : '')}>{m.mz_state === 'done' ? L('انجام‌شده', 'Done') : m.mz_state === 'gone' ? L('دیگر دیده نمی‌شود', 'No longer seen') : L('باز', 'Open')}{m.mz_progress !== '' && m.mz_progress !== undefined && m.mz_state !== 'done' && <span className="text-sub num"> · {fa(Number(m.mz_progress) || 0)}٪</span>}</span>)}
+              {m.mz_done_at && prop(L('انجام شد', 'Done'), <span className="text-sub">{fmtDate(m.mz_done_at)}{m.mz_done_by && ` · ${m.mz_done_by}`}</span>)}
+              {m.mz_project && prop(L('پروژه', 'Project'), <span>{m.mz_project}</span>)}
+              {m.mz_owner && prop(L('سازنده', 'Created by'), <span>{m.mz_owner}</span>)}
+              {m.mz_assignees && prop(L('مسئولان', 'Assignees'), <span className="leading-5">{m.mz_assignees}</span>)}
+              {m.mz_deadline && prop(L('مهلت در میزیتو', 'Mizito deadline'), <span className="num">{fmtDate(m.mz_deadline)}</span>)}
+              {m.mz_labels && prop(L('برچسب‌ها', 'Labels'), <span className="flex flex-wrap gap-1">{String(m.mz_labels).split(',').map((x) => x.trim()).filter(Boolean).map((x) => <span key={x} className="rounded-full bg-muted px-1.5 text-[0.625rem]">{x}</span>)}</span>)}
+              {m.mz_last_by && prop(L('آخرین پیام', 'Last message'), <span className="text-sub">{m.mz_last_by} · {m.mz_last_at && timeAgo(toDate(m.mz_last_at))}</span>)}
+            </>
+          )}
           {canEdit && (
             <div className="pt-4">
               <button className="btn-outline btn-sm w-full" onClick={() => open('FollowUps', { person: m.assigned_to || m.asked_by, subject: L(`میزیتو: ${m.title}`, `Mizito: ${m.title}`), notes: m.link, priority: s.p <= 1 ? 'high' : 'medium' })}>
@@ -580,6 +659,96 @@ function OptionList({ title, items, onSave, kind }: { title: string; items: (MzO
   )
 }
 
+/** The Mizito agent (browser extension): a key per person, the cutoff, and each agent's last run. */
+function AgentCard({ admin }: { admin: boolean }) {
+  const { db, action, config, setting, setSetting, toast, refresh } = useStore()
+  const [code, setCode] = useState<{ name: string; code: string } | null>(null)
+  const [busy, setBusy] = useState('')
+  const leaders = db.Team.filter((x) => (x.access === 'super' || x.access === 'exec') && String(x.active) !== 'false')
+  const cutoff = setting(MZ_KEYS.cutoff) || MZ_CUTOFF
+  const when = (s?: string) => (s ? timeAgo(toDate(s)) : '—')
+  const makeKey = async (name: string) => {
+    setBusy(name)
+    try {
+      const row = (await action('mzAgentKey', { name })) as { token?: string } | undefined
+      if (!row?.token) return toast(L('در حالت نمایشی کلید ساخته نمی‌شود', 'No keys in demo mode'), 'err')
+      // one code carries both the data address and the key, so the extension needs a single paste
+      setCode({ name, code: `madar:${btoa(unescape(encodeURIComponent(JSON.stringify({ u: config.apiUrl, k: row.token, n: name }))))}` })
+      void refresh()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e), 'err')
+    } finally {
+      setBusy('')
+    }
+  }
+  const revoke = async (name: string) => {
+    if (!window.confirm(L(`کلید ایجنت ${name} باطل شود؟ افزونه‌اش دیگر چیزی نمی‌فرستد.`, `Revoke ${name}’s agent key?`))) return
+    try {
+      await action('mzAgentRevoke', { name })
+      toast(L('کلید باطل شد', 'Key revoked'))
+      void refresh()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e), 'err')
+    }
+  }
+  return (
+    <Card eyebrow={<span className="flex items-center gap-1.5"><Bot size={12} /> {L('ایجنت میزیتو', 'Mizito agent')}</span>} title={L('خواندن خودکار میزیتو', 'Reading Mizito automatically')} className="md:col-span-2">
+      <p className="mb-4 text-xs leading-6 text-sub">
+        {L('افزونه‌ی کروم «ایجنت میزیتوی مدار» در مرورگری که در آن وارد میزیتو شده‌اید، منشن‌ها، تسک‌های باز و گفتگوی هر تسک را می‌خواند و اینجا می‌آورد؛ در میزیتو چیزی نمی‌نویسد. برای هر نفر (شما و CPTO) یک کلید بسازید و «کد اتصال» را در افزونه بچسبانید. موارد تازه در «تازه از میزیتو» می‌نشینند؛ باز یا بسته بودن را میزیتو تعیین می‌کند و اولویت، دسته و یادداشت‌ها مال مدار است.', 'The “Madar Mizito agent” Chrome extension reads mentions, open tasks and each task’s conversation in the browser where you are signed in to Mizito, and brings them here; it never writes in Mizito. Make a key per person and paste the connection code into the extension.')}
+      </p>
+      <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
+        <span>{L('تسک‌هایی که از این روز به بعد فعالیت داشته‌اند:', 'Tasks with activity since:')}</span>
+        <DatePicker compact value={cutoff} onChange={(v) => admin && v && setSetting(MZ_KEYS.cutoff, v)} />
+        <span className="text-xs text-sub">{L('(پیش‌فرض ۱ تیر ۱۴۰۵)', '(default 1 Tir 1405)')}</span>
+      </div>
+      <ul className="divide-y divide-line rounded-2xl border border-line">
+        {leaders.map((p) => {
+          const r = agentRun(setting(MZ_KEYS.agent + p.name))
+          const live = !!r.key_at && !r.revoked
+          return (
+            <li key={p.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+              <Avatar name={p.name} size="sm" />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium">{p.name}</div>
+                <div className="mt-0.5 flex flex-wrap gap-x-3 text-[0.6875rem] text-sub">
+                  {live ? (
+                    <>
+                      <span>{L(`آخرین ارسال: ${when(r.at)}`, `Last batch: ${when(r.at)}`)}</span>
+                      <span>{L(`آخرین خواندن کامل: ${when(r.full)}`, `Last full read: ${when(r.full)}`)}</span>
+                      {r.run?.tasks !== undefined && <span className="num">{L(`${fa(r.run.tasks || 0)} تسک · ${fa(r.run.mentions || 0)} منشن`, `${r.run.tasks} tasks · ${r.run.mentions || 0} mentions`)}</span>}
+                      {r.version && <span dir="ltr">v{r.version}</span>}
+                    </>
+                  ) : (
+                    <span>{r.revoked ? L('کلید باطل شده', 'Key revoked') : L('هنوز کلیدی ساخته نشده', 'No key yet')}</span>
+                  )}
+                </div>
+                {live && r.error && <div className="mt-1 text-xs text-bad">⚠ {r.error}</div>}
+              </div>
+              {admin && (
+                <>
+                  <button className="btn-outline btn-sm" disabled={!!busy} onClick={() => makeKey(p.name)}><KeyRound size={13} /> {live ? L('کلید تازه', 'New key') : L('ساخت کلید', 'Make a key')}</button>
+                  {live && <button className="btn-ghost btn-sm text-sub" onClick={() => revoke(p.name)}>{L('باطل کردن', 'Revoke')}</button>}
+                </>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+      {code && (
+        <div className="mt-4 rounded-2xl border border-brand/30 bg-brand-soft/30 p-4">
+          <div className="mb-2 text-sm font-medium">{L(`کد اتصال ${code.name}`, `${code.name}’s connection code`)}</div>
+          <p className="mb-2 text-xs leading-6 text-sub">{L('فقط همین یک بار نشان داده می‌شود. در افزونه (روی آیکن مدار ← اتصال) بچسبانید. اگر گم شد، کلید تازه بسازید؛ کلید قبلی خودبه‌خود باطل می‌شود.', 'Shown only once. Paste it into the extension (Madar icon → connect). If lost, make a new key; the old one stops working.')}</p>
+          <div className="flex gap-2">
+            <input readOnly dir="ltr" value={code.code} onFocus={(e) => e.target.select()} className="input h-9 min-w-0 flex-1 font-mono text-[0.6875rem]" />
+            <button className="btn-primary btn-sm h-9" onClick={() => navigator.clipboard?.writeText(code.code).then(() => toast(L('کپی شد', 'Copied')))}><Copy size={13} /> {L('کپی', 'Copy')}</button>
+            <button className="btn-ghost btn-sm h-9" onClick={() => setCode(null)}><X size={14} /></button>
+          </div>
+        </div>
+      )}
+    </Card>
+  )
+}
+
 export function MizitoSettings({ admin }: { admin: boolean }) {
   const { setSetting } = useStore()
   const c = mzCfg()
@@ -596,6 +765,7 @@ export function MizitoSettings({ admin }: { admin: boolean }) {
   const t = (k: keyof typeof c.thresholds) => (v: number) => setSetting(MZ_KEYS.thresholds, JSON.stringify({ ...c.thresholds, [k]: v }))
   return (
     <div className="grid gap-4 md:grid-cols-2">
+      <AgentCard admin={admin} />
       <Card eyebrow={<span className="flex items-center gap-1.5"><Settings2 size={12} /> {L('میزیتو', 'Mizito')}</span>} title={L('فهرست‌ها', 'Lists')}>
         <fieldset disabled={!admin} className="space-y-5">
           <label className="block">

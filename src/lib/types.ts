@@ -408,6 +408,28 @@ export interface MizitoItem {
   closed_at: string
   ext_id?: string
   batch?: string
+  /** 'agent' when the Mizito agent brought it */
+  source?: string
+  /** 'new' = brought by the agent and not looked at yet; 'ignored' = set aside */
+  review?: string
+  // what Mizito says about the task (written by the agent only)
+  /** open | done | gone (no longer in this person's Mizito) */
+  mz_state?: string
+  mz_done_at?: string
+  mz_done_by?: string
+  mz_progress?: string | number
+  mz_project?: string
+  mz_owner?: string
+  mz_assignees?: string
+  mz_labels?: string
+  /** one line per item, "✓ " or "○ " first */
+  mz_checklist?: string
+  mz_deadline?: string
+  /** the last comment in Mizito: who and when (whose court the ball is in) */
+  mz_last_by?: string
+  mz_last_at?: string
+  mz_sig?: string
+  synced_at?: string
 }
 
 export interface MizitoMention {
@@ -418,6 +440,25 @@ export interface MizitoMention {
   note: string
   /** status set with this mention, if any */
   status: string
+  batch?: string
+  /** brought by the agent: the mention's id in Mizito, whose Mizito it came from, and the comment */
+  mz_id?: string
+  account?: string
+  mz_comment?: string
+}
+
+/** One comment on a Mizito task, as the agent read it. */
+export interface MizitoComment {
+  id: string
+  item_id: string
+  by: string
+  at: string
+  body: string
+  /** people mentioned in it, comma-separated */
+  mentions: string
+  reply_to: string
+  /** attachment names, one per line */
+  files: string
   batch?: string
 }
 
@@ -497,6 +538,7 @@ export interface DB {
   Contacts: Contact[]
   Mizito: MizitoItem[]
   MizitoMentions: MizitoMention[]
+  MizitoComments: MizitoComment[]
   Objectives: Objective[]
   KeyResults: KeyResult[]
   Kpis: Kpi[]
