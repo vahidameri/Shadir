@@ -73,8 +73,16 @@ export interface Sprint {
   committed_points: number
   completed_points: number
   status: 'planned' | 'active' | 'closed'
+  /** the team that runs the sprint (sprints belong to a team, not a project) */
+  team?: string
+  /** "YYYY-MM-DD HH:mm" when it was started / completed */
+  started_at?: string
+  closed_at?: string
+  /** retrospective notes, written when the sprint is completed */
+  retro?: string
 }
 
+export type IssueType = 'story' | 'bug' | 'task' | 'spike' | ''
 export type BuiltinStatus = 'intake' | 'backlog' | 'todo' | 'in_progress' | 'review' | 'qa' | 'waiting' | 'blocked' | 'done' | 'cancelled'
 /** What a status means for tracking; every column (built-in or custom) has one. */
 export type StatusCat = 'intake' | 'open' | 'active' | 'waiting' | 'blocked' | 'done' | 'cancelled'
@@ -87,6 +95,10 @@ export interface Task {
   sprint_id: string
   /** the key result this task moves ('' = other work) */
   kr_id?: string
+  /** sprint work: story | bug | task | spike */
+  issue_type?: IssueType
+  /** short readable id for sprint work, e.g. TECH-42 */
+  key?: string
   title: string
   description: string
   assignee: string
@@ -311,7 +323,7 @@ export interface Meeting {
 
 export interface FileRef {
   id: string
-  entity: 'Meetings' | 'Projects' | 'Tasks' | 'Team' | 'Deliverables' | 'Contracts' | 'Mizito'
+  entity: 'Meetings' | 'Projects' | 'Tasks' | 'Team' | 'Deliverables' | 'Contracts' | 'Mizito' | 'KeyResults'
   entity_id: string
   name: string
   mime: string
@@ -330,7 +342,7 @@ export interface ConfigRow {
 
 export interface Comment {
   id: string
-  entity: 'Tasks' | 'FollowUps' | 'Projects' | 'Risks'
+  entity: 'Tasks' | 'FollowUps' | 'Projects' | 'Risks' | 'KeyResults' | 'Sprints'
   entity_id: string
   author: string
   body: string
@@ -484,6 +496,20 @@ export interface DB {
   Objectives: Objective[]
   KeyResults: KeyResult[]
   Kpis: Kpi[]
+  Checkins: Checkin[]
+}
+
+/** One check-in on a key result: the value at that moment, the confidence, and a note (the trend). */
+export interface Checkin {
+  id: string
+  kr_id: string
+  /** "YYYY-MM-DD HH:mm" */
+  at: string
+  value: number
+  confidence: KrConfidence
+  note: string
+  by: string
+  batch?: string
 }
 
 /** A team's objective for one quarter (OKR). */
@@ -508,6 +534,11 @@ export interface KeyResult {
   title: string
   owner: string
   kind: 'number' | 'percent' | 'done'
+  /** share of the team's quarter (all of a team's key results add up to 100) */
+  weight: number
+  /** the Mizito task where this key result is discussed */
+  mizito_link: string
+  /** kept for older rows; progress is measured from zero */
   start: number
   target: number
   current: number

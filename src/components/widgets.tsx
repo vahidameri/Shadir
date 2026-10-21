@@ -18,6 +18,7 @@ import { riskLevel, riskScore } from '../lib/metrics'
 import { fa, fmtDate, daysFromToday, timeAgo } from '../lib/jalali'
 import { L, lbl, tr } from '../lib/i18n'
 import { useProjectName } from './shared'
+import { IssueBadge, KeyTag } from './SprintParts'
 
 
 // ---------------- Kanban ----------------
@@ -82,6 +83,7 @@ export function Kanban({ tasks, defaults, showProject = true }: { tasks: Task[];
                     className={cx('cursor-pointer rounded-2xl border border-line bg-surface p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-float', drag === t.id && 'rotate-1 opacity-40')}
                   >
                     {showProject && t.project_id && <div className="mb-1 truncate font-mono text-[0.625rem] uppercase tracking-wider text-sub" dir="auto">{db.Projects.find((p) => p.id === t.project_id)?.code || pname(t.project_id)}</div>}
+                    {(t.key || t.issue_type) && <div className="mb-1 flex items-center gap-1.5"><IssueBadge type={t.issue_type} /><KeyTag k={t.key} /></div>}
                     <div className={cx('flex items-start gap-1.5 text-sm leading-6', isClosed(s) && 'text-sub line-through')}>
                       {t.flag && <span className="mt-1"><FlagMark id={t.flag} size={12} /></span>}
                       <span className="min-w-0 flex-1">{t.title}</span>

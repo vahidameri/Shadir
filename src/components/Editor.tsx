@@ -8,20 +8,22 @@ import { canPersonal, dueFor, fieldOn, fieldReq, needsDue, needsProject, taskCfg
 import { columns, isBlocked, statusLabel } from '../lib/columns'
 import { useStore } from '../lib/store'
 import { uid } from '../lib/api'
-import { todayISO } from '../lib/jalali'
+import { fa, todayISO } from '../lib/jalali'
 import { L, lbl, tr, type T2 } from '../lib/i18n'
 import { TRACK, TRACKS } from '../lib/tracks'
 import {
-  CHANNEL, CONFIDENCE, CONTRACT_KIND, CONTRACT_STATUS, DELIVERABLE_STATUS, MEETING_SERIES, MEETING_STATUS, PLAN_PURPOSE, AGILE_SERIES, FOLLOWUP_STATUS, HEALTH, MILESTONE_STATUS, PRIORITY, PROJECT_STATUS, RISK_STATUS, RISK_TYPE, SCOPE_STATUS, SPRINT_STATUS,
+  CHANNEL, CONFIDENCE, CONTRACT_KIND, CONTRACT_STATUS, DELIVERABLE_STATUS, MEETING_SERIES, MEETING_STATUS, PLAN_PURPOSE, AGILE_SERIES, FOLLOWUP_STATUS, HEALTH, MILESTONE_STATUS, PRIORITY, PROJECT_STATUS, RISK_STATUS, RISK_TYPE, SCOPE_STATUS,
   ACCESS, JOB_TITLE_OPTIONS, TEAM_NAMES } from '../lib/labels'
 import { Sheet, cx } from './ui'
 import { DatePicker } from './DatePicker'
 import { ItemSheet } from './ItemSheet'
 import { useAuto } from '../lib/automations'
 import { can } from '../lib/access'
-import { addQuarter, quarterLabel, quarterOf, quarterOptions } from '../lib/okr'
+import { addQuarter, quarterLabel, quarterOf, quarterOptions, weightSum } from '../lib/okr'
+import { sprintTeam } from '../lib/sprints'
+import { teamOf } from '../lib/teams'
 
-type FieldType = 'text' | 'textarea' | 'select' | 'multi' | 'date' | 'number' | 'project' | 'person' | 'people' | 'sprint' | 'member' | 'scale' | 'status' | 'area' | 'side' | 'title' | 'assignees' | 'flag' | 'tier' | 'mzstatus' | 'mzcat' | 'mzaction' | 'pprio' | 'kr' | 'quarter' | 'objective'
+type FieldType = 'text' | 'textarea' | 'select' | 'multi' | 'date' | 'number' | 'project' | 'person' | 'people' | 'sprint' | 'member' | 'scale' | 'status' | 'area' | 'side' | 'title' | 'assignees' | 'flag' | 'tier' | 'mzstatus' | 'mzcat' | 'mzaction' | 'pprio' | 'kr' | 'quarter' | 'objective' | 'krweight'
 interface Field {
   key: string
   label: T2
@@ -32,7 +34,7 @@ interface Field {
   placeholder?: T2
 }
 
-export type EditableSheet = Exclude<SheetName, 'Comments' | 'Files' | 'Config' | 'Handoffs' | 'Deliveries' | 'History' | 'MizitoMentions'>
+export type EditableSheet = Exclude<SheetName, 'Comments' | 'Files' | 'Config' | 'Handoffs' | 'Deliveries' | 'History' | 'MizitoMentions' | 'Checkins'>
 
 const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields: Field[]; defaults: () => Record<string, unknown> }> = {
   Tasks: {
@@ -43,7 +45,7 @@ const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields: Field[
       { key: 'description', label: ['توضیحات', 'Description'], type: 'textarea' },
       { key: 'project_id', label: ['محصول / پروژه', 'Product / project'], type: 'project', half: true },
       { key: 'area', label: ['حوزه', 'Area'], type: 'area', half: true },
-      { key: 'kr_id', label: ['کی‌ریزالت (OKR)', 'Key result (OKR)'], type: 'kr', half: true },
+      { key: 'kr_id', label: ['نتیجه‌ی کلیدی (OKR)', 'Key result (OKR)'], type: 'kr', half: true },
       { key: 'assignee', label: ['مسئول انجام (یک یا چند نفر)', 'Assignees (one or more)'], type: 'assignees' },
       { key: 'requested_by', label: ['درخواست‌دهنده', 'Requested by'], type: 'person', half: true },
       { key: 'assigned_at', label: ['تاریخ اساین', 'Assigned on'], type: 'date', half: true },
@@ -62,7 +64,8 @@ const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields: Field[
       { key: 'deadline', label: ['ددلاین (تحویل نهایی)', 'Deadline (final delivery)'], type: 'date', half: true },
       { key: 'notify', label: ['اعلان‌ها', 'Alerts'], type: 'select', options: { '': ['روشن', 'On'], off: ['خاموش', 'Off'] }, half: true },
       { key: 'estimate', label: ['تخمین (ساعت)', 'Estimate (hours)'], type: 'number', half: true },
-      { key: 'points', label: ['امتیاز', 'Story points'], type: 'number', half: true },
+      { key: 'issue_type', label: ['نوع کار', 'Issue type'], type: 'select', options: { '': ['—', '—'], story: ['استوری', 'Story'], task: ['تسک', 'Task'], bug: ['باگ', 'Bug'], spike: ['بررسی (Spike)', 'Spike'] }, half: true },
+      { key: 'points', label: ['امتیاز (Story points)', 'Story points'], type: 'number', half: true },
       { key: 'tags', label: ['برچسب‌ها', 'Tags'], type: 'text', half: true, placeholder: ['با کاما جدا کنید', 'Comma separated'] },
       { key: 'track', label: ['تیم', 'Team'], type: 'side', half: true },
       { key: 'private', label: ['دیده‌شدن', 'Visibility'], type: 'select', options: { '': ['عمومی', 'Visible'], '1': ['خصوصی', 'Private'] }, half: true },
@@ -165,15 +168,13 @@ const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields: Field[
     prefix: 'S',
     fields: [
       { key: 'name', label: ['نام', 'Name'], type: 'text', required: true, half: true },
-      { key: 'project_id', label: ['پروژه', 'Project'], type: 'project', half: true, required: true },
-      { key: 'goal', label: ['هدف اسپرینت', 'Sprint goal'], type: 'text' },
-      { key: 'start_date', label: ['شروع', 'Start'], type: 'date', half: true },
-      { key: 'end_date', label: ['پایان', 'End'], type: 'date', half: true },
-      { key: 'committed_points', label: ['امتیاز تعهدشده', 'Committed points'], type: 'number', half: true },
-      { key: 'completed_points', label: ['امتیاز انجام‌شده', 'Completed points'], type: 'number', half: true },
-      { key: 'status', label: ['وضعیت', 'Status'], type: 'select', options: SPRINT_STATUS },
+      { key: 'team', label: ['تیم', 'Team'], type: 'side', half: true, required: true },
+      { key: 'goal', label: ['هدف اسپرینت (یک جمله)', 'Sprint goal (one sentence)'], type: 'text' },
+      { key: 'start_date', label: ['شروع', 'Start'], type: 'date', half: true, required: true },
+      { key: 'end_date', label: ['پایان', 'End'], type: 'date', half: true, required: true },
+      { key: 'retro', label: ['رترو: چه خوب بود، چه بهتر شود', 'Retro: what went well, what to improve'], type: 'textarea' },
     ],
-    defaults: () => ({ status: 'planned', committed_points: 0, completed_points: 0 }),
+    defaults: () => ({ status: 'planned', committed_points: 0, completed_points: 0, project_id: '', retro: '' }),
   },
   Risks: {
     title: ['ریسک / مسئله', 'Risk / issue'],
@@ -252,22 +253,23 @@ const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields: Field[
     defaults: () => ({ quarter: quarterOf(), sort: 1, description: '' }),
   },
   KeyResults: {
-    title: ['کی‌ریزالت', 'Key result'],
+    title: ['نتیجه‌ی کلیدی', 'Key result'],
     prefix: 'KR',
     fields: [
-      { key: 'title', label: ['نتیجه‌ی کلیدی', 'Key result'], type: 'text', required: true, placeholder: ['مثلاً «نرخ تکمیل ثبت‌نام از ۴۰٪ به ۶۰٪»', 'e.g. “Sign-up completion from 40% to 60%”'] },
+      { key: 'title', label: ['نتیجه‌ی کلیدی', 'Key result'], type: 'text', required: true, placeholder: ['مثلاً «نرخ تکمیل ثبت‌نام به ۶۰٪»', 'e.g. “Sign-up completion at 60%”'] },
       { key: 'objective_id', label: ['زیر هدف', 'Under objective'], type: 'objective', required: true },
       { key: 'kind', label: ['نوع سنجش', 'Measured as'], type: 'select', options: { number: ['عدد', 'Number'], percent: ['درصد', 'Percent'], done: ['انجام شد / نشد', 'Done / not done'] }, half: true },
       { key: 'unit', label: ['واحد (برای عدد)', 'Unit (for numbers)'], type: 'text', half: true },
-      { key: 'start', label: ['مقدار شروع', 'Start value'], type: 'number', half: true },
-      { key: 'target', label: ['هدف', 'Target'], type: 'number', half: true, required: true },
+      { key: 'target', label: ['هدف (مقدار نهایی)', 'Target'], type: 'number', half: true, required: true },
       { key: 'current', label: ['مقدار فعلی', 'Current value'], type: 'number', half: true },
+      { key: 'weight', label: ['وزن (از ۱۰۰)', 'Weight (of 100)'], type: 'krweight', half: true, required: true },
+      { key: 'mizito_link', label: ['لینک میزیتو', 'Mizito link'], type: 'text', half: true, placeholder: ['https://mizito.noyanet.com/#/ws/tasks/…', 'https://mizito.noyanet.com/#/ws/tasks/…'] },
       { key: 'confidence', label: ['اطمینان', 'Confidence'], type: 'select', options: { '': ['خودکار (از پیشرفت و زمان)', 'Automatic (progress vs time)'], on_track: ['در مسیر', 'On track'], at_risk: ['در خطر', 'At risk'], off_track: ['عقب', 'Off track'] }, half: true },
       { key: 'owner', label: ['مسئول', 'Owner'], type: 'person', half: true },
       { key: 'project_id', label: ['محصول مرتبط', 'Related product'], type: 'project', half: true },
       { key: 'note', label: ['یادداشت', 'Note'], type: 'textarea' },
     ],
-    defaults: () => ({ kind: 'number', start: 0, current: 0, target: '', unit: '', confidence: '', project_id: '', note: '' }),
+    defaults: () => ({ kind: 'number', start: 0, current: 0, target: '', unit: '', confidence: '', project_id: '', note: '', weight: '', mizito_link: '' }),
   },
   Kpis: {
     title: ['شاخص (KPI)', 'KPI'],
@@ -556,6 +558,18 @@ function FieldInput({ f, value, set, form, disabled, autoFocus, onSubmit }: { f:
           {quarterOptions(db).map((q) => <option key={q} value={q}>{quarterLabel(q)}</option>)}
         </select>
       )
+    case 'krweight': {
+      // a team's key results for the quarter add up to 100: show what is left for this one
+      const o = db.Objectives.find((x) => x.id === form.objective_id)
+      const others = o ? weightSum(db, o.team, o.quarter, String(form.id || '')) : 0
+      const left = 100 - others - (Number(v) || 0)
+      return (
+        <div>
+          <input {...common} type="number" min={0} max={100} value={String(v)} onChange={(e) => set(e.target.value)} />
+          {o && <div className={cx('mt-1 text-[0.6875rem]', left < 0 ? 'text-bad' : 'text-sub')}>{left < 0 ? L(`جمع وزن‌های این تیم از ۱۰۰ بیشتر می‌شود (${fa(100 - left)})`, `This team’s weights would total ${100 - left}, over 100`) : L(`سایر نتایج کلیدی تیم: ${fa(others)} · باقی‌مانده تا ۱۰۰: ${fa(left)}`, `Other key results: ${others} · left to 100: ${left}`)}</div>}
+        </div>
+      )
+    }
     case 'objective':
       return (
         <select {...common} value={String(v)} onChange={(e) => set(e.target.value)}>
@@ -579,7 +593,9 @@ function FieldInput({ f, value, set, form, disabled, autoFocus, onSubmit }: { f:
       )
     }
     case 'sprint': {
-      const ss = db.Sprints.filter((s) => !form.project_id || s.project_id === form.project_id)
+      // the team's planned and running sprints (plus the one already set)
+      const team = teamOf(form as never, db)
+      const ss = db.Sprints.filter((s) => s.id === v || ((s.team || '') === team && s.status !== 'closed'))
       return (
         <select {...common} value={String(v)} onChange={(e) => set(e.target.value)}>
           <option value="">{L('— بک‌لاگ —', '— Backlog —')}</option>
@@ -640,6 +656,7 @@ function EditorModal({ sheet, row, isNew, onClose }: { sheet: EditableSheet; row
   // task rules from the back office: deadline / project may be required, except for listed people
   const owner = db.Team.find((m) => m.name === String(form.assignee || '').split(',')[0])
   const optional = new Set<string>(TASK_FIELDS)
+  const sprintWork = sheet === 'Tasks' && sprintTeam(teamOf(form as never, db))
   const schema =
     sheet === 'Meetings'
       ? { ...base, fields: base.fields.filter((f) => f.key !== 'purpose' || AGILE_SERIES.includes(String(form.series))) }
@@ -651,7 +668,8 @@ function EditorModal({ sheet, row, isNew, onClose }: { sheet: EditableSheet; row
       : {
           ...base,
           fields: base.fields
-            .filter((f) => !optional.has(f.key) || fieldOn(f.key as TaskField))
+            // sprint teams always see sprint, points and issue type; other teams only when switched on
+            .filter((f) => (f.key === 'issue_type' ? sprintWork : !optional.has(f.key) || fieldOn(f.key as TaskField) || (sprintWork && (f.key === 'sprint_id' || f.key === 'points'))))
             // the blocker's reason and owner only matter while the task is blocked
             .filter((f) => (f.key !== 'blocked_reason' && f.key !== 'blocked_by') || isBlocked(String(form.status)))
             .map((f) => ((f.key === 'due_date' && needsDue(owner)) || (f.key === 'project_id' && needsProject(owner)) || (optional.has(f.key) && fieldReq(f.key as TaskField)) ? { ...f, required: true } : f)),

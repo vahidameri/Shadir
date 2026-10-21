@@ -6,6 +6,7 @@ import { AtSign, Ban, CalendarClock, MoonStar, Settings2 } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { Band, Card, Empty, Overlap, Progress, StatStrip, StatusIcon, cx } from '../components/ui'
 import { elapsed, quarterLabel, quarterOf, teamOkr } from '../lib/okr'
+import { activeSprint, sprintCfg, sprintStats } from '../lib/sprints'
 import { L } from '../lib/i18n'
 import { useEditor } from '../components/Editor'
 import { daysFromToday, fa, fmtDayMonth, todayISO } from '../lib/jalali'
@@ -46,6 +47,39 @@ export default function Overview() {
 
   const widgets: Record<DashWidget, () => React.ReactNode> = {
     kpis: () => null, // shown in the band
+    sprint: () => {
+      const rows = sprintCfg().teams.map((t) => ({ t, s: activeSprint(db, t) }))
+      return (
+        <Card eyebrow={L('اسپرینت', 'Sprint')} title={L('تیم فنی در این اسپرینت', 'The tech team this sprint')} action={<Link to="/sprints" className="text-xs text-sub hover:text-ink">{L('بورد', 'Board')}</Link>}>
+          {rows.every((r) => !r.s) ? (
+            <Empty text={L('اسپرینتی در جریان نیست', 'No sprint running')} />
+          ) : (
+            <ul className="space-y-4">
+              {rows.filter((r) => r.s).map(({ t, s }) => {
+                const st = sprintStats(db, s!)
+                return (
+                  <li key={t}>
+                    <Link to={`/sprints/${s!.id}`} className="block rounded-xl hover:bg-muted/40">
+                      <div className="flex items-baseline justify-between gap-2 text-sm">
+                        <span className="truncate font-medium">{s!.name} <span className="text-xs font-normal text-sub">· {teamName(t)}</span></span>
+                        <span className="shrink-0 text-xs text-sub num">{L(`${fa(st.daysLeft)} روز مانده`, `${st.daysLeft} days left`)}</span>
+                      </div>
+                      {s!.goal && <div className="mt-0.5 truncate text-xs text-sub">{s!.goal}</div>}
+                      <Progress value={st.pct} marker={st.elapsed} className="mt-2" />
+                      <div className="mt-1.5 flex flex-wrap gap-x-3 text-[0.6875rem] text-sub num">
+                        <span>{L(`${fa(st.done)} از ${fa(st.total)} امتیاز`, `${st.done} of ${st.total} pts`)}</span>
+                        {st.added.points > 0 && <span className="text-warn">{L(`+${fa(st.added.points)} بعد از شروع`, `+${st.added.points} after start`)}</span>}
+                        {st.blocked.length > 0 && <span className="text-bad">{L(`${fa(st.blocked.length)} مسدود`, `${st.blocked.length} blocked`)}</span>}
+                      </div>
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </Card>
+      )
+    },
     okr: () => {
       const qq = quarterOf()
       const rows = d.teams.filter((t) => t.id).map((t) => ({ id: t.id, o: teamOkr(db, t.id, qq, t.tasks) }))

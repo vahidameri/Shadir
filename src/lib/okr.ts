@@ -1,6 +1,8 @@
 // Quarterly OKRs. Quarters follow the Persian year (Q1 = Farvardin–Khordad … Q4 = Dey–Esfand) and are
-// written "1405-Q3". A key result's progress is how far it has moved from its start towards its
-// target; it is compared with how much of the quarter has passed to judge whether it is on track.
+// written "1405-Q3". A key result's progress is its current value as a share of its target (there is
+// no start value); it is compared with how much of the quarter has passed to judge whether it is on
+// track. Each key result carries a weight; a team's key results for a quarter add up to 100, and
+// objective and team progress are weighted by them.
 import type { DB, KeyResult, KrConfidence, Objective, Task } from './types'
 import { daysBetween, fa, isoToJalaliParts, jalaliMonthLength, jalaliPartsToISO, todayISO } from './jalali'
 import { L, type T2 } from './i18n'
@@ -48,10 +50,9 @@ export function elapsed(q: string, today = todayISO()) {
 export function krProgress(k: KeyResult) {
   const cur = Number(k.current) || 0
   if (k.kind === 'done') return cur >= 1 ? 100 : 0
-  const start = Number(k.start) || 0
   const target = Number(k.target)
-  if (!Number.isFinite(target) || target === start) return cur >= target ? 100 : 0
-  return Math.max(0, Math.min(100, Math.round(((cur - start) / (target - start)) * 100)))
+  if (!Number.isFinite(target) || target <= 0) return cur > 0 ? 100 : 0
+  return Math.max(0, Math.min(100, Math.round((cur / target) * 100)))
 }
 /** The confidence set at the last check-in, else judged from progress against elapsed time. */
 export function krConfidence(k: KeyResult, quarter: string): Exclude<KrConfidence, ''> {
@@ -66,10 +67,20 @@ export const CONF: Record<Exclude<KrConfidence, ''>, { label: T2; tone: string; 
 }
 
 export const krsOf = (db: DB, objectiveId: string) => db.KeyResults.filter((k) => k.objective_id === objectiveId)
-export function objectiveProgress(db: DB, o: Objective) {
-  const ks = krsOf(db, o.id)
-  return ks.length ? Math.round(ks.reduce((a, k) => a + krProgress(k), 0) / ks.length) : 0
+/** Progress of a set of key results, weighted by their weights (plain average when none is weighted). */
+export function weighted(ks: KeyResult[]) {
+  if (!ks.length) return 0
+  const w = ks.reduce((a, k) => a + (Number(k.weight) || 0), 0)
+  return Math.round(w > 0 ? ks.reduce((a, k) => a + krProgress(k) * (Number(k.weight) || 0), 0) / w : ks.reduce((a, k) => a + krProgress(k), 0) / ks.length)
 }
+export const objectiveProgress = (db: DB, o: Objective) => weighted(krsOf(db, o.id))
+/** Sum of a team's key-result weights in a quarter (should be 100), optionally leaving one out. */
+export function weightSum(db: DB, team: string, quarter: string, except = '') {
+  const objs = new Set(db.Objectives.filter((o) => o.team === team && o.quarter === quarter).map((o) => o.id))
+  return db.KeyResults.filter((k) => objs.has(k.objective_id) && k.id !== except).reduce((a, k) => a + (Number(k.weight) || 0), 0)
+}
+/** The trend: a key result's check-ins, oldest first. */
+export const checkinsOf = (db: DB, krId: string) => db.Checkins.filter((c) => c.kr_id === krId).sort((a, b) => (a.at < b.at ? -1 : 1))
 const objectivesOf = (db: DB, team: string, quarter: string) => db.Objectives.filter((o) => o.team === team && o.quarter === quarter).sort((a, b) => (Number(a.sort) || 0) - (Number(b.sort) || 0))
 
 /** Work on a key result: its tasks, how many are open, late and blocked. */
@@ -90,7 +101,8 @@ export function teamOkr(db: DB, team: string, quarter: string, teamTasks: Task[]
   return {
     objectives: objs,
     krs,
-    progress: objs.length ? Math.round(objs.reduce((a, o) => a + objectiveProgress(db, o), 0) / objs.length) : 0,
+    progress: weighted(krs),
+    weights: krs.reduce((a, k) => a + (Number(k.weight) || 0), 0),
     conf,
     okrOpen: open.filter((t) => t.kr_id && krIds.has(t.kr_id)).length,
     otherOpen: open.filter((t) => !t.kr_id || !krIds.has(t.kr_id)).length,

@@ -168,7 +168,7 @@ export function BlockerPanel({ t, patch }: { t: Task; patch: (p: Partial<Task>) 
 
 const FIELD: Record<string, [string, string]> = {
   title: ['عنوان', 'title'], description: ['توضیحات', 'description'], status: ['وضعیت', 'status'], priority: ['اولویت', 'priority'], assignee: ['مسئول', 'assignee'],
-  due_date: ['ددلاین', 'deadline'], assigned_at: ['تاریخ اساین', 'assign date'], flag: ['پرچم', 'flag'], track: ['تیم', 'team'], project_id: ['محصول / پروژه', 'product / project'], kr_id: ['کی‌ریزالت', 'key result'], current: ['مقدار', 'value'], confidence: ['اطمینان', 'confidence'], target: ['هدف', 'target'], note: ['یادداشت', 'note'],
+  due_date: ['ددلاین', 'deadline'], assigned_at: ['تاریخ اساین', 'assign date'], flag: ['پرچم', 'flag'], track: ['تیم', 'team'], project_id: ['محصول / پروژه', 'product / project'], kr_id: ['نتیجه‌ی کلیدی', 'key result'], current: ['مقدار', 'value'], confidence: ['اطمینان', 'confidence'], target: ['هدف', 'target'], note: ['یادداشت', 'note'],
   blocked_reason: ['علت انسداد', 'blocker reason'], blocked_by: ['مسدودکننده', 'blocked by'], link: ['لینک', 'link'], requested_by: ['درخواست‌دهنده', 'requested by'],
   collaborators: ['همکاران', 'shared with'], watchers: ['ناظرها', 'watchers'], private: ['دیده‌شدن', 'visibility'], deadline: ['ددلاین دوم', 'second deadline'],
   subject: ['موضوع', 'subject'], person: ['طرف پیگیری', 'person'], channel: ['کانال', 'channel'], notes: ['یادداشت', 'notes'], owner: ['پیگیری‌کننده', 'owner'],

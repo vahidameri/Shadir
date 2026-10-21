@@ -17,13 +17,14 @@ import { assigneesOf } from '../lib/assignees'
 import { can } from '../lib/access'
 import { uid } from '../lib/api'
 import { addDays, fa, fmtDate, nowStamp, relDays, todayISO, timeAgo } from '../lib/jalali'
-import { L, lbl } from '../lib/i18n'
+import { L, lbl, tr } from '../lib/i18n'
 import { CHANNEL, FOLLOWUP_STATUS } from '../lib/labels'
 import { Avatar, AvatarStack, Sheet, cx, Chip, MenuItem, Popover } from './ui'
 import { DatePicker } from './DatePicker'
 import { useEditor } from './Editor'
 import { SaveClose } from './SaveClose'
 import { addQuarter, quarterOf } from '../lib/okr'
+import { ISSUE, sprintTeam } from '../lib/sprints'
 import { teamName } from './TeamParts'
 import { AssigneesPicker, ListPicker, PeoplePicker, PersonPicker, PriorityPicker, ProjectPicker, StatusPicker } from './pickers'
 import { TRACK, TRACKS, trackOf, depsOf, dependentsOf, depIds, sideSoft, autoTrack } from '../lib/tracks'
@@ -45,6 +46,8 @@ export function ItemSheet({ sheet, id, onClose }: { sheet: 'Tasks' | 'FollowUps'
   if (!item) return null
   const isTask = sheet === 'Tasks'
   const project = db.Projects.find((p) => p.id === item.project_id)
+  // sprint teams' work shows its issue type, sprint and points
+  const sprintWork = isTask && sprintTeam(trackOf(item as never, db))
   const patch = async (p: Partial<Item>) => {
     const next = { ...item, ...p }
     if (!isTask && 'status' in p) next.done_at = p.status === 'done' ? item.done_at || todayISO() : ''
@@ -409,17 +412,25 @@ export function ItemSheet({ sheet, id, onClose }: { sheet: 'Tasks' | 'FollowUps'
                 </button>
               </Prop>
               <Prop label={L('محصول / پروژه', 'Product / project')}>
-                <ProjectPicker value={item.project_id} onChange={(v) => patch({ project_id: v, sprint_id: '' })} />
+                <ProjectPicker value={item.project_id} onChange={(v) => patch({ project_id: v })} />
               </Prop>
               <Prop label="OKR">
                 <KrPicker value={item.kr_id || ''} onChange={(v) => patch({ kr_id: v })} />
               </Prop>
-              {fieldOn('sprint_id') && (
+              {sprintWork && (
+                <Prop label={L('نوع کار', 'Issue type')}>
+                  <select disabled={!canEdit} value={item.issue_type || ''} onChange={(e) => patch({ issue_type: e.target.value as never })} className="h-8 w-full rounded-full bg-transparent px-2 text-xs hover:bg-muted">
+                    <option value="">—</option>
+                    {(Object.keys(ISSUE) as (keyof typeof ISSUE)[]).map((k) => <option key={k} value={k}>{tr(ISSUE[k].label)}</option>)}
+                  </select>
+                </Prop>
+              )}
+              {(fieldOn('sprint_id') || sprintWork) && (
               <Prop label={L('اسپرینت', 'Sprint')}>
-                <SprintPicker projectId={item.project_id} value={item.sprint_id} onChange={(v) => patch({ sprint_id: v })} />
+                <SprintPicker team={trackOf(item, db)} value={item.sprint_id} onChange={(v) => patch({ sprint_id: v })} />
               </Prop>
               )}
-              {fieldOn('points') && (
+              {(fieldOn('points') || sprintWork) && (
               <Prop label={L('امتیاز', 'Points')}>
                 <input
                   type="number"
@@ -604,9 +615,9 @@ function ActivityDot({ icon, children }: { icon: React.ReactNode; children: Reac
   )
 }
 
-function SprintPicker({ projectId, value, onChange }: { projectId: string; value: string; onChange: (v: string) => void }) {
+function SprintPicker({ team, value, onChange }: { team: string; value: string; onChange: (v: string) => void }) {
   const { db, canEdit } = useStore()
-  const ss = db.Sprints.filter((s) => !projectId || s.project_id === projectId)
+  const ss = db.Sprints.filter((s) => s.id === value || ((s.team || '') === team && s.status !== 'closed'))
   const cur = db.Sprints.find((s) => s.id === value)
   return (
     <Popover

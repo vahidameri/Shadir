@@ -12,7 +12,7 @@ import { L, lbl, tr, useI18n } from '../lib/i18n'
 import { ROLE } from '../lib/labels'
 import { APP_NAME } from '../lib/brand'
 import { WEEK_KEYS, weekCfg } from '../lib/weeks'
-import { CalendarLayersCard, DashboardWidgetsCard, TeamHealthCard } from '../components/ViewSettings'
+import { CalendarLayersCard, DashboardWidgetsCard, SprintSettingsCard, TeamHealthCard } from '../components/ViewSettings'
 import { ColumnsCard, FieldsCard, FlagsCard, NotifyCard, Switch, TaskCard } from '../components/TaskSettings'
 
 export default function Settings({ embedded }: { embedded?: boolean }) {
@@ -84,6 +84,7 @@ export default function Settings({ embedded }: { embedded?: boolean }) {
         <DashboardWidgetsCard admin={admin} />
         <TeamHealthCard admin={admin} />
         <CalendarLayersCard admin={admin} />
+        <SprintSettingsCard admin={admin} />
 
         <Card eyebrow="Google" title={L('ورود با گوگل و تقویم', 'Google sign-in & calendar')}>
           <div className="space-y-4">

@@ -234,7 +234,7 @@ export default function Tasks() {
         {kr && (
           <div className="mb-3 flex items-center gap-2 rounded-2xl border border-line bg-surface px-4 py-2 text-sm">
             <Target size={15} className="text-sub" />
-            {kr === 'none' ? L('فقط کارهای خارج از OKR', 'Only work outside the OKRs') : L(`فقط کارهای کی‌ریزالت «${db.KeyResults.find((k) => k.id === kr)?.title || kr}»`, `Only work on “${db.KeyResults.find((k) => k.id === kr)?.title || kr}”`)}
+            {kr === 'none' ? L('فقط کارهای خارج از OKR', 'Only work outside the OKRs') : L(`فقط کارهای نتیجه‌ی کلیدی «${db.KeyResults.find((k) => k.id === kr)?.title || kr}»`, `Only work on “${db.KeyResults.find((k) => k.id === kr)?.title || kr}”`)}
             <button className="icon-btn ms-auto h-7 w-7" onClick={() => set('kr', '')} aria-label={L('حذف فیلتر', 'Clear filter')}><X size={14} /></button>
           </div>
         )}

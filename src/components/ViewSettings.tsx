@@ -1,13 +1,17 @@
 // Settings for what the shared views show: calendar layers, overview widgets (on/off and order)
 // and the thresholds behind team health.
 import { useEffect, useState } from 'react'
-import { ArrowDown, ArrowUp, CalendarDays, LayoutDashboard, Users } from 'lucide-react'
+import { ArrowDown, ArrowUp, CalendarDays, LayoutDashboard, Users, Zap } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { Card } from './ui'
 import { Switch } from './TaskSettings'
 import { L, tr } from '../lib/i18n'
 import { CAL_KEY, CAL_LAYERS, DASH_KEY, DASH_WIDGETS, readPicks, writePicks, type Choice } from '../lib/views'
 import { TEAM_KEYS, teamCfg } from '../lib/teams'
+import { SPRINT_KEYS, sprintCfg } from '../lib/sprints'
+import { TRACKS } from '../lib/tracks'
+import { teamName } from './TeamParts'
+import { cx } from './ui'
 
 /** An ordered list of on/off items stored in one Config key. */
 function Picks<K extends string>({ admin, cfgKey, all, order }: { admin: boolean; cfgKey: string; all: Choice<K>[]; order?: boolean }) {
@@ -78,6 +82,38 @@ export function TeamHealthCard({ admin }: { admin: boolean }) {
         {field(L('قرمز از', 'Red from'), L('درصد کارهای باز', '% of open work'), TEAM_KEYS.redPct, c.redPct, '٪')}
         {field(L('زرد از', 'Amber from'), L('درصد کارهای باز (هر مسدودی هم زرد می‌کند)', '% of open work (any blocked task also turns it amber)'), TEAM_KEYS.amberPct, c.amberPct, '٪')}
         {field(L('بازه‌ی «انجام‌شده‌ی اخیر»', '“Done recently” window'), L('برای سرعت تیم', 'For the team’s pace'), TEAM_KEYS.doneDays, c.doneDays, L('روز', 'days'))}
+      </div>
+    </Card>
+  )
+}
+
+export function SprintSettingsCard({ admin }: { admin: boolean }) {
+  const { setSetting } = useStore()
+  const c = sprintCfg()
+  const [prefix, setPrefix] = useState(c.prefix)
+  useEffect(() => setPrefix(c.prefix), [c.prefix])
+  return (
+    <Card eyebrow={<span className="flex items-center gap-1.5"><Zap size={12} /> {L('اسپرینت', 'Sprints')}</span>} title={L('تیم‌هایی که اسپرینتی کار می‌کنند', 'Teams that work in sprints')}>
+      <div className="flex flex-wrap gap-1.5">
+        {TRACKS.map((t) => {
+          const on = c.teams.includes(t)
+          return (
+            <button key={t} disabled={!admin} onClick={() => setSetting(SPRINT_KEYS.teams, (on ? c.teams.filter((x) => x !== t) : [...c.teams, t]).join(','))} className={cx('h-9 rounded-full border px-3 text-xs transition disabled:opacity-60', on ? 'border-transparent bg-ink text-surface' : 'border-line text-sub hover:text-ink')}>
+              {teamName(t)}
+            </button>
+          )
+        })}
+      </div>
+      <p className="mt-2 text-xs leading-6 text-sub">{L('کارهای این تیم‌ها نوع کار، امتیاز، اسپرینت و کلید خوانا (مثل TECH-42) می‌گیرند.', 'Work of these teams gets an issue type, points, a sprint and a readable key (e.g. TECH-42).')}</p>
+      <div className="mt-4 space-y-3">
+        <NumField label={L('طول پیش‌فرض اسپرینت', 'Default sprint length')} hint={L('برای اسپرینت جدید', 'For a new sprint')} value={c.days} unit={L('روز', 'days')} disabled={!admin} onSave={(v) => setSetting(SPRINT_KEYS.days, String(v))} />
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <div className="text-sm font-medium">{L('پیشوند کلید کارها', 'Key prefix')}</div>
+            <div className="text-[0.6875rem] text-sub">{L('مثلاً TECH ← TECH-42', 'e.g. TECH → TECH-42')}</div>
+          </div>
+          <input dir="ltr" className="input h-9 w-28 text-center text-sm uppercase" disabled={!admin} value={prefix} onChange={(e) => setPrefix(e.target.value.replace(/[^A-Za-z]/g, '').toUpperCase())} onBlur={() => prefix && prefix !== c.prefix && setSetting(SPRINT_KEYS.prefix, prefix)} />
+        </div>
       </div>
     </Card>
   )

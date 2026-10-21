@@ -11,6 +11,8 @@ import { diffRows } from './history'
 import { readMzCfg, setMzCfg, stampMizito } from './mizito'
 import { readTeamCfg, setTeamCfg } from './teams'
 import { setKrTitles } from './okr'
+import { nextKey, readSprintCfg, setSprintCfg, sprintTeam } from './sprints'
+import { teamOf } from './teams'
 import { passFor } from './handoffs'
 import type { Task } from './types'
 import { NOTIFY_KEY, setNotifyOff } from './inbox'
@@ -75,7 +77,7 @@ const NUMERIC: Partial<Record<SheetName, string[]>> = {
 }
 
 function emptyDB(): DB {
-  return { Projects: [], Scope: [], Milestones: [], Sprints: [], Tasks: [], FollowUps: [], Risks: [], Team: [], Allocations: [], Updates: [], Comments: [], Deliverables: [], Meetings: [], Files: [], Config: [], Contracts: [], Handoffs: [], Deliveries: [], History: [], Contacts: [], Mizito: [], MizitoMentions: [], Objectives: [], KeyResults: [], Kpis: [] }
+  return { Projects: [], Scope: [], Milestones: [], Sprints: [], Tasks: [], FollowUps: [], Risks: [], Team: [], Allocations: [], Updates: [], Comments: [], Deliverables: [], Meetings: [], Files: [], Config: [], Contracts: [], Handoffs: [], Deliveries: [], History: [], Contacts: [], Mizito: [], MizitoMentions: [], Objectives: [], KeyResults: [], Kpis: [], Checkins: [] }
 }
 
 // Sheets return numbers as numbers or strings, dates as ISO strings. Normalize once here.
@@ -223,6 +225,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setColumns(readColumns(db.Config.find((r) => r.id === COLUMNS_KEY)?.value))
     setMzCfg(readMzCfg((k) => db.Config.find((r) => r.id === k)?.value))
     setTeamCfg(readTeamCfg((k) => db.Config.find((r) => r.id === k)?.value))
+    setSprintCfg(readSprintCfg((k) => db.Config.find((r) => r.id === k)?.value))
   }, [db.Config, db.Team])
   useMemo(() => setKrTitles(db.KeyResults), [db.KeyResults])
   const shown = useMemo(() => {
@@ -325,6 +328,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const prev = dbRef.current
       const list = prev[sheet] as Row<S>[]
       if (sheet === 'Mizito') row = stampMizito(list.find((r) => r.id === row.id) as unknown as MizitoItem | undefined, row as unknown as MizitoItem) as unknown as Row<S>
+      // sprint teams' work gets a readable key (TECH-42) the first time it is saved
+      if (sheet === 'Tasks' && !(row as unknown as Task).key && sprintTeam(teamOf(row as unknown as Task, prev))) row = { ...row, key: nextKey(prev) } as Row<S>
       if (sheet === 'Tasks') row = stampTask(list.find((r) => r.id === row.id) as unknown as Task | undefined, row as unknown as Task) as unknown as Row<S>
       const old = list.find((r) => r.id === row.id)
       const exists = !!old
@@ -423,7 +428,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [config, mode],
   )
 
-  const BULK_SHEETS: SheetName[] = ['Tasks', 'FollowUps', 'Mizito', 'MizitoMentions', 'Contacts', 'Team', 'Projects', 'History', 'Comments', 'Allocations', 'Objectives', 'KeyResults', 'Kpis']
+  const BULK_SHEETS: SheetName[] = ['Tasks', 'FollowUps', 'Mizito', 'MizitoMentions', 'Contacts', 'Team', 'Projects', 'History', 'Comments', 'Allocations', 'Objectives', 'KeyResults', 'Kpis', 'Checkins', 'Sprints']
   const bulk = useCallback(
     async <S extends SheetName>(sheet: S, rows: Row<S>[]) => {
       if (!rows.length) return

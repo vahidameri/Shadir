@@ -307,7 +307,7 @@ export default function ProjectDetail() {
                   ))}
                 </div>
               ) : (
-                <Empty text={L('هنوز نتیجه‌ی کلیدی‌ای به این محصول وصل نشده؛ در صفحه‌ی OKR هنگام تعریف کی‌ریزالت، محصول را انتخاب کنید.', 'No key results linked yet; pick this product when defining a key result on the OKR page.')} />
+                <Empty text={L('هنوز نتیجه‌ی کلیدی‌ای به این محصول وصل نشده؛ در صفحه‌ی OKR هنگام تعریف نتیجه‌ی کلیدی، محصول را انتخاب کنید.', 'No key results linked yet; pick this product when defining a key result on the OKR page.')} />
               )}
             </Card>
           )}

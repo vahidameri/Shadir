@@ -18,14 +18,15 @@
  *   viewer — read only (leadership)
  */
 
-var MADAR_VERSION = '1.3.0'; // shown on the login page and by diagnose()
+var MADAR_VERSION = '1.4.0'; // shown on the login page and by diagnose()
 
 var SCHEMA = {
   Projects: ['id', 'code', 'name', 'description', 'category', 'owner', 'client', 'liaison', 'liaison_contact', 'status', 'priority', 'phase', 'start_date', 'end_date', 'progress', 'health_override', 'objective', 'paused_at', 'pause_reason', 'delivery_day', 'last_delivery', 'archived', 'archived_at', 'links', 'team', 'kind', 'batch'],
   Scope: ['id', 'project_id', 'item', 'type', 'status', 'change_note', 'date'],
   Milestones: ['id', 'project_id', 'title', 'planned_date', 'actual_date', 'status', 'owner', 'weight'],
-  Sprints: ['id', 'project_id', 'name', 'start_date', 'end_date', 'goal', 'committed_points', 'completed_points', 'status'],
-  Tasks: ['id', 'project_id', 'sprint_id', 'title', 'description', 'assignee', 'reporter', 'status', 'priority', 'due_date', 'points', 'tags', 'created_at', 'completed_at', 'track', 'depends_on', 'meeting_id', 'private', 'deadline', 'handoff_date', 'test_date', 'follow_date', 'area', 'collaborators', 'watchers', 'notify', 'start_date', 'estimate', 'checklist', 'assigned_at', 'flag', 'blocked_reason', 'blocked_by', 'blocked_since', 'updated_at', 'link', 'requested_by', 'kr_id', 'ext_id', 'batch'],
+  // sprints belong to a team; committed_points is fixed when the sprint starts, completed_points when it closes
+  Sprints: ['id', 'project_id', 'name', 'start_date', 'end_date', 'goal', 'committed_points', 'completed_points', 'status', 'team', 'started_at', 'closed_at', 'retro', 'batch'],
+  Tasks: ['id', 'project_id', 'sprint_id', 'title', 'description', 'assignee', 'reporter', 'status', 'priority', 'due_date', 'points', 'tags', 'created_at', 'completed_at', 'track', 'depends_on', 'meeting_id', 'private', 'deadline', 'handoff_date', 'test_date', 'follow_date', 'area', 'collaborators', 'watchers', 'notify', 'start_date', 'estimate', 'checklist', 'assigned_at', 'flag', 'blocked_reason', 'blocked_by', 'blocked_since', 'updated_at', 'link', 'requested_by', 'kr_id', 'issue_type', 'key', 'ext_id', 'batch'],
   // owner = who is chasing; follow-ups are personal
   FollowUps: ['id', 'project_id', 'subject', 'person', 'channel', 'due_date', 'status', 'priority', 'notes', 'created_at', 'done_at', 'owner', 'waiting_for', 'link', 'last_ping', 'ping_count', 'ext_id', 'batch'],
   Risks: ['id', 'project_id', 'title', 'type', 'probability', 'impact', 'owner', 'mitigation', 'status', 'due_date'],
@@ -65,7 +66,10 @@ var SCHEMA = {
   MizitoMentions: ['id', 'item_id', 'by', 'at', 'note', 'status', 'batch'],
   // quarterly OKRs per team: objectives, and key results under them (kind: number | percent | done)
   Objectives: ['id', 'team', 'quarter', 'title', 'description', 'owner', 'sort', 'batch'],
-  KeyResults: ['id', 'objective_id', 'title', 'owner', 'kind', 'start', 'target', 'current', 'unit', 'confidence', 'project_id', 'note', 'updated_at', 'batch'],
+  // weight = share of the team's quarter (a team's key results add up to 100); mizito_link = where it is discussed
+  KeyResults: ['id', 'objective_id', 'title', 'owner', 'kind', 'start', 'target', 'current', 'unit', 'confidence', 'project_id', 'note', 'updated_at', 'weight', 'mizito_link', 'batch'],
+  // one row per key-result check-in: the value, confidence and note at that moment (the trend)
+  Checkins: ['id', 'kr_id', 'at', 'value', 'confidence', 'note', 'by', 'batch'],
   // product KPIs: latest value against a target; previous = the value before the last update
   Kpis: ['id', 'project_id', 'name', 'unit', 'direction', 'target', 'current', 'previous', 'updated_at', 'note', 'batch'],
 };
@@ -73,7 +77,7 @@ var SCHEMA = {
 var USERS_SHEET = 'Users';
 var USERS_HEADERS = ['key', 'name', 'email', 'role', 'active'];
 var LOG_SHEET = 'AuditLog';
-var DATE_COLS = ['start_date', 'end_date', 'planned_date', 'actual_date', 'due_date', 'created_at', 'completed_at', 'done_at', 'week_date', 'date', 'target_date', 'baseline_date', 'delivered_date', 'time', 'deadline', 'handoff_date', 'test_date', 'follow_date', 'last_delivery', 'archived_at', 'sent_at', 'responded_at', 'week', 'assigned_at', 'blocked_since', 'updated_at', 'received_at', 'last_mention_at', 'closed_at', 'at', 'last_ping'];
+var DATE_COLS = ['start_date', 'end_date', 'planned_date', 'actual_date', 'due_date', 'created_at', 'completed_at', 'done_at', 'week_date', 'date', 'target_date', 'baseline_date', 'delivered_date', 'time', 'deadline', 'handoff_date', 'test_date', 'follow_date', 'last_delivery', 'archived_at', 'sent_at', 'responded_at', 'week', 'assigned_at', 'blocked_since', 'updated_at', 'received_at', 'last_mention_at', 'closed_at', 'at', 'last_ping', 'started_at'];
 
 // --------------------------------------------------------------------------
 // HTTP entry points
@@ -789,10 +793,10 @@ function googleEmail_(token) {
 // --------------------------------------------------------------------------
 
 var HISTORY_FIELDS = {
-  Tasks: ['title', 'description', 'status', 'priority', 'assignee', 'due_date', 'assigned_at', 'flag', 'track', 'project_id', 'blocked_reason', 'blocked_by', 'link', 'requested_by', 'collaborators', 'watchers', 'private', 'deadline', 'kr_id'],
+  Tasks: ['title', 'description', 'status', 'priority', 'assignee', 'due_date', 'assigned_at', 'flag', 'track', 'project_id', 'blocked_reason', 'blocked_by', 'link', 'requested_by', 'collaborators', 'watchers', 'private', 'deadline', 'kr_id', 'sprint_id', 'points'],
   FollowUps: ['subject', 'person', 'status', 'due_date', 'priority', 'channel', 'notes', 'project_id', 'owner', 'waiting_for', 'link'],
   Mizito: ['title', 'status', 'asked_by', 'mentioned', 'category', 'action', 'priority_override', 'urgent', 'assigned_to', 'due_date', 'outcome', 'link', 'description'],
-  KeyResults: ['current', 'confidence', 'target', 'title', 'owner', 'note'],
+  KeyResults: ['current', 'confidence', 'target', 'title', 'owner', 'note', 'weight'],
   Kpis: ['current', 'target', 'name'],
 };
 
@@ -829,7 +833,7 @@ function historyRows_(rows, user) {
 // Every imported row carries a batch id, so a whole import can be taken back.
 // --------------------------------------------------------------------------
 
-var BULK_SHEETS = { Tasks: 1, FollowUps: 1, Mizito: 1, MizitoMentions: 1, Contacts: 1, Team: 1, Projects: 1, History: 1, Comments: 1, Allocations: 1, Objectives: 1, KeyResults: 1, Kpis: 1 };
+var BULK_SHEETS = { Tasks: 1, FollowUps: 1, Mizito: 1, MizitoMentions: 1, Contacts: 1, Team: 1, Projects: 1, History: 1, Comments: 1, Allocations: 1, Objectives: 1, KeyResults: 1, Kpis: 1, Checkins: 1, Sprints: 1 };
 
 function bulk_(name, rows, user) {
   if (user.access !== 'super') throw new Error('فقط مدیر برنامه می‌تواند ایمپورت کند');
@@ -1089,6 +1093,14 @@ function sendDailyDigest() {
   var fus = data.FollowUps.filter(function (f) { return f.status !== 'done' && f.due_date && f.due_date <= today; });
   var ms = data.Milestones.filter(function (m) { return m.status !== 'done' && m.planned_date && m.planned_date < today; });
 
+  // running sprints, so the CPTO sees the tech team's state without opening the app
+  var sprints = (data.Sprints || []).filter(function (x) { return x.status === 'active'; }).map(function (x) {
+    var ts = data.Tasks.filter(function (t) { return t.sprint_id === x.id && t.status !== 'cancelled'; });
+    var p = function (list) { return list.reduce(function (n, t) { return n + (Number(t.points) || 0); }, 0); };
+    var left = Math.max(0, Math.round((new Date(x.end_date) - new Date(today)) / 86400000));
+    return { name: x.name, goal: x.goal, done: p(ts.filter(function (t) { return t.status === 'done'; })), total: p(ts), blocked: ts.filter(function (t) { return t.status === 'blocked'; }).length, left: left };
+  });
+
   var li = function (s) { return '<li style="margin:4px 0">' + s + '</li>'; };
   var sec = function (title, color, items) {
     if (!items.length) return '';
@@ -1098,6 +1110,7 @@ function sendDailyDigest() {
   var html = '<div dir="rtl" style="font-family:Tahoma,Vazirmatn,sans-serif;font-size:14px;line-height:1.8;color:#111">' +
     '<h2 style="margin:0 0 8px">خلاصه‌ی امروز — مدار</h2>' +
     sec('میزیتو: فوری یا عبور از SLA', '#c4314b', mz.map(function (m) { return li('<b>' + esc_(m.title) + '</b> — ' + esc_(m.asked_by || '') + (m.why ? ' · ' + m.why : '') + (m.link ? ' · <a href="' + m.link + '">میزیتو</a>' : '')); })) +
+    sec('اسپرینت‌های در جریان', '#1f7a76', sprints.map(function (x) { return li('<b>' + esc_(x.name) + '</b>' + (x.goal ? ' — ' + esc_(x.goal) : '') + ' · ' + x.done + ' از ' + x.total + ' امتیاز · ' + x.left + ' روز مانده' + (x.blocked ? ' · <b style="color:#e13748">' + x.blocked + ' مسدود</b>' : '')); })) +
     sec('پیگیری‌های امروز و معوق', '#e13748', fus.map(function (f) { return li('<b>' + f.subject + '</b> — ' + f.person + (f.project_id ? ' · ' + (pname[f.project_id] || '') : '') + ' · ' + f.due_date); })) +
     sec('تسک‌های امروز', '#4f46e5', todayTasks.map(function (t) { return li(t.title + ' — ' + t.assignee + (t.project_id ? ' · ' + (pname[t.project_id] || '') : '')); })) +
     sec('تسک‌های معوق', '#d98d06', overdueTasks.map(function (t) { return li(t.title + ' — ' + t.assignee + ' · ددلاین ' + t.due_date); })) +
