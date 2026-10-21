@@ -43,7 +43,7 @@
     <div class="tiles" id="tiles">
       <div class="tile"><b id="t-tasks">۰</b><span>تسک</span></div>
       <div class="tile"><b id="t-mentions">۰</b><span>منشن</span></div>
-      <div class="tile"><b id="t-sent">۰</b><span>تغییر به مدار</span></div>
+      <div class="tile"><b id="t-links">۰</b><span>لینک</span></div>
     </div>
 
     <div id="linkbox" class="linkbox">
@@ -60,6 +60,13 @@
       <button class="primary" id="now">همگام‌سازی الان</button>
       <button class="ghost" id="full" title="همه‌ی تسک‌ها و کامنت‌ها دوباره خوانده می‌شوند">بازخوانی کامل</button>
     </div>
+    <button class="test" id="test">تست سریع: فقط تسک‌های یک هفته‌ی اخیر</button>
+
+    <details id="report" class="report">
+      <summary>گزارش آخرین برداشت لینک‌ها</summary>
+      <ol id="log"></ol>
+      <button class="link" id="copylog">کپی گزارش</button>
+    </details>
 
     <p class="note">هر ۱۵ دقیقه و با هر منشن تازه، همه‌ی پیام‌های «دستیار میزیتو» و تسک‌های باز بررسی می‌شوند و فقط تغییرات به مدار می‌رود. کافی است یک تب میزیتو باز باشد. در میزیتو چیزی نوشته نمی‌شود.</p>
     <button class="link" id="out">قطع اتصال</button>

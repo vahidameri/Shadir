@@ -33,7 +33,11 @@
     const path = String(url || '').replace(/^.*\/api\/api\//, '')
     if (!/^[\w/]+$/.test(path)) return
     const t = taskOf(body)
-    if (t) lastTask = t
+    if (t && t !== lastTask) {
+      lastTask = t
+      // the task the page just opened (Mizito checks its key when a task is shown)
+      if (/checkToken|getComments|tasks\/get/.test(path)) tell({ type: 'task', id: t })
+    }
     recent.push({ path, body: typeof body === 'string' ? body : '', text: String(text || '').slice(0, 4000), at: Date.now() })
     if (recent.length > 40) recent.shift()
   }

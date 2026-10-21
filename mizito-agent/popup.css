@@ -70,3 +70,8 @@ textarea:focus { border-color: var(--brand); }
 .link-text { display: flex; flex-direction: column; line-height: 1.7; min-width: 0; }
 .link-text b { font-weight: 600; font-size: 12.5px; }
 .link-text .sub { font-size: 11.5px; overflow-wrap: anywhere; }
+
+button.test { width: 100%; height: 34px; background: var(--brand-soft); color: var(--brand); border-color: transparent; font-size: 12.5px; }
+.report { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 8px 12px; font-size: 12px; }
+.report summary { cursor: pointer; color: var(--sub); }
+.report ol { margin: 6px 0; padding-inline-start: 18px; max-height: 160px; overflow: auto; line-height: 1.8; }
