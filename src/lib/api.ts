@@ -81,12 +81,24 @@ export async function fetchAll(c: Config): Promise<{ data: DB; user: RemoteUser;
 
 // text/plain avoids a CORS preflight, which Apps Script doesn't answer.
 async function post(c: Config, body: Record<string, unknown>) {
-  const res = await fetch(c.apiUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ ...body, ...auth(c) }),
-    redirect: 'follow',
-  })
+  // a request that never answers must not hold the app (refreshes wait for writes): give up after
+  // 60s, or 3 minutes for an upload
+  const ctl = new AbortController()
+  const timer = setTimeout(() => ctl.abort(), body.action === 'upload' ? 180000 : 60000)
+  let res: Response
+  try {
+    res = await fetch(c.apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ ...body, ...auth(c) }),
+      redirect: 'follow',
+      signal: ctl.signal,
+    })
+  } catch (e) {
+    throw new Error(ctl.signal.aborted ? 'سرور پاسخ نداد؛ دوباره تلاش کنید' : e instanceof Error ? e.message : String(e))
+  } finally {
+    clearTimeout(timer)
+  }
   const json = await readJson(res)
   if (!json.ok) throw new Error(json.error || 'ذخیره انجام نشد')
   return json

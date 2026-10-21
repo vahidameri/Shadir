@@ -164,7 +164,7 @@ function Timeline({ q, teams, items, onOpen, onAdd }: { q: string; teams: string
                   </button>
                   <div className="relative">
                     {weeks.map((w, i) => <div key={w} className="absolute inset-y-0 border-s border-line/60" style={{ insetInlineStart: `${(i * 7 * 100) / span}%` }} />)}
-                    <div className="absolute inset-y-0 w-[2px] bg-ink/40" style={{ insetInlineStart: `${now}%` }} title={L('امروز', 'Today')} />
+                    {today >= a && today <= b && <div className="absolute inset-y-0 w-[2px] bg-ink/40" style={{ insetInlineStart: `${now}%` }} title={L('امروز', 'Today')} />}
                     {base !== null && <div className="absolute top-1/2 h-6 -translate-y-1/2 rounded-md border border-dashed border-warn/70" style={{ insetInlineStart: `${s}%`, width: `${Math.max(1, base - s)}%` }} title={L('بازه‌ی تعهد اول', 'First committed window')} />}
                     <button
                       onClick={() => onOpen(p.id)}

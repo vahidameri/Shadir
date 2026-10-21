@@ -41,7 +41,8 @@ export default function Report() {
           sprintSt: sprint ? sprintStats(db, sprint) : undefined,
           moving: plans.filter((p) => p.status === 'in_progress' || p.status === 'review'),
           risky: plans.filter((p) => planOpen(p) && planHealth(db, p, today) !== 'on_track'),
-          done: plans.filter((p) => p.status === 'done' && doneAt(db, p) >= since),
+          // finished in the window, even if its own window ended last quarter
+          done: db.Plans.filter((p) => p.team === t && p.status === 'done' && doneAt(db, p) >= since),
           next: db.Plans.filter((p) => p.team === t && planOpen(p) && p.status !== 'in_progress' && p.status !== 'review' && p.start_date > today && p.start_date <= ahead),
         }
       }),

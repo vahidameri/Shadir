@@ -269,7 +269,7 @@ export function Sheet({ open, onClose, title, children, footer, wide, header }: 
   return createPortal(
     <div className="fixed inset-0 z-50 flex justify-end no-print">
       <div className="absolute inset-0 bg-[#0a0d12]/40 backdrop-blur-[3px] fade-in" onClick={onClose} />
-      <div className={cx('relative m-0 flex h-full w-full flex-col bg-surface shadow-pop sheet-in sm:m-2 sm:h-[calc(100%-1rem)] sm:rounded-3xl', wide ? 'max-w-4xl' : 'max-w-xl')}>
+      <div role="dialog" aria-modal="true" className={cx('relative m-0 flex h-full w-full flex-col bg-surface shadow-pop sheet-in sm:m-2 sm:h-[calc(100%-1rem)] sm:rounded-3xl', wide ? 'max-w-4xl' : 'max-w-xl')}>
         <div className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-line px-6">
           {header || <h2 className="font-semibold">{title}</h2>}
           <button className="icon-btn" onClick={onClose} aria-label={L('بستن', 'Close')}>

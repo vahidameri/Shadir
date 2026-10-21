@@ -199,6 +199,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // write finished is stale (it would drop the write or add its row twice), so it is thrown away
   const inflight = useRef(0)
   const writeSeq = useRef(0)
+  // one refresh at a time, and at most one pending retry
+  const fetching = useRef(false)
+  const retry = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const retryLater = (ms: number) => {
+    if (retry.current) clearTimeout(retry.current)
+    retry.current = setTimeout(() => {
+      retry.current = null
+      refreshRef.current?.()
+    }, ms)
+  }
   const track = useCallback(async <T,>(p: Promise<T>): Promise<T> => {
     inflight.current++
     writeSeq.current++
@@ -274,18 +284,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
     if (!authed) return
     // never refresh over a save that is still on its way; try again shortly
-    if (inflight.current > 0) {
-      setTimeout(() => refreshRef.current?.(), 2500)
-      return
-    }
+    if (inflight.current > 0) return retryLater(2500)
+    if (fetching.current) return
+    fetching.current = true
     const seq = writeSeq.current
     setLoading(true)
     try {
       const { data, user, version } = await fetchAll(config)
-      if (seq !== writeSeq.current) {
-        setTimeout(() => refreshRef.current?.(), 1500)
-        return
-      }
+      if (seq !== writeSeq.current) return retryLater(1500)
       setServerVersion(version)
       const fresh = normalize(data)
       dbRef.current = fresh
@@ -299,6 +305,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
+      fetching.current = false
       setLoading(false)
     }
   }, [config, mode, authed, session?.token]) // eslint-disable-line react-hooks/exhaustive-deps

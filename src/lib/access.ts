@@ -69,6 +69,10 @@ export function scopeDB(db: DB, me: string, access: Access): DB {
     Deliverables: new Set(out.Deliverables.filter((d) => inP(d.project_id)).map((d) => d.id)),
     Team: new Set(out.Team.map((m) => m.id)),
     Risks: new Set(out.Risks.filter((r) => inP(r.project_id)).map((r) => r.id)),
+    // plans, key results and sprints are not scoped, so neither are their notes and documents
+    Plans: new Set(out.Plans.map((x) => x.id)),
+    KeyResults: new Set(out.KeyResults.map((x) => x.id)),
+    Sprints: new Set(out.Sprints.map((x) => x.id)),
   }
   // hand-offs: the ones I sent or received, and those on tasks I can see
   const Handoffs = out.Handoffs.filter((h) => h.from_person === me || forMe(h) || visible.Tasks.has(h.task_id) || (!h.task_id && inP(h.project_id)))

@@ -537,6 +537,8 @@ function applyScope_(data, user, owners) {
   data.Deliverables.forEach(function (d) { vis.Deliverables[d.id] = 1; });
   data.Risks.forEach(function (r) { vis.Risks[r.id] = 1; });
   data.Team.forEach(function (m) { vis.Team[m.id] = 1; });
+  // plans, key results and sprints are not scoped, so neither are their notes and documents
+  ['Plans', 'KeyResults', 'Sprints'].forEach(function (k) { vis[k] = {}; (data[k] || []).forEach(function (r) { vis[k][r.id] = 1; }); });
   data.Handoffs = (data.Handoffs || []).filter(function (h) { return h.from_person === me || forMe(h) || vis.Tasks[h.task_id] || (!h.task_id && inP(h.project_id)); });
   data.Deliveries = (data.Deliveries || []).filter(function (x) { return inP(x.project_id); });
   data.Comments = data.Comments.filter(function (c) { return vis[c.entity] && vis[c.entity][c.entity_id]; });

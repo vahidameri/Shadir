@@ -34,11 +34,13 @@ export default function MizitoPage() {
   const cat = get('cat')
   const [q, setQ] = useState('')
   const [capture, setCapture] = useState<false | string>(false)
+  const openId = get('id')
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const sort = get('s') || 'p'
   // paste a Mizito link anywhere on the page (outside a field) to log it
   useEffect(() => {
-    if (!canEdit) return
+    // not while an item or the capture sheet is open: the paste belongs to that sheet
+    if (!canEdit || openId || capture !== false) return
     const onPaste = (e: ClipboardEvent) => {
       const t = e.target as HTMLElement | null
       if (t && (t.closest('input, textarea, [contenteditable="true"]') || t.closest('[role="dialog"]'))) return
@@ -50,9 +52,8 @@ export default function MizitoPage() {
     }
     window.addEventListener('paste', onPaste)
     return () => window.removeEventListener('paste', onPaste)
-  }, [canEdit])
+  }, [canEdit, openId, capture])
   const [settings, setSettings] = useState(false)
-  const openId = get('id')
   const remind = useReminder()
   const c = mzCfg()
   const leaders = db.Team.filter((m) => m.access === 'super' || m.access === 'exec').map((m) => m.name)
