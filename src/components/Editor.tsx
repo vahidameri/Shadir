@@ -23,7 +23,7 @@ import { addQuarter, quarterLabel, quarterOf, quarterOptions, weightSum } from '
 import { sprintTeam } from '../lib/sprints'
 import { teamOf } from '../lib/teams'
 
-type FieldType = 'text' | 'textarea' | 'select' | 'multi' | 'date' | 'number' | 'project' | 'person' | 'people' | 'sprint' | 'member' | 'scale' | 'status' | 'area' | 'side' | 'title' | 'assignees' | 'flag' | 'tier' | 'mzstatus' | 'mzcat' | 'mzaction' | 'pprio' | 'kr' | 'quarter' | 'objective' | 'krweight'
+type FieldType = 'text' | 'textarea' | 'select' | 'multi' | 'date' | 'number' | 'project' | 'person' | 'people' | 'sprint' | 'member' | 'scale' | 'status' | 'area' | 'side' | 'title' | 'assignees' | 'flag' | 'tier' | 'mzstatus' | 'mzcat' | 'mzaction' | 'pprio' | 'kr' | 'quarter' | 'objective' | 'krweight' | 'unit' | 'plan'
 interface Field {
   key: string
   label: T2
@@ -46,6 +46,7 @@ const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields: Field[
       { key: 'project_id', label: ['محصول / پروژه', 'Product / project'], type: 'project', half: true },
       { key: 'area', label: ['حوزه', 'Area'], type: 'area', half: true },
       { key: 'kr_id', label: ['نتیجه‌ی کلیدی (OKR)', 'Key result (OKR)'], type: 'kr', half: true },
+      { key: 'plan_id', label: ['آیتم برنامه (رودمپ)', 'Plan item (roadmap)'], type: 'plan', half: true },
       { key: 'assignee', label: ['مسئول انجام (یک یا چند نفر)', 'Assignees (one or more)'], type: 'assignees' },
       { key: 'requested_by', label: ['درخواست‌دهنده', 'Requested by'], type: 'person', half: true },
       { key: 'assigned_at', label: ['تاریخ اساین', 'Assigned on'], type: 'date', half: true },
@@ -239,6 +240,26 @@ const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields: Field[
     ],
     defaults: () => ({ name_en: '', capacity: 100, photo: '', tasks_private: '', phone: '', access: 'member', active: 'true' }),
   },
+  Plans: {
+    title: ['آیتم برنامه', 'Plan item'],
+    prefix: 'PL',
+    fields: [
+      { key: 'title', label: ['عنوان', 'Title'], type: 'text', required: true, placeholder: ['مثلاً «طراحی جریان ثبت‌نام جدید کلاسا»', 'e.g. “Design the new Kelasa sign-up flow”'] },
+      { key: 'team', label: ['تیم', 'Team'], type: 'side', half: true, required: true },
+      { key: 'kind', label: ['نوع کار', 'Kind of work'], type: 'select', options: { discovery: ['دیسکاوری', 'Discovery'], design: ['طراحی', 'Design'], spec: ['نوشتن مشخصات (PRD)', 'Spec / PRD'], delivery: ['تحویل', 'Delivery'], research: ['تحقیق کاربر', 'User research'], other: ['سایر', 'Other'] }, half: true },
+      { key: 'start_date', label: ['شروع', 'Start'], type: 'date', half: true, required: true },
+      { key: 'end_date', label: ['پایان (تعهد)', 'End (committed)'], type: 'date', half: true, required: true },
+      { key: 'owner', label: ['مسئول', 'Owner'], type: 'person', half: true },
+      { key: 'status', label: ['وضعیت', 'Status'], type: 'select', options: { idea: ['ایده', 'Idea'], planned: ['برنامه‌ریزی‌شده', 'Planned'], in_progress: ['در جریان', 'In progress'], review: ['بازبینی', 'In review'], done: ['انجام‌شده', 'Done'], paused: ['متوقف', 'Paused'], dropped: ['کنار گذاشته', 'Dropped'] }, half: true },
+      { key: 'progress', label: ['پیشرفت دستی (٪؛ خالی = از تسک‌ها)', 'Progress by hand (%; blank = from tasks)'], type: 'number', half: true },
+      { key: 'confidence', label: ['اطمینان', 'Confidence'], type: 'select', options: { '': ['خودکار (از تاریخ و پیشرفت)', 'Automatic (dates vs progress)'], on_track: ['در مسیر', 'On track'], at_risk: ['در خطر', 'At risk'], off_track: ['عقب', 'Off track'] }, half: true },
+      { key: 'project_id', label: ['محصول', 'Product'], type: 'project', half: true },
+      { key: 'kr_id', label: ['نتیجه‌ی کلیدی (OKR)', 'Key result (OKR)'], type: 'kr', half: true },
+      { key: 'link', label: ['لینک (فیگما، سند، میزیتو)', 'Link (Figma, doc, Mizito)'], type: 'text' },
+      { key: 'note', label: ['آخرین وضعیت (یک خط برای CPTO)', 'Latest status (one line for the CPTO)'], type: 'textarea' },
+    ],
+    defaults: () => ({ kind: 'design', status: 'planned', progress: '', confidence: '', project_id: '', kr_id: '', link: '', note: '', baseline_end: '', start_date: todayISO() }),
+  },
   Objectives: {
     title: ['هدف (Objective)', 'Objective'],
     prefix: 'O',
@@ -259,7 +280,7 @@ const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields: Field[
       { key: 'title', label: ['نتیجه‌ی کلیدی', 'Key result'], type: 'text', required: true, placeholder: ['مثلاً «نرخ تکمیل ثبت‌نام به ۶۰٪»', 'e.g. “Sign-up completion at 60%”'] },
       { key: 'objective_id', label: ['زیر هدف', 'Under objective'], type: 'objective', required: true },
       { key: 'kind', label: ['نوع سنجش', 'Measured as'], type: 'select', options: { number: ['عدد', 'Number'], percent: ['درصد', 'Percent'], done: ['انجام شد / نشد', 'Done / not done'] }, half: true },
-      { key: 'unit', label: ['واحد (برای عدد)', 'Unit (for numbers)'], type: 'text', half: true },
+      { key: 'unit', label: ['واحد شمارش (کلمه، اختیاری)', 'Unit (a word, optional)'], type: 'unit', half: true, placeholder: ['مثلاً نفر، ثانیه، کاربر', 'e.g. users, seconds'] },
       { key: 'target', label: ['هدف (مقدار نهایی)', 'Target'], type: 'number', half: true, required: true },
       { key: 'current', label: ['مقدار فعلی', 'Current value'], type: 'number', half: true },
       { key: 'weight', label: ['وزن (از ۱۰۰)', 'Weight (of 100)'], type: 'krweight', half: true, required: true },
@@ -558,6 +579,20 @@ function FieldInput({ f, value, set, form, disabled, autoFocus, onSubmit }: { f:
           {quarterOptions(db).map((q) => <option key={q} value={q}>{quarterLabel(q)}</option>)}
         </select>
       )
+    case 'plan': {
+      // the team's open roadmap items (plus the one already set)
+      const team = teamOf(form as never, db)
+      const ps = db.Plans.filter((p) => p.id === v || (p.team === team && !['done', 'dropped'].includes(p.status)))
+      return (
+        <select {...common} value={String(v)} onChange={(e) => set(e.target.value)}>
+          <option value="">{L('— بدون آیتم برنامه —', '— No plan item —')}</option>
+          {ps.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+        </select>
+      )
+    }
+    case 'unit':
+      // a word only: digits belong in the target and current value
+      return <input {...common} value={String(v)} placeholder={f.placeholder && tr(f.placeholder)} onChange={(e) => set(e.target.value.replace(/[\d۰-۹]/g, ''))} />
     case 'krweight': {
       // a team's key results for the quarter add up to 100: show what is left for this one
       const o = db.Objectives.find((x) => x.id === form.objective_id)

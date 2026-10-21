@@ -194,7 +194,7 @@ export function Progress({ value, h, className, marker }: { value: number; h?: H
         <div
           className="absolute -top-1 h-3.5 w-[2px] rounded bg-ink/60"
           style={{ insetInlineStart: `calc(${Math.max(0, Math.min(100, marker))}% - 1px)` }}
-          title={`${L('زمان سپری‌شده', 'Time elapsed')}: ${fa(`${Math.round(marker)}%`)}`}
+          title={L(`امروز: ${fa(Math.round(marker))}٪ از زمان گذشته. اگر نوار به این خط نرسیده، از برنامه عقب است.`, `Today: ${Math.round(marker)}% of the time has passed. A bar short of this line is behind plan.`)}
         />
       )}
     </div>

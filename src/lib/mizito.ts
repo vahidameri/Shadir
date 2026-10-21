@@ -114,11 +114,32 @@ export const mzCat = (id?: string): MzCat => statusById(id)?.cat || 'open'
 export const mzClosed = (m: { status: string }) => ['done', 'cancelled'].includes(mzCat(m.status))
 export const firstMzStatus = (cat: MzCat) => cfg.statuses.find((s) => s.cat === cat)?.id || cfg.statuses[0]?.id || ''
 
+// ------------------------------------------------------------------ index
+// Lookups the queue makes for every row (mentions of an item, a person's registry row) are built
+// once per data version instead of scanning the lists each time.
+interface MzIndex { mentions: Map<string, MizitoMention[]>; contacts: Map<string, Contact> }
+const indexes = new WeakMap<DB, MzIndex>()
+function indexOf(db: DB): MzIndex {
+  let ix = indexes.get(db)
+  if (!ix) {
+    const mentions = new Map<string, MizitoMention[]>()
+    for (const x of db.MizitoMentions) mentions.set(x.item_id, [...(mentions.get(x.item_id) || []), x])
+    mentions.forEach((l) => l.sort((a, b) => (a.at < b.at ? -1 : 1)))
+    const contacts = new Map<string, Contact>()
+    for (const c of db.Contacts) {
+      if (c.name_en) contacts.set(c.name_en, c)
+      contacts.set(c.name, c)
+    }
+    ix = { mentions, contacts }
+    indexes.set(db, ix)
+  }
+  return ix
+}
+
 // ------------------------------------------------------------------ people
 /** Everyone who can ask or be chased: the department (Team) and the registry (Contacts). */
 function contactOf(db: DB, name: string): Contact | undefined {
-  const n = String(name || '').trim()
-  return db.Contacts.find((c) => c.name === n || c.name_en === n)
+  return indexOf(db).contacts.get(String(name || '').trim())
 }
 /** A person's tier: their Contacts row, else the lowest tier. */
 export function tierOf(db: DB, name: string): Tier | undefined {
@@ -146,7 +167,7 @@ const stampMs = (s: string) => {
   const t = new Date(String(s || '').replace(' ', 'T')).getTime()
   return Number.isFinite(t) ? t : 0
 }
-export const mentionsOf = (db: DB, id: string): MizitoMention[] => db.MizitoMentions.filter((x) => x.item_id === id).sort((a, b) => (a.at < b.at ? -1 : 1))
+export const mentionsOf = (db: DB, id: string): MizitoMention[] => indexOf(db).mentions.get(id) || []
 /** Everyone who mentioned it: the asker and every re-mention. */
 export const askersOf = (db: DB, m: MizitoItem) => [...new Set([m.asked_by, ...mentionsOf(db, m.id).map((x) => x.by)].filter(Boolean))]
 /** The highest tier among the people who asked. */
@@ -173,10 +194,27 @@ interface MzSignals {
   ageDays: number
 }
 
-export function mzSignals(db: DB, m: MizitoItem, now = Date.now()): MzSignals {
+// signals per item, kept for the current data and minute (the page, sidebar, desk and overview all ask)
+const sigCache = new WeakMap<DB, { at: number; map: Map<string, { row: MizitoItem; s: MzSignals }> }>()
+export function mzSignals(db: DB, m: MizitoItem, at?: number): MzSignals {
+  const now = at ?? Date.now()
+  if (at === undefined) {
+    const minute = Math.floor(now / 60000)
+    let c = sigCache.get(db)
+    if (!c || c.at !== minute) sigCache.set(db, (c = { at: minute, map: new Map() }))
+    const hit = c.map.get(m.id)
+    if (hit && m === hit.row) return hit.s
+    const s = computeSignals(db, m, now)
+    c.map.set(m.id, { row: m, s })
+    return s
+  }
+  return computeSignals(db, m, now)
+}
+
+function computeSignals(db: DB, m: MizitoItem, now: number): MzSignals {
   const c = cfg
   const tier = topTier(db, m)
-  const mentions = 1 + db.MizitoMentions.filter((x) => x.item_id === m.id).length
+  const mentions = 1 + mentionsOf(db, m.id).length
   const open = !mzClosed(m)
   const cat = mzCat(m.status)
   const last = stampMs(m.last_mention_at || m.received_at || m.created_at)

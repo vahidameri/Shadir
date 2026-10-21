@@ -101,7 +101,11 @@ export default function OkrPage() {
           {[{ id: '', label: L('همه‌ی تیم‌ها', 'All teams') }, ...teams.map((t) => ({ id: t.id, label: teamName(t.id) }))].map((x) => (
             <button key={x.id || 'all'} onClick={() => setOnly(x.id)} className={cx('h-8 rounded-full border px-3 text-xs transition', only === x.id ? 'border-transparent bg-ink text-surface' : 'border-line text-sub hover:text-ink')}>{x.label}</button>
           ))}
-          <button className="btn-ghost btn-sm ms-auto" onClick={() => save(allOpen ? new Set([...expanded].filter((x) => !shown.some((t) => t.id === x))) : new Set([...expanded, ...shown.map((t) => t.id)]))}>
+          <span className="ms-auto flex items-center gap-1.5 text-[0.6875rem] text-sub">
+            <span className="relative inline-block h-1.5 w-10 rounded-full bg-ink/10"><span className="absolute inset-y-0 start-0 w-5 rounded-full bg-ink/60" /><span className="absolute -top-1 start-7 h-3.5 w-[2px] rounded bg-ink/60" /></span>
+            {L(`خط عمودی روی نوارها = امروز (${fa(el)}٪ از فصل گذشته)؛ نواری که به آن نرسیده عقب است`, `The vertical line = today (${el}% of the quarter gone); a bar short of it is behind`)}
+          </span>
+          <button className="btn-ghost btn-sm" onClick={() => save(allOpen ? new Set([...expanded].filter((x) => !shown.some((t) => t.id === x))) : new Set([...expanded, ...shown.map((t) => t.id)]))}>
             <ChevronDown size={14} className={cx('transition', allOpen && 'rotate-180')} /> {allOpen ? L('بستن همه', 'Collapse all') : L('باز کردن همه', 'Expand all')}
           </button>
         </div>

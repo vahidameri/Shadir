@@ -99,6 +99,8 @@ export interface Task {
   kr_id?: string
   /** sprint work: story | bug | task | spike */
   issue_type?: IssueType
+  /** the roadmap item this task belongs to */
+  plan_id?: string
   /** short readable id for sprint work, e.g. TECH-42 */
   key?: string
   title: string
@@ -325,7 +327,7 @@ export interface Meeting {
 
 export interface FileRef {
   id: string
-  entity: 'Meetings' | 'Projects' | 'Tasks' | 'Team' | 'Deliverables' | 'Contracts' | 'Mizito' | 'KeyResults'
+  entity: 'Meetings' | 'Projects' | 'Tasks' | 'Team' | 'Deliverables' | 'Contracts' | 'Mizito' | 'KeyResults' | 'Plans'
   entity_id: string
   name: string
   mime: string
@@ -344,7 +346,7 @@ export interface ConfigRow {
 
 export interface Comment {
   id: string
-  entity: 'Tasks' | 'FollowUps' | 'Projects' | 'Risks' | 'KeyResults' | 'Sprints'
+  entity: 'Tasks' | 'FollowUps' | 'Projects' | 'Risks' | 'KeyResults' | 'Sprints' | 'Plans'
   entity_id: string
   author: string
   body: string
@@ -422,7 +424,7 @@ export interface MizitoMention {
 /** One change to a tracked row (field-level log). Written by the server; the app mirrors it locally. */
 export interface HistoryRow {
   id: string
-  entity: 'Tasks' | 'FollowUps' | 'Mizito' | 'KeyResults' | 'Kpis'
+  entity: 'Tasks' | 'FollowUps' | 'Mizito' | 'KeyResults' | 'Kpis' | 'Plans'
   entity_id: string
   /** the field that changed, or '_created' / '_deleted' */
   field: string
@@ -499,6 +501,33 @@ export interface DB {
   KeyResults: KeyResult[]
   Kpis: Kpi[]
   Checkins: Checkin[]
+  Plans: PlanItem[]
+}
+
+export type PlanStatus = 'idea' | 'planned' | 'in_progress' | 'review' | 'done' | 'paused' | 'dropped'
+export type PlanKind = 'discovery' | 'design' | 'spec' | 'delivery' | 'research' | 'other'
+/** A roadmap item for teams that plan without sprints (design, product): dates, status, progress. */
+export interface PlanItem {
+  id: string
+  team: string
+  title: string
+  kind: PlanKind
+  project_id: string
+  kr_id: string
+  owner: string
+  start_date: string
+  end_date: string
+  /** the first committed end date, kept when the end moves (slippage) */
+  baseline_end: string
+  status: PlanStatus
+  /** 0..100 by hand; blank = from linked tasks */
+  progress: number | ''
+  confidence: KrConfidence
+  /** the latest status line for the CPTO */
+  note: string
+  link: string
+  updated_at: string
+  batch?: string
 }
 
 /** One check-in on a key result: the value at that moment, the confidence, and a note (the trend). */

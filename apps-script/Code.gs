@@ -18,7 +18,7 @@
  *   viewer — read only (leadership)
  */
 
-var MADAR_VERSION = '1.4.0'; // shown on the login page and by diagnose()
+var MADAR_VERSION = '1.5.0'; // shown on the login page and by diagnose()
 
 var SCHEMA = {
   Projects: ['id', 'code', 'name', 'description', 'category', 'owner', 'client', 'liaison', 'liaison_contact', 'status', 'priority', 'phase', 'start_date', 'end_date', 'progress', 'health_override', 'objective', 'paused_at', 'pause_reason', 'delivery_day', 'last_delivery', 'archived', 'archived_at', 'links', 'team', 'kind', 'batch'],
@@ -26,7 +26,7 @@ var SCHEMA = {
   Milestones: ['id', 'project_id', 'title', 'planned_date', 'actual_date', 'status', 'owner', 'weight'],
   // sprints belong to a team; committed_points is fixed when the sprint starts, completed_points when it closes
   Sprints: ['id', 'project_id', 'name', 'start_date', 'end_date', 'goal', 'committed_points', 'completed_points', 'status', 'team', 'started_at', 'closed_at', 'retro', 'carried', 'batch'],
-  Tasks: ['id', 'project_id', 'sprint_id', 'title', 'description', 'assignee', 'reporter', 'status', 'priority', 'due_date', 'points', 'tags', 'created_at', 'completed_at', 'track', 'depends_on', 'meeting_id', 'private', 'deadline', 'handoff_date', 'test_date', 'follow_date', 'area', 'collaborators', 'watchers', 'notify', 'start_date', 'estimate', 'checklist', 'assigned_at', 'flag', 'blocked_reason', 'blocked_by', 'blocked_since', 'updated_at', 'link', 'requested_by', 'kr_id', 'issue_type', 'key', 'ext_id', 'batch'],
+  Tasks: ['id', 'project_id', 'sprint_id', 'title', 'description', 'assignee', 'reporter', 'status', 'priority', 'due_date', 'points', 'tags', 'created_at', 'completed_at', 'track', 'depends_on', 'meeting_id', 'private', 'deadline', 'handoff_date', 'test_date', 'follow_date', 'area', 'collaborators', 'watchers', 'notify', 'start_date', 'estimate', 'checklist', 'assigned_at', 'flag', 'blocked_reason', 'blocked_by', 'blocked_since', 'updated_at', 'link', 'requested_by', 'kr_id', 'issue_type', 'key', 'plan_id', 'ext_id', 'batch'],
   // owner = who is chasing; follow-ups are personal
   FollowUps: ['id', 'project_id', 'subject', 'person', 'channel', 'due_date', 'status', 'priority', 'notes', 'created_at', 'done_at', 'owner', 'waiting_for', 'link', 'last_ping', 'ping_count', 'ext_id', 'batch'],
   Risks: ['id', 'project_id', 'title', 'type', 'probability', 'impact', 'owner', 'mitigation', 'status', 'due_date'],
@@ -70,6 +70,8 @@ var SCHEMA = {
   KeyResults: ['id', 'objective_id', 'title', 'owner', 'kind', 'start', 'target', 'current', 'unit', 'confidence', 'project_id', 'note', 'updated_at', 'weight', 'mizito_link', 'batch'],
   // one row per key-result check-in: the value, confidence and note at that moment (the trend)
   Checkins: ['id', 'kr_id', 'at', 'value', 'confidence', 'note', 'by', 'batch'],
+  // roadmap items for teams that plan without sprints; baseline_end = first committed end (slippage)
+  Plans: ['id', 'team', 'title', 'kind', 'project_id', 'kr_id', 'owner', 'start_date', 'end_date', 'baseline_end', 'status', 'progress', 'confidence', 'note', 'link', 'updated_at', 'batch'],
   // product KPIs: latest value against a target; previous = the value before the last update
   Kpis: ['id', 'project_id', 'name', 'unit', 'direction', 'target', 'current', 'previous', 'updated_at', 'note', 'batch'],
 };
@@ -77,7 +79,7 @@ var SCHEMA = {
 var USERS_SHEET = 'Users';
 var USERS_HEADERS = ['key', 'name', 'email', 'role', 'active'];
 var LOG_SHEET = 'AuditLog';
-var DATE_COLS = ['start_date', 'end_date', 'planned_date', 'actual_date', 'due_date', 'created_at', 'completed_at', 'done_at', 'week_date', 'date', 'target_date', 'baseline_date', 'delivered_date', 'time', 'deadline', 'handoff_date', 'test_date', 'follow_date', 'last_delivery', 'archived_at', 'sent_at', 'responded_at', 'week', 'assigned_at', 'blocked_since', 'updated_at', 'received_at', 'last_mention_at', 'closed_at', 'at', 'last_ping', 'started_at'];
+var DATE_COLS = ['start_date', 'end_date', 'planned_date', 'actual_date', 'due_date', 'created_at', 'completed_at', 'done_at', 'week_date', 'date', 'target_date', 'baseline_date', 'delivered_date', 'time', 'deadline', 'handoff_date', 'test_date', 'follow_date', 'last_delivery', 'archived_at', 'sent_at', 'responded_at', 'week', 'assigned_at', 'blocked_since', 'updated_at', 'received_at', 'last_mention_at', 'closed_at', 'at', 'last_ping', 'started_at', 'baseline_end'];
 
 // --------------------------------------------------------------------------
 // HTTP entry points
@@ -481,12 +483,13 @@ function applyPrivacy_(data, user) {
   data.Files = (data.Files || []).filter(function (f) { return !(f.entity === 'Tasks' && hidden[f.entity_id]); });
   var out = applyScope_(data, user, owners);
   // the log of a task or follow-up travels only with the row itself
-  var seen = { Tasks: {}, FollowUps: {}, Mizito: {}, KeyResults: {}, Kpis: {} };
+  var seen = { Tasks: {}, FollowUps: {}, Mizito: {}, KeyResults: {}, Kpis: {}, Plans: {} };
   (out.Tasks || []).forEach(function (t) { seen.Tasks[t.id] = 1; });
   (out.FollowUps || []).forEach(function (f) { seen.FollowUps[f.id] = 1; });
   (out.Mizito || []).forEach(function (m) { seen.Mizito[m.id] = 1; });
   (out.KeyResults || []).forEach(function (k) { seen.KeyResults[k.id] = 1; });
   (out.Kpis || []).forEach(function (k) { seen.Kpis[k.id] = 1; });
+  (out.Plans || []).forEach(function (k) { seen.Plans[k.id] = 1; });
   out.History = (out.History || []).filter(function (h) { return seen[h.entity] && seen[h.entity][h.entity_id]; });
   return out;
 }
@@ -808,11 +811,12 @@ function googleEmail_(token) {
 // --------------------------------------------------------------------------
 
 var HISTORY_FIELDS = {
-  Tasks: ['title', 'description', 'status', 'priority', 'assignee', 'due_date', 'assigned_at', 'flag', 'track', 'project_id', 'blocked_reason', 'blocked_by', 'link', 'requested_by', 'collaborators', 'watchers', 'private', 'deadline', 'kr_id', 'sprint_id', 'points'],
+  Tasks: ['title', 'description', 'status', 'priority', 'assignee', 'due_date', 'assigned_at', 'flag', 'track', 'project_id', 'blocked_reason', 'blocked_by', 'link', 'requested_by', 'collaborators', 'watchers', 'private', 'deadline', 'kr_id', 'sprint_id', 'points', 'plan_id'],
   FollowUps: ['subject', 'person', 'status', 'due_date', 'priority', 'channel', 'notes', 'project_id', 'owner', 'waiting_for', 'link'],
   Mizito: ['title', 'status', 'asked_by', 'mentioned', 'category', 'action', 'priority_override', 'urgent', 'assigned_to', 'due_date', 'outcome', 'link', 'description'],
   KeyResults: ['current', 'confidence', 'target', 'title', 'owner', 'note', 'weight'],
   Kpis: ['current', 'target', 'name'],
+  Plans: ['status', 'end_date', 'progress', 'confidence', 'note', 'owner', 'title', 'start_date'],
 };
 
 function clip_(v) { return String(v === undefined || v === null ? '' : v).slice(0, 300); }
@@ -848,7 +852,7 @@ function historyRows_(rows, user) {
 // Every imported row carries a batch id, so a whole import can be taken back.
 // --------------------------------------------------------------------------
 
-var BULK_SHEETS = { Tasks: 1, FollowUps: 1, Mizito: 1, MizitoMentions: 1, Contacts: 1, Team: 1, Projects: 1, History: 1, Comments: 1, Allocations: 1, Objectives: 1, KeyResults: 1, Kpis: 1, Checkins: 1, Sprints: 1 };
+var BULK_SHEETS = { Tasks: 1, FollowUps: 1, Mizito: 1, MizitoMentions: 1, Contacts: 1, Team: 1, Projects: 1, History: 1, Comments: 1, Allocations: 1, Objectives: 1, KeyResults: 1, Kpis: 1, Checkins: 1, Sprints: 1, Plans: 1 };
 
 function bulk_(name, rows, user) {
   if (user.access !== 'super') throw new Error('فقط مدیر برنامه می‌تواند ایمپورت کند');

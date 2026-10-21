@@ -17,27 +17,44 @@ export function Attachments({ entity, id, compact }: { entity: FileRef['entity']
   const files = db.Files.filter((f) => f.entity === entity && f.entity_id === id)
   const [drag, setDrag] = useState(false)
 
+  const [names, setNames] = useState<string[]>([])
   const send = async (list: FileList | null) => {
-    if (!list?.length) return
-    const arr = Array.from(list)
+    // one batch at a time; the same file picked twice is sent once
+    if (!list?.length || busy) return
+    const arr = Array.from(list).filter((f, i, all) => f.size > 0 && all.findIndex((x) => x.name === f.name && x.size === f.size) === i)
+    if (!arr.length) return
     setBusy(arr.length)
+    setNames(arr.map((f) => f.name))
+    let ok = 0
     for (const f of arr) {
       try {
         await upload(entity, id, f)
-      } catch {}
+        ok++
+      } catch {
+        /* the store already showed why */
+      }
       setBusy((n) => n - 1)
+      setNames((x) => x.slice(1))
     }
-    toast(L(`${fa(arr.length)} فایل آپلود شد`, `${arr.length} file(s) uploaded`))
+    if (ok) toast(L(`${fa(ok)} فایل آپلود شد`, `${ok} file(s) uploaded`))
   }
+  const isFiles = (e: React.DragEvent) => Array.from(e.dataTransfer.types || []).includes('Files')
 
   return (
     <div
-      onDragOver={(e) => (e.preventDefault(), canEdit && setDrag(true))}
+      onDragOver={(e) => {
+        if (!isFiles(e)) return
+        e.preventDefault()
+        canEdit && setDrag(true)
+      }}
       onDragLeave={() => setDrag(false)}
       onDrop={(e) => {
+        // only real files: dragged text, links or cards are not attachments
+        if (!isFiles(e)) return
         e.preventDefault()
+        e.stopPropagation()
         setDrag(false)
-        canEdit && send(e.dataTransfer.files)
+        if (canEdit) send(e.dataTransfer.files)
       }}
       className={cx('rounded-2xl transition', drag && 'bg-brand/5 ring-2 ring-brand/30')}
     >
@@ -72,9 +89,9 @@ export function Attachments({ entity, id, compact }: { entity: FileRef['entity']
       {canEdit && (
         <>
           <input ref={input} type="file" multiple hidden onChange={(e) => (send(e.target.files), (e.target.value = ''))} />
-          <button onClick={() => input.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong px-3 py-2.5 text-xs text-sub transition hover:border-ink/30 hover:text-ink">
+          <button type="button" disabled={!!busy} onClick={() => input.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong px-3 py-2.5 text-xs text-sub transition hover:border-ink/30 hover:text-ink disabled:cursor-wait">
             {busy ? <Loader size={14} className="animate-spin" /> : <Paperclip size={14} />}
-            {busy ? L('در حال آپلود…', 'Uploading…') : L('افزودن فایل', 'Attach files')}
+            {busy ? L(`در حال آپلود ${fa(busy)} فایل… ${names[0] || ''}`, `Uploading ${busy} file(s)… ${names[0] || ''}`) : L('افزودن فایل (یا بکشید و رها کنید)', 'Attach files (or drop them here)')}
           </button>
         </>
       )}

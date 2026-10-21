@@ -4,7 +4,7 @@ import { NavLink, useLocation, useNavigate, Link } from 'react-router-dom'
 import {
   Briefcase, ListChecks, Users, BellRing, ShieldAlert, Settings, Moon, Sun, Search, Plus, RefreshCw, Menu,
   Sparkles, CheckCircle2, AlertCircle, Bell, PanelLeftClose, PanelLeftOpen, Languages, Star, AtSign, Flag, Clock, CircleAlert, Ban, CalendarDays, Keyboard, CalendarRange, UserRound, LogOut, PackageCheck, Repeat,
-  LayoutDashboard, Target, Gauge, Zap,
+  LayoutDashboard, Target, Gauge, Zap, GanttChart, FileBarChart,
 } from 'lucide-react'
 import { useStore, clearSnaps } from '../lib/store'
 import { useI18n, L } from '../lib/i18n'
@@ -111,7 +111,9 @@ export function Layout({ children }: { children: ReactNode }) {
       label: L('برنامه‌ریزی', 'Planning'),
       links: [
         { to: '/okr', label: L('OKR تیم‌ها', 'Team OKRs'), icon: Target },
+        { to: '/plan', label: L('برنامه‌ی تیم‌ها', 'Team plans'), icon: GanttChart },
         { to: '/sprints', label: L('اسپرینت‌های تیم فنی', 'Tech sprints'), icon: Zap },
+        { to: '/report', label: L('گزارش برای CPTO', 'Report for the CPTO'), icon: FileBarChart },
         { to: '/resources', label: L('توزیع منابع', 'Resources'), icon: Gauge },
       ],
     },

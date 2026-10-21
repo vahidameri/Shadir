@@ -112,8 +112,10 @@ export function teamOkr(db: DB, team: string, quarter: string, teamTasks: Task[]
   }
 }
 
+/** A unit is a word ("نفر", "ثانیه"); a number typed there by mistake is not shown next to the value. */
+const unitOf = (u?: string) => (u && !/^[\s\d۰-۹.,٫٬%٪]+$/.test(u) ? ` ${u.trim()}` : '')
 export const fmtVal = (k: Pick<KeyResult, 'kind' | 'unit'>, v: number | string) =>
-  k.kind === 'done' ? (Number(v) >= 1 ? L('انجام شد', 'Done') : L('نشده', 'Not yet')) : `${fa(Number(v) || 0)}${k.kind === 'percent' ? '٪' : k.unit ? ` ${k.unit}` : ''}`
+  k.kind === 'done' ? (Number(v) >= 1 ? L('انجام شد', 'Done') : L('نشده', 'Not yet')) : `${fa(Number(v) || 0)}${k.kind === 'percent' ? '٪' : unitOf(k.unit)}`
 
 /** Key-result titles by id, kept current by the store, for log lines that only carry an id. */
 let titles = new Map<string, string>()

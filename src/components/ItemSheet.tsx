@@ -417,6 +417,14 @@ export function ItemSheet({ sheet, id, onClose }: { sheet: 'Tasks' | 'FollowUps'
               <Prop label="OKR">
                 <KrPicker value={item.kr_id || ''} onChange={(v) => patch({ kr_id: v })} />
               </Prop>
+              {(db.Plans.some((x) => x.team === trackOf(item, db)) || item.plan_id) && (
+                <Prop label={L('برنامه', 'Plan')}>
+                  <select disabled={!canEdit} value={item.plan_id || ''} onChange={(e) => patch({ plan_id: e.target.value })} className="h-8 w-full truncate rounded-full bg-transparent px-2 text-xs hover:bg-muted">
+                    <option value="">{L('بدون آیتم برنامه', 'No plan item')}</option>
+                    {db.Plans.filter((x) => x.id === item.plan_id || (x.team === trackOf(item, db) && !['done', 'dropped'].includes(x.status))).map((x) => <option key={x.id} value={x.id}>{x.title}</option>)}
+                  </select>
+                </Prop>
+              )}
               {sprintWork && (
                 <Prop label={L('نوع کار', 'Issue type')}>
                   <select disabled={!canEdit} value={item.issue_type || ''} onChange={(e) => patch({ issue_type: e.target.value as never })} className="h-8 w-full rounded-full bg-transparent px-2 text-xs hover:bg-muted">

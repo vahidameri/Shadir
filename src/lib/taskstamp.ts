@@ -12,7 +12,7 @@ export const nowStamp = () => {
 const lead = (t?: Partial<Task>) => String(t?.assignee || '').split(',')[0].trim()
 
 /** Fields whose change counts as an update (and goes into the history). */
-export const TRACKED: (keyof Task)[] = ['title', 'description', 'status', 'priority', 'assignee', 'due_date', 'assigned_at', 'flag', 'track', 'project_id', 'blocked_reason', 'blocked_by', 'link', 'requested_by', 'collaborators', 'watchers', 'private', 'deadline', 'kr_id', 'sprint_id', 'points']
+export const TRACKED: (keyof Task)[] = ['title', 'description', 'status', 'priority', 'assignee', 'due_date', 'assigned_at', 'flag', 'track', 'project_id', 'blocked_reason', 'blocked_by', 'link', 'requested_by', 'collaborators', 'watchers', 'private', 'deadline', 'kr_id', 'sprint_id', 'points', 'plan_id']
 
 export function stampTask(prev: Task | undefined, next: Task): Task {
   const out = { ...next }

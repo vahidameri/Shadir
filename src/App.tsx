@@ -18,6 +18,8 @@ import OkrPage from './pages/Okr'
 import Resources from './pages/Resources'
 import Sprints from './pages/Sprints'
 import SprintReport from './pages/SprintReport'
+import Plan from './pages/Plan'
+import Report from './pages/Report'
 import FollowUps from './pages/FollowUps'
 import Risks from './pages/Risks'
 import CalendarPage from './pages/Calendar'
@@ -117,6 +119,8 @@ export default function App() {
                 <Route path="/resources" element={<Resources />} />
                 <Route path="/sprints" element={<Sprints />} />
                 <Route path="/sprints/:id" element={<SprintReport />} />
+                <Route path="/plan" element={<Plan />} />
+                <Route path="/report" element={<Report />} />
                 <Route path="/projects" element={<Projects />} />
                 <Route path="/projects/:id" element={<ProjectDetail />} />
                 <Route path="/risks" element={<Only rule="portfolio"><Risks /></Only>} />

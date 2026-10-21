@@ -12,6 +12,7 @@ const HISTORY_FIELDS: Partial<Record<SheetName, string[]>> = {
   // check-ins: every change of value or confidence is kept, so a KR's trend can be read back
   KeyResults: ['current', 'confidence', 'target', 'title', 'owner', 'note', 'weight'],
   Kpis: ['current', 'target', 'name'],
+  Plans: ['status', 'end_date', 'progress', 'confidence', 'note', 'owner', 'title', 'start_date'],
 }
 const clip = (v: unknown) => String(v ?? '').slice(0, 300)
 

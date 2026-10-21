@@ -11,10 +11,12 @@ import { diffRows } from './history'
 import { readMzCfg, setMzCfg, stampMizito } from './mizito'
 import { readTeamCfg, setTeamCfg } from './teams'
 import { setKrTitles } from './okr'
+import { stampPlan } from './plans'
 import { nextKey, readSprintCfg, setSprintCfg, sprintTeam } from './sprints'
 import { teamOf } from './teams'
 import { passFor } from './handoffs'
-import type { Task } from './types'
+import type { PlanItem, Task } from './types'
+import { nowStamp } from './taskstamp'
 import { NOTIFY_KEY, setNotifyOff } from './inbox'
 import { hideArchived, isArchived } from './archive'
 import type { Project } from './types'
@@ -77,7 +79,7 @@ const NUMERIC: Partial<Record<SheetName, string[]>> = {
 }
 
 function emptyDB(): DB {
-  return { Projects: [], Scope: [], Milestones: [], Sprints: [], Tasks: [], FollowUps: [], Risks: [], Team: [], Allocations: [], Updates: [], Comments: [], Deliverables: [], Meetings: [], Files: [], Config: [], Contracts: [], Handoffs: [], Deliveries: [], History: [], Contacts: [], Mizito: [], MizitoMentions: [], Objectives: [], KeyResults: [], Kpis: [], Checkins: [] }
+  return { Projects: [], Scope: [], Milestones: [], Sprints: [], Tasks: [], FollowUps: [], Risks: [], Team: [], Allocations: [], Updates: [], Comments: [], Deliverables: [], Meetings: [], Files: [], Config: [], Contracts: [], Handoffs: [], Deliveries: [], History: [], Contacts: [], Mizito: [], MizitoMentions: [], Objectives: [], KeyResults: [], Kpis: [], Checkins: [], Plans: [] }
 }
 
 // Sheets return numbers as numbers or strings, dates as ISO strings. Normalize once here.
@@ -85,8 +87,10 @@ function normalize(raw: Partial<DB>): DB {
   const db = emptyDB()
   for (const k of Object.keys(db) as SheetName[]) {
     const rows = (raw[k] || []) as unknown as Record<string, unknown>[]
+    const seen = new Set<string>()
     db[k] = rows
-      .filter((r) => r && r.id !== '' && r.id !== undefined)
+      // one row per id: a sheet edited by hand (or a retried write) can hold the same id twice
+      .filter((r) => r && r.id !== '' && r.id !== undefined && !seen.has(String(r.id)) && !!seen.add(String(r.id)))
       .map((r) => {
         const o: Record<string, unknown> = {}
         for (const [key, v] of Object.entries(r)) {
@@ -191,6 +195,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   lastSyncRef.current = lastSync
   const [toasts, setToasts] = useState<Toast[]>([])
   const dbRef = useRef(db)
+  // writes in flight, and a counter that moves with every write: a refresh that started before a
+  // write finished is stale (it would drop the write or add its row twice), so it is thrown away
+  const inflight = useRef(0)
+  const writeSeq = useRef(0)
+  const track = useCallback(async <T,>(p: Promise<T>): Promise<T> => {
+    inflight.current++
+    writeSeq.current++
+    try {
+      return await p
+    } finally {
+      inflight.current--
+      writeSeq.current++
+    }
+  }, [])
   // keep the local snapshot current (debounced) so the next open is instant
   useEffect(() => {
     if (mode !== 'live' || !lastSyncRef.current || !session?.email) return
@@ -255,9 +273,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return
     }
     if (!authed) return
+    // never refresh over a save that is still on its way; try again shortly
+    if (inflight.current > 0) {
+      setTimeout(() => refreshRef.current?.(), 2500)
+      return
+    }
+    const seq = writeSeq.current
     setLoading(true)
     try {
       const { data, user, version } = await fetchAll(config)
+      if (seq !== writeSeq.current) {
+        setTimeout(() => refreshRef.current?.(), 1500)
+        return
+      }
       setServerVersion(version)
       const fresh = normalize(data)
       dbRef.current = fresh
@@ -274,6 +302,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setLoading(false)
     }
   }, [config, mode, authed, session?.token]) // eslint-disable-line react-hooks/exhaustive-deps
+  const refreshRef = useRef(refresh)
+  refreshRef.current = refresh
 
   useEffect(() => {
     if (mode === 'demo') {
@@ -330,6 +360,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (sheet === 'Mizito') row = stampMizito(list.find((r) => r.id === row.id) as unknown as MizitoItem | undefined, row as unknown as MizitoItem) as unknown as Row<S>
       // sprint teams' work gets a readable key (TECH-42) the first time it is saved
       if (sheet === 'Tasks' && !(row as unknown as Task).key && !list.some((r) => r.id === row.id) && sprintTeam(teamOf(row as unknown as Task, prev))) row = { ...row, key: nextKey(prev) } as Row<S>
+      if (sheet === 'Plans') row = stampPlan(list.find((r) => r.id === row.id) as unknown as PlanItem | undefined, row as unknown as PlanItem, nowStamp()) as unknown as Row<S>
       if (sheet === 'Tasks') row = stampTask(list.find((r) => r.id === row.id) as unknown as Task | undefined, row as unknown as Task) as unknown as Row<S>
       const old = list.find((r) => r.id === row.id)
       const exists = !!old
@@ -347,7 +378,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return
       }
       try {
-        await remoteUpsert(config, sheet, row as unknown as Record<string, unknown>)
+        await track(remoteUpsert(config, sheet, row as unknown as Record<string, unknown>))
         setLastSync(new Date())
         // a task re-assigned to someone in another unit is a hand-off; log it (see lib/handoffs)
         if (sheet === 'Tasks') {
@@ -379,7 +410,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return
       }
       try {
-        await remoteDelete(config, sheet, id)
+        await track(remoteDelete(config, sheet, id))
       } catch (e) {
         setDb(prev)
         toast(`${L('حذف نشد', 'Not deleted')}: ${e instanceof Error ? e.message : e}`, 'err')
@@ -411,9 +442,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         persistDemo(next)
         return row
       }
-      const res = await remoteUpload(config, { name: file.name, mime: base.mime, data: dataUrl.split(',')[1], entity, entity_id })
+      const res = await track(remoteUpload(config, { name: file.name, mime: base.mime, data: dataUrl.split(',')[1], entity, entity_id }))
       const row = { ...base, ...(res.row as Partial<FileRef>) } as FileRef
-      setDb((d) => ({ ...d, Files: [...d.Files, row] }))
+      const cur = dbRef.current
+      const next = { ...cur, Files: [...cur.Files.filter((f) => f.id !== row.id), row] }
+      dbRef.current = next
+      setDb(next)
       return row
     },
     [config, mode, me, toast], // eslint-disable-line react-hooks/exhaustive-deps
@@ -428,7 +462,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [config, mode],
   )
 
-  const BULK_SHEETS: SheetName[] = ['Tasks', 'FollowUps', 'Mizito', 'MizitoMentions', 'Contacts', 'Team', 'Projects', 'History', 'Comments', 'Allocations', 'Objectives', 'KeyResults', 'Kpis', 'Checkins', 'Sprints']
+  const BULK_SHEETS: SheetName[] = ['Tasks', 'FollowUps', 'Mizito', 'MizitoMentions', 'Contacts', 'Team', 'Projects', 'History', 'Comments', 'Allocations', 'Objectives', 'KeyResults', 'Kpis', 'Checkins', 'Sprints', 'Plans']
   const bulk = useCallback(
     async <S extends SheetName>(sheet: S, rows: Row<S>[]) => {
       if (!rows.length) return
@@ -443,7 +477,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (mode === 'demo') return persistDemo(next)
       try {
         // in chunks, so one request never runs into the Apps Script time limit
-        for (let i = 0; i < rows.length; i += 300) await remoteAction(config, 'bulk', { sheet, rows: rows.slice(i, i + 300) })
+        for (let i = 0; i < rows.length; i += 300) await track(remoteAction(config, 'bulk', { sheet, rows: rows.slice(i, i + 300) }))
         setLastSync(new Date())
       } catch (e) {
         dbRef.current = prev
@@ -471,7 +505,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         persistDemo(next)
         return n
       }
-      const res = (await remoteAction(config, 'undoBatch', { batch })) as { row?: { removed?: number } }
+      const res = (await track(remoteAction(config, 'undoBatch', { batch }))) as { row?: { removed?: number } }
       return res?.row?.removed ?? n
     },
     [config, mode], // eslint-disable-line react-hooks/exhaustive-deps
