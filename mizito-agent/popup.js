@@ -26,15 +26,15 @@ async function render() {
   $('t-tasks').textContent = fa(s.tasks || 0)
   $('t-mentions').textContent = fa(s.mentions || 0)
   $('t-sent').textContent = fa(s.sent || 0)
-  // the task link is learnt from one «لینک وظیفه» click in Mizito
+  // the task link is found by the agent itself: it opens a task in a background Mizito tab and takes «لینک وظیفه»
   const learned = linkRecipe && linkRecipe.recipe
-  $('linkbox').classList.toggle('todo', !learned)
-  $('link-title').textContent = learned ? 'لینک وظیفه یاد گرفته شد ✓' : 'لینک تسک‌ها هنوز یاد گرفته نشده'
+  $('linkbox').classList.toggle('todo', !!linkRecipe && !learned)
+  $('link-title').textContent = learned ? 'لینک تسک‌ها پیدا و بررسی شد ✓' : linkRecipe ? 'لینک تسک‌ها هنوز پیدا نشده' : 'لینک تسک‌ها در اولین همگام‌سازی پیدا می‌شود'
   $('link-sub').textContent = learned
-    ? `همه‌ی لینک‌ها مثل «لینک وظیفه»ی خود میزیتو ساخته می‌شوند. اگر میزیتو عوض شد، دوباره یک بار «لینک وظیفه» را بزنید.`
+    ? `ایجنت یک تسک را در یک تب پس‌زمینه‌ی میزیتو باز کرد، دید که درست باز می‌شود و لینک را از «لینک وظیفه» برداشت؛ لینک همه‌ی تسک‌ها همین‌طور ساخته می‌شود.${linkRecipe.sample ? ' نمونه: ' + linkRecipe.sample : ''}`
     : linkRecipe
-      ? 'لینک کپی شد ولی الگویش پیدا نشد؛ یک تسک را باز کنید و دوباره از منوی ⋮ «لینک وظیفه» را بزنید.'
-      : 'در میزیتو یک تسک را باز کنید، منوی ⋮ (سه‌نقطه) ← «لینک وظیفه» را بزنید. ایجنت از همان یاد می‌گیرد و لینک همه‌ی تسک‌ها را درست می‌کند.'
+      ? `هر ۶ ساعت دوباره امتحان می‌شود. آزموده شد: ${(linkRecipe.tried || []).join(' · ')}`
+      : 'برای این کار یک تب میزیتو چند ثانیه در پس‌زمینه باز و بسته می‌شود.'
   $('error').textContent = failed ? status.error : ''
   $('error').classList.toggle('hidden', !failed)
 }

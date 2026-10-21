@@ -172,7 +172,7 @@ function Composer({ projectId, update, onClose }: { projectId?: string; update?:
         )
       }
     >
-      <div className="grid gap-0 md:grid-cols-[1.25fr_1fr]">
+      <div className="grid gap-0 @lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
         {/* ---------------- narrative */}
         <div className="space-y-5 px-6 py-6">
           <div>

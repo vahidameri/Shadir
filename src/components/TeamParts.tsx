@@ -114,7 +114,7 @@ export function TeamCard({ id, stats, compact }: { id: string; stats?: TeamStats
         <CatBar by={s.byCat} legend={!compact} className="mt-4" />
         <OkrLine id={id} tasks={s.tasks} />
 
-        <div className="mt-3 grid grid-cols-2 gap-1 sm:grid-cols-4">
+        <div className="mt-3 grid grid-cols-2 gap-1 @md:grid-cols-4">
           {num(<CalendarClock size={13} />, s.late, L('معوق', 'late'), 'text-bad', `/tasks?track=${id}&v=late`)}
           {num(<Ban size={13} />, s.blocked, L('مسدود', 'blocked'), 'text-bad', `/tasks?track=${id}&v=blocked`)}
           {num(<Clock3 size={13} />, s.byCat.waiting, L('در انتظار', 'waiting'), 'text-ink', `/tasks?track=${id}&v=waiting`)}

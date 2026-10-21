@@ -276,7 +276,7 @@ export function Sheet({ open, onClose, title, children, footer, wide, header }: 
             <X size={18} />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto">{children}</div>
+        <div className="@container flex-1 overflow-y-auto">{children}</div>
         {footer && <div className="flex shrink-0 items-center gap-2 border-t border-line px-6 py-3">{footer}</div>}
       </div>
     </div>,

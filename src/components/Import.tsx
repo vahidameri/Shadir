@@ -133,7 +133,7 @@ export function ImportPage() {
   return (
     <div className="space-y-4">
       <Card eyebrow={<span className="flex items-center gap-1.5"><Upload size={12} /> {L('ایمپورت', 'Import')}</span>} title={L('۱. چه چیزی را ایمپورت می‌کنید؟', '1. What are you importing?')}>
-        <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid gap-2 @md:grid-cols-3 @xl:grid-cols-5">
           {(Object.keys(TARGETS) as Target[]).map((t) => (
             <button key={t} onClick={() => (setTarget(t), setDone(''))} className={cx('rounded-2xl border p-3 text-start text-sm transition', target === t ? 'border-ink bg-ink text-surface' : 'border-line hover:border-line-strong')}>
               <div className="font-medium">{L(TARGETS[t].fa, TARGETS[t].en)}</div>
@@ -209,7 +209,7 @@ export function ImportPage() {
           }
         >
           <p className="mb-3 text-xs text-sub">{L(`${fa(rows.length - header - 1)} ردیف داده پیدا شد. هر فیلد مدار را به ستون درست وصل کنید؛ حدس اولیه زده شده.`, `${rows.length - header - 1} data rows. Point each Madar field at the right column; a first guess is filled in.`)}</p>
-          <div className="grid gap-2 md:grid-cols-2">
+          <div className="grid gap-2 @lg:grid-cols-2">
             {fields.map((f) => {
               const i = cols[f.key]
               const sample = i !== undefined && i >= 0 ? rows.slice(header + 1).map((r) => cellText(r[i] || '')).find(Boolean) : ''
@@ -238,7 +238,7 @@ export function ImportPage() {
       {rows.length > 0 && enumFields.length > 0 && (
         <Card title={L('۴. مقدارها', '4. Values')}>
           <p className="mb-3 text-xs text-sub">{L('هر مقدار شیت قدیمی معادل کدام مقدار مدار است؟', 'What does each old value mean in Madar?')}</p>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 @lg:grid-cols-2">
             {enumFields.map((f) => {
               const opts = enumOptions(target, f.key)
               return (
@@ -268,7 +268,7 @@ export function ImportPage() {
 
       {built && (
         <Card title={L('۵. پیش‌نمایش و ایمپورت', '5. Preview & import')}>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 @lg:grid-cols-4">
             {[
               [L('ردیف جدید', 'New rows'), built.Tasks.length + built.FollowUps.length + built.Mizito.length + (target === 'Contacts' ? built.Contacts.length : 0) + built.History.length + built.Comments.length],
               ...(target === 'Mizito' ? [[L('منشن در ترد', 'Threaded mentions'), built.MizitoMentions.length]] : []),

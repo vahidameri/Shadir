@@ -144,7 +144,7 @@ function TermsCard({ admin }: { admin: boolean }) {
       <p className="mb-3 text-xs leading-6 text-sub">{L('هر کلمه را این‌جا عوض کنید، در کل مدار (منوها، عنوان‌ها، دکمه‌ها) عوض می‌شود. خالی بگذارید تا پیش‌فرض بماند.', 'Rename a word here and it changes across Madar (menus, titles, buttons). Leave blank to keep the default.')}</p>
       <ul className="divide-y divide-line">
         {TERMS.map((t) => (
-          <li key={t.id} className="grid items-center gap-2 py-2 sm:grid-cols-[9rem_1fr_1fr]">
+          <li key={t.id} className="grid items-center gap-2 py-2 @md:grid-cols-[9rem_minmax(0,1fr)_minmax(0,1fr)]">
             <div className="min-w-0">
               {/* the default word, shown as is (not through the glossary) */}
               <div className="text-sm font-medium">{locale.lang === 'fa' ? <>{t.word[0]} <span className="text-sub">· {t.word[1]}</span></> : t.word[1]}</div>

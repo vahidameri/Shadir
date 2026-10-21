@@ -320,7 +320,7 @@ export function TaskSettingsSheet({ onClose }: { onClose: () => void }) {
         </>
       }
     >
-      <div className="grid gap-4 p-4 md:grid-cols-2">
+      <div className="grid gap-4 p-4 @2xl:grid-cols-2">
         <FieldsCard admin={admin} />
         <ColumnsCard admin={admin} />
         <FlagsCard admin={admin} />

@@ -72,8 +72,8 @@ export function PlanSheet({ id, onClose }: { id: string; onClose: () => void }) 
         )
       }
     >
-      <div className="grid min-h-full lg:grid-cols-[1fr_280px]">
-        <div className="min-w-0 space-y-6 px-6 py-6 lg:border-e lg:border-line">
+      <div className="grid min-h-full @lg:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="min-w-0 space-y-6 px-6 py-6 @lg:border-e @lg:border-line">
           <div>
             <div className="flex flex-wrap items-center gap-2 text-xs text-sub">
               <span>{tr(PLAN_KIND[p.kind] || PLAN_KIND.other)}</span>

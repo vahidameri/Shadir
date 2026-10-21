@@ -128,8 +128,8 @@ export function ItemSheet({ sheet, id, onClose }: { sheet: 'Tasks' | 'FollowUps'
         )
       }
     >
-      <div className="grid min-h-full lg:grid-cols-[1fr_280px]">
-        <div className="min-w-0 px-6 py-6 lg:border-e lg:border-line">
+      <div className="grid min-h-full @lg:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="min-w-0 px-6 py-6 @lg:border-e @lg:border-line">
           <textarea
             defaultValue={title}
             disabled={!canEdit}

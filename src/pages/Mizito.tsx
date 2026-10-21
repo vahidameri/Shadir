@@ -176,11 +176,11 @@ export default function MizitoPage() {
           <FilterSelect
             value={badge}
             onChange={(v) => set('b', v)}
-            placeholder={L('همه (با و بی بج)', 'All (any badge)')}
+            placeholder={L('همه‌ی موارد', 'All items')}
             options={[
-              { value: 'key', label: L(`فقط ${c.keyProjects[0] || 'پروژه‌های کلیدی'}`, `Only ${c.keyProjects[0] || 'key projects'}`) },
-              { value: 'exec', label: L('فقط مدیران ارشد', 'Only senior asks') },
-              { value: 'any', label: L('هر دو بج (میز شاد یا مدیر ارشد)', 'Either badge') },
+              { value: 'key', label: c.keyProjects.join('، ') || L('پروژه‌های کلیدی', 'Key projects') },
+              { value: 'exec', label: L('مدیران ارشد', 'Senior managers') },
+              { value: 'any', label: L(`${c.keyProjects[0] || 'پروژه‌های کلیدی'} یا مدیران ارشد`, `${c.keyProjects[0] || 'Key projects'} or senior managers`) },
             ]}
           />
           <FilterSelect

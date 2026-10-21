@@ -157,7 +157,7 @@ function ContactSheet({ name, onClose }: { name: string; onClose: () => void }) 
       footer={c ? <button className="btn-outline btn-sm" onClick={() => open('Contacts', c as never)}><Pencil size={14} /> {L('ویرایش', 'Edit')}</button> : undefined}
     >
       <div className="space-y-6 p-6">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 @lg:grid-cols-4">
           {[
             [L('موارد باز میزیتو', 'Open Mizito items'), fa(openItems.length)],
             [L('کل موارد', 'All items'), fa(items.length)],
@@ -190,7 +190,7 @@ function ContactSheet({ name, onClose }: { name: string; onClose: () => void }) 
           )}
         </section>
         {(fus.length > 0 || asked.length > 0) && (
-          <section className="grid gap-4 sm:grid-cols-2">
+          <section className="grid gap-4 @md:grid-cols-2">
             <div>
               <div className="eyebrow mb-2">{L('پیگیری‌های باز', 'Open follow-ups')}</div>
               <ul className="space-y-1 text-sm">{fus.map((f) => <li key={f.id} className="truncate">• {f.subject}</li>)}</ul>
@@ -222,7 +222,7 @@ export function PeopleRegistry({ admin }: { admin: boolean }) {
   })
   const openBy = (name: string) => db.Mizito.filter((m) => !mzClosed(m) && m.asked_by === name).length
   return (
-    <div className="grid gap-4 xl:grid-cols-[1fr_24rem]">
+    <div className="grid gap-4 @2xl:grid-cols-[minmax(0,1fr)_24rem]">
       <Card
         pad={false}
         eyebrow={<span className="flex items-center gap-1.5"><Users size={12} /> {L('اشخاص', 'People')}</span>}

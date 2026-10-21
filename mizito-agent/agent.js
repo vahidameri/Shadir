@@ -12,11 +12,16 @@
   const TEHRAN = '+03:30'
 
   let token = ''
+  let probing = false
+  let copiedLink = ''
   window.addEventListener('message', (e) => {
     if (e.source !== window || !e.data || !e.data.__madar) return
     if (e.data.type === 'token' && e.data.token) token = e.data.token
     if (e.data.type === 'ping') ping()
-    if (e.data.type === 'link') learnLink(e.data)
+    if (e.data.type === 'link') {
+      if (probing) copiedLink = String(e.data.text || '').trim()
+      else learnLink(e.data)
+    }
   })
 
   // ---- the task link, exactly as Mizito's «لینک وظیفه» gives it ----
@@ -44,7 +49,7 @@
     // links go to Madar with the next read: start one now
     if (recipe) chrome.runtime.sendMessage({ type: 'request', reason: 'link', force: true }).catch(() => {})
   }
-  const linkVersion = (r) => (r && r.recipe ? (r.recipe.kind === 'pattern' ? r.recipe.pattern : r.recipe.path + r.recipe.body).length + ':' + r.at : 'none')
+  const linkVersion = (r) => (r && r.recipe ? JSON.stringify(r.recipe).length + ':' + r.at : 'none')
   // until the page makes its first call: Mizito keeps its session key in local storage
   function storedToken() {
     try {
@@ -137,19 +142,21 @@
     progress('آماده‌سازی…')
     const me = await api('workspace/userId', { regId: null })
     // the task link: learnt from «لینک وظیفه»; until then, Mizito's shape <workspace>_sl<task>
-    const { linkRecipe } = await chrome.storage.local.get('linkRecipe')
-    const recipe = linkRecipe && linkRecipe.recipe
-    const linkV = linkVersion(linkRecipe)
-    const linkOf = async (id) => {
+    // the task link: found and checked in Mizito itself (see discoverLink)
+    let { linkRecipe } = await chrome.storage.local.get('linkRecipe')
+    let recipe = linkRecipe && linkRecipe.recipe
+    let linkV = linkVersion(linkRecipe)
+    const linkOf = async (t) => {
       try {
-        if (recipe && recipe.kind === 'pattern') return recipe.pattern.split('{id}').join(id)
+        if (recipe && recipe.kind === 'field' && t[recipe.field]) return recipe.prefix + t[recipe.field] + (recipe.suffix || '')
+        if (recipe && recipe.kind === 'pattern') return recipe.pattern.split('{id}').join(t._id)
         if (recipe && recipe.kind === 'call') {
-          const r = await api(recipe.path, JSON.parse(recipe.body.split('{id}').join(id)), recipe.path)
+          const r = await api(recipe.path, JSON.parse(recipe.body.split('{id}').join(t._id)), recipe.path)
           const m = JSON.stringify(r).match(/(https?:\/\/[^"\\]*)?#\/ws\/[^"\\\s]+/)
           if (m) return m[0].startsWith('http') ? m[0] : location.origin + '/' + m[0]
         }
       } catch (e) {}
-      return location.origin + '/#/ws/tasks/inbox/' + (me && me.wid ? me.wid + '_sl' : '') + id
+      return location.origin + '/#/ws/tasks/inbox/' + (me && me.wid ? me.wid + '_sl' : '') + t._id
     }
     const users = {}
     // Arabic ي/ك typed in some profiles become Persian, so names match Madar's people
@@ -211,6 +218,20 @@
       mentionsDone = pages < 400
     }
 
+    // the link is checked once a week (and retried every 6 hours while it fails)
+    const age = linkRecipe ? Date.now() - (linkRecipe.at || 0) : Infinity
+    if (!linkRecipe || (recipe && linkRecipe.checked && age > 7 * 86400000) || (!recipe && age > 6 * 3600000) || (recipe && !linkRecipe.checked)) {
+      const sample = [...tasks.values()].find((x) => x.assistant && !x.t.completed && x.t.title) || [...tasks.values()].find((x) => x.assistant && x.t.title)
+      if (sample) {
+        progress('پیدا کردن لینک تسک‌ها در خود میزیتو…')
+        const found = await discoverLink(sample.t, me && me.wid, box)
+        linkRecipe = { at: Date.now(), checked: true, recipe: found.recipe, sample: found.canonical || '', tried: found.tried }
+        await chrome.storage.local.set({ linkRecipe })
+        recipe = found.recipe
+        linkV = linkVersion(linkRecipe)
+      }
+    }
+
     // 2. the open tasks of this person's inbox
     progress('تسک‌های باز…')
     // the inbox comes in pages: the first from getAll, the rest from upcoming (from = how many so far)
@@ -250,7 +271,7 @@
         key: t._id,
         title: t.title || '',
         notes: t.notes || '',
-        link: await linkOf(t._id),
+        link: await linkOf(t),
         first_at: list[i].first,
         project: projects[t.project] || '',
         owner: name(t.owner),
@@ -304,8 +325,113 @@
       await madar({ action: 'mzIngest', items: out.slice(i, i + BATCH), version: VERSION })
     }
     const stats = { tasks: list.length, sent: out.length, mentions: mentionCount, comments: commentsRead, pages: pages + 1, open: seen.length, uid: me && me.uid }
-    await madar({ action: 'mzIngest', items: [], final: true, full: true, seen: inboxDone && mentionsDone ? [...new Set([...seen, ...list.filter((x) => !x.t.completed).map((x) => x.t._id)])] : undefined, assistant: mentionsDone ? list.map((x) => x.t._id) : undefined, link: linkRecipe ? (recipe ? 'learned' : 'failed') : 'none', stats, version: VERSION })
+    await madar({ action: 'mzIngest', items: [], final: true, full: true, seen: inboxDone && mentionsDone ? [...new Set([...seen, ...list.filter((x) => !x.t.completed).map((x) => x.t._id)])] : undefined, assistant: mentionsDone ? list.map((x) => x.t._id) : undefined, link: recipe ? 'learned' : linkRecipe ? 'failed' : 'none', link_how: linkRecipe ? (recipe ? JSON.stringify(recipe) : (linkRecipe.tried || []).join(' · ')).slice(0, 280) : '', stats, version: VERSION })
     return stats
+  }
+
+  // ---- finding the task link in Mizito itself ----
+  // Candidate links are opened, one by one, in a background Mizito tab; the agent there says whether
+  // the task really opened (its title under «مشخصات وظیفه») and takes the link from the task's own
+  // ⋮ → «لینک وظیفه». What worked becomes the rule for every task.
+  const norm = (x) => String(x || '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/\s+/g, ' ').trim()
+  const isId = (v) => typeof v === 'string' && /^[0-9a-f]{24}$/.test(v)
+  function fromCanonical(link, t) {
+    link = String(link || '').trim()
+    if (!link) return null
+    for (const k of Object.keys(t)) {
+      const v = t[k]
+      if (isId(v) && link.includes(v)) {
+        const i = link.indexOf(v)
+        return { kind: 'field', field: k, prefix: link.slice(0, i), suffix: link.slice(i + v.length) }
+      }
+    }
+    return null
+  }
+  async function discoverLink(t, wid, box) {
+    const base = location.origin + '/#/ws/tasks/inbox/'
+    const people = new Set(['owner', 'responsible', 'project', 'kanban_board', 'dialog', 'completed_by_responsible', 'workspace_id'])
+    const fields = ['_id', 'dialog_message', ...Object.keys(t).filter((k) => !people.has(k) && k !== '_id' && k !== 'dialog_message' && isId(t[k]))].filter((f) => isId(t[f]))
+    const cands = []
+    for (const f of fields) {
+      if (wid) cands.push({ field: f, prefix: base + wid + '_sl' })
+      cands.push({ field: f, prefix: base })
+    }
+    const tried = []
+    for (const c of cands.slice(0, 8)) {
+      const r = await chrome.runtime.sendMessage({ type: 'probe', job: { mode: 'task', url: c.prefix + t[c.field], title: t.title } }).catch(() => null)
+      tried.push(`${c.field}${c.prefix.includes('_sl') ? '+sl' : ''}: ${r && r.ok ? 'باز شد' : (r && r.error) || 'نه'}`)
+      if (r && r.ok) return { recipe: fromCanonical(r.canonical, t) || { kind: 'field', field: c.field, prefix: c.prefix }, canonical: r.canonical || '', tried }
+    }
+    // last: from the assistant's chat, the way a person would («مشاهده وظیفه» → ⋮ → «لینک وظیفه»)
+    if (box) {
+      for (const route of ['#/ws/chat/', '#/ws/messenger/', '#/ws/chats/', '#/ws/dialog/']) {
+        const r = await chrome.runtime.sendMessage({ type: 'probe', job: { mode: 'chat', url: location.origin + '/' + route + box._id, title: t.title } }).catch(() => null)
+        tried.push(`${route}: ${r && r.ok ? 'باز شد' : (r && r.error) || 'نه'}`)
+        const rc = r && r.ok && fromCanonical(r.canonical, t)
+        if (rc) return { recipe: rc, canonical: r.canonical, tried }
+      }
+    }
+    return { recipe: null, canonical: '', tried }
+  }
+
+  // in a background tab opened for a check
+  const visible = (e) => !!(e && (e.offsetWidth || e.offsetHeight || e.getClientRects().length))
+  async function copyTaskLink() {
+    copiedLink = ''
+    const items = () => [...document.querySelectorAll('button, md-menu-item, [role="menuitem"], a, li')].filter((e) => visible(e) && norm(e.textContent) === 'لینک وظیفه')
+    if (!items().length) {
+      // only menu openers (⋮), never other buttons of the task (they would change it)
+      const openers = [...document.querySelectorAll('md-menu > button, md-menu button, [aria-haspopup="true"], button, md-icon, i')].filter((e) => visible(e) && (e.matches('md-menu > button, md-menu button, [aria-haspopup="true"]') || /^(more_vert|more_horiz|⋮)$/.test(norm(e.textContent))))
+      for (const o of openers.slice(0, 12)) {
+        ;(o.closest('button') || o).click()
+        await sleep(700)
+        if (items().length) break
+        document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true }))
+        await sleep(250)
+      }
+    }
+    // the innermost match is the real button (a menu item wraps it)
+    const found = items()
+    const it = found.find((e) => !found.some((o) => o !== e && e.contains(o)))
+    if (!it) return ''
+    it.click()
+    for (let i = 0; i < 20 && !copiedLink; i++) await sleep(200)
+    return copiedLink
+  }
+  async function runProbe(job) {
+    probing = true
+    const want = norm(job.title).slice(0, 28)
+    const start = Date.now()
+    let result = { ok: false, error: 'تسک باز نشد' }
+    let mode = job.mode
+    while (Date.now() - start < 32000) {
+      await sleep(800)
+      const text = norm(document.body ? document.body.innerText : '')
+      if (mode === 'chat') {
+        // the message about this task, then its «مشاهده وظیفه»
+        const holder = [...document.querySelectorAll('div, span, p')].find((e) => visible(e) && e.children.length < 4 && want && norm(e.textContent).includes(want))
+        let node = holder
+        for (let i = 0; node && i < 8; i++, node = node.parentElement) {
+          const btn = [...node.querySelectorAll('button, a, span')].find((b) => visible(b) && /مشاهده/.test(norm(b.textContent)) && norm(b.textContent).length < 20)
+          if (btn) {
+            btn.click()
+            mode = 'task'
+            await sleep(2500)
+            break
+          }
+        }
+        continue
+      }
+      if (want && text.includes(want) && text.includes('مشخصات وظیفه')) {
+        result = { ok: true, canonical: await copyTaskLink() }
+        break
+      }
+      if (Date.now() - start > 6000 && /خطا/.test(text) && /وظیفه/.test(text) && !text.includes(want)) {
+        result = { ok: false, error: 'خطای نمایش وظیفه' }
+        break
+      }
+    }
+    chrome.runtime.sendMessage({ type: 'probe-result', result }).catch(() => {})
   }
 
   let busy = false
@@ -330,5 +456,9 @@
     return true
   })
   // tell the worker a Mizito tab is here (it may want to run a read that was due)
-  chrome.runtime.sendMessage({ type: 'hello' }).catch(() => {})
+  // say hello: a tab opened by the agent for a check gets its job back
+  chrome.runtime
+    .sendMessage({ type: 'hello' })
+    .then((r) => r && r.probe && runProbe(r.probe))
+    .catch(() => {})
 })()

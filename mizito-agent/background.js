@@ -33,6 +33,26 @@ async function madar(body) {
   }
 }
 
+// ---- checking a task link in Mizito itself ----
+// The reading tab asks to open a link (a task, or the assistant's chat) in a background tab; the
+// agent in that tab says whether the task really shows there, and takes the link from Mizito's own
+// «لینک وظیفه». The tab is closed right after.
+const probes = new Map() // tabId → { job, done }
+async function probe(job) {
+  const tab = await chrome.tabs.create({ url: job.url, active: false })
+  return new Promise((resolve) => {
+    const finish = (r) => {
+      if (!probes.has(tab.id)) return
+      probes.delete(tab.id)
+      clearTimeout(timer)
+      chrome.tabs.remove(tab.id).catch(() => {})
+      resolve(r)
+    }
+    const timer = setTimeout(() => finish({ ok: false, error: 'timeout' }), 45000)
+    probes.set(tab.id, { job, done: finish })
+  })
+}
+
 let running = false
 /** One read at a time, in the first open Mizito tab. full: null = decide (a full read once a day). */
 async function start(full, reason, force) {
@@ -41,7 +61,7 @@ async function start(full, reason, force) {
   if (!conn) return { ok: false, error: 'افزونه به مدار وصل نیست' }
   const st = (await get('status')) || {}
   if (full === null) full = !st.full_at || Date.now() - st.full_at > FULL_EVERY
-  const tabs = await chrome.tabs.query({ url: 'https://mizito.noyanet.com/*' })
+  const tabs = (await chrome.tabs.query({ url: 'https://mizito.noyanet.com/*' })).filter((t) => !probes.has(t.id))
   if (!tabs.length) {
     await status({ state: 'idle', note: 'تب میزیتو باز نیست؛ با باز کردن میزیتو، خواندن ادامه پیدا می‌کند', due: true })
     return { ok: false, error: 'یک تب میزیتو باز کنید' }
@@ -90,8 +110,23 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     return true
   }
   if (msg.type === 'hello') {
+    const p = sender.tab && probes.get(sender.tab.id)
+    if (p) {
+      reply({ probe: p.job })
+      return
+    }
     // a Mizito tab opened: run a read that was due while none was open
     get('status').then((st) => st && st.due && start(null, 'tab'))
+    reply({})
+    return
+  }
+  if (msg.type === 'probe') {
+    probe(msg.job).then(reply)
+    return true
+  }
+  if (msg.type === 'probe-result') {
+    const p = sender.tab && probes.get(sender.tab.id)
+    if (p) p.done(msg.result)
     return
   }
   if (msg.type === 'connect') {

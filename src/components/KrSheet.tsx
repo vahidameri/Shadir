@@ -169,8 +169,8 @@ export function KrSheet({ id, onClose }: { id: string; onClose: () => void }) {
         )
       }
     >
-      <div className="grid min-h-full lg:grid-cols-[1fr_280px]">
-        <div className="min-w-0 space-y-6 px-6 py-6 lg:border-e lg:border-line">
+      <div className="grid min-h-full @lg:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="min-w-0 space-y-6 px-6 py-6 @lg:border-e @lg:border-line">
           <div>
             <div className="text-xs text-sub">{o.title}</div>
             <h2 className="display mt-1 text-2xl leading-snug">{k.title}</h2>

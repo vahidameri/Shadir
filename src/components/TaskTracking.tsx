@@ -123,7 +123,7 @@ export function BlockerPanel({ t, patch }: { t: Task; patch: (p: Partial<Task>) 
         {t.blocked_since && <span className="font-normal text-bad/80">{L(`(از ${fmtDayMonth(t.blocked_since)})`, `(since ${fmtDayMonth(t.blocked_since)})`)}</span>}
         {s.blockedLong && <span className="rounded-full bg-bad px-2 py-0.5 text-[0.625rem] text-white">{L('بیش از حد مجاز', 'Over the limit')}</span>}
       </div>
-      <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_12rem]">
+      <div className="mt-3 grid gap-2 @md:grid-cols-[minmax(0,1fr)_12rem]">
         <textarea
           key={`r-${t.id}-${t.blocked_reason}`}
           defaultValue={t.blocked_reason || ''}

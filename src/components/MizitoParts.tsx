@@ -261,7 +261,7 @@ export function CaptureSheet({ onClose, onOpen, initialLink = '' }: { onClose: (
           <StampPicker value={f.at} onChange={(v) => set('at', v)} />
           <span className="mt-1 block text-[0.6875rem] text-sub">{L('SLA و «چند روز گذشته» از همین زمان حساب می‌شود، نه از زمان ثبت در مدار.', 'SLA and age count from this time, not from when it was logged in Madar.')}</span>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 @md:grid-cols-2">
           <label className="block">
             <span className="label">{existing ? L('چه کسی دوباره منشن کرد', 'Who mentioned again') : L('چه کسی مطرح کرد / منشن کرد', 'Raised / mentioned by')}</span>
             <input list="mz-people" className="input h-10 w-full text-sm" value={f.asked_by} onChange={(e) => set('asked_by', e.target.value)} placeholder={existing?.asked_by} />
@@ -429,8 +429,8 @@ export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }
         )
       }
     >
-      <div className="grid min-h-full lg:grid-cols-[1fr_300px]">
-        <div className="min-w-0 px-6 py-6 lg:border-e lg:border-line">
+      <div className="grid min-h-full @lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="min-w-0 px-6 py-6 @lg:border-e @lg:border-line">
           <div className="flex items-start gap-3">
             <PBadge p={s.p} big />
             <textarea
@@ -750,7 +750,7 @@ function AgentCard({ admin }: { admin: boolean }) {
     }
   }
   return (
-    <Card eyebrow={<span className="flex items-center gap-1.5"><Bot size={12} /> {L('ایجنت میزیتو', 'Mizito agent')}</span>} title={L('خواندن خودکار میزیتو', 'Reading Mizito automatically')} className="md:col-span-2">
+    <Card eyebrow={<span className="flex items-center gap-1.5"><Bot size={12} /> {L('ایجنت میزیتو', 'Mizito agent')}</span>} title={L('خواندن خودکار میزیتو', 'Reading Mizito automatically')} className="@2xl:col-span-2">
       <p className="mb-4 text-xs leading-6 text-sub">
         {L('افزونه‌ی کروم «ایجنت میزیتوی مدار» در مرورگری که در آن وارد میزیتو شده‌اید، منشن‌ها، تسک‌های باز و گفتگوی هر تسک را می‌خواند و اینجا می‌آورد؛ در میزیتو چیزی نمی‌نویسد. برای هر نفر (شما و CPTO) یک کلید بسازید و «کد اتصال» را در افزونه بچسبانید. موارد تازه در «تازه از میزیتو» می‌نشینند؛ باز یا بسته بودن را میزیتو تعیین می‌کند و اولویت، دسته و یادداشت‌ها مال مدار است.', 'The “Madar Mizito agent” Chrome extension reads mentions, open tasks and each task’s conversation in the browser where you are signed in to Mizito, and brings them here; it never writes in Mizito. Make a key per person and paste the connection code into the extension.')}
       </p>
@@ -775,13 +775,14 @@ function AgentCard({ admin }: { admin: boolean }) {
                       <span>{L(`آخرین خواندن کامل: ${when(r.full)}`, `Last full read: ${when(r.full)}`)}</span>
                       {r.run?.tasks !== undefined && <span className="num">{L(`${fa(r.run.tasks || 0)} تسک · ${fa(r.run.mentions || 0)} منشن`, `${r.run.tasks} tasks · ${r.run.mentions || 0} mentions`)}</span>}
                       {r.version && <span dir="ltr">v{r.version}</span>}
-                      <span className={r.link === 'learned' ? 'text-good' : 'text-warn'}>{r.link === 'learned' ? L('لینک وظیفه: یاد گرفته شد', 'Task link: learnt') : L('لینک وظیفه هنوز یاد گرفته نشده (در میزیتو یک بار «لینک وظیفه» را بزنید)', 'Task link not learnt yet (click «لینک وظیفه» once in Mizito)')}</span>
+                      <span className={r.link === 'learned' ? 'text-good' : 'text-warn'} title={r.link_how || ''}>{r.link === 'learned' ? L('لینک تسک‌ها: در میزیتو پیدا و بررسی شد', 'Task links: found and checked in Mizito') : r.link === 'failed' ? L('لینک تسک‌ها هنوز پیدا نشده', 'Task links not found yet') : L('لینک تسک‌ها در اولین خواندن بررسی می‌شود', 'Task links are checked on the first read')}</span>
                     </>
                   ) : (
                     <span>{r.revoked ? L('کلید باطل شده', 'Key revoked') : L('هنوز کلیدی ساخته نشده', 'No key yet')}</span>
                   )}
                 </div>
                 {live && r.error && <div className="mt-1 text-xs text-bad">⚠ {r.error}</div>}
+                {live && r.link === 'failed' && r.link_how && <div className="mt-1 text-[0.6875rem] text-sub" dir="auto">{L('آزموده شد:', 'Tried:')} {r.link_how}</div>}
               </div>
               {admin && (
                 <>
@@ -823,7 +824,7 @@ export function MizitoSettings({ admin }: { admin: boolean }) {
   const w = (k: keyof typeof c.weights) => (v: number) => setSetting(MZ_KEYS.weights, JSON.stringify({ ...c.weights, [k]: v }))
   const t = (k: keyof typeof c.thresholds) => (v: number) => setSetting(MZ_KEYS.thresholds, JSON.stringify({ ...c.thresholds, [k]: v }))
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="grid gap-4 @2xl:grid-cols-2">
       <AgentCard admin={admin} />
       <Card eyebrow={<span className="flex items-center gap-1.5"><Settings2 size={12} /> {L('میزیتو', 'Mizito')}</span>} title={L('فهرست‌ها', 'Lists')}>
         <fieldset disabled={!admin} className="space-y-5">

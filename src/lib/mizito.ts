@@ -401,6 +401,8 @@ export interface AgentRun {
   version?: string
   /** the task link: learned | failed | none */
   link?: string
+  /** how the link is built, or what was tried */
+  link_how?: string
   run?: { tasks?: number; mentions?: number; comments?: number; pages?: number }
 }
 export function agentRun(raw?: string): AgentRun {
