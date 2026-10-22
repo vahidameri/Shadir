@@ -18,7 +18,7 @@
  *   viewer — read only (leadership)
  */
 
-var MADAR_VERSION = '1.8.2'; // shown on the login page and by diagnose()
+var MADAR_VERSION = '1.8.3'; // shown on the login page and by diagnose()
 
 var SCHEMA = {
   Projects: ['id', 'code', 'name', 'description', 'category', 'owner', 'client', 'liaison', 'liaison_contact', 'status', 'priority', 'phase', 'start_date', 'end_date', 'progress', 'health_override', 'objective', 'paused_at', 'pause_reason', 'delivery_day', 'last_delivery', 'archived', 'archived_at', 'links', 'team', 'kind', 'batch'],
@@ -65,7 +65,7 @@ var SCHEMA = {
   // source = agent when the Mizito agent brought it; review = new (waiting for a look) | ignored.
   // mz_* columns mirror the task in Mizito and are written by the agent only.
   Mizito: ['id', 'mz_key', 'link', 'title', 'description', 'docs', 'asked_by', 'mentioned', 'category', 'action', 'status', 'priority_override', 'override_reason', 'urgent', 'assigned_to', 'due_date', 'received_at', 'last_mention_at', 'last_mention_by', 'outcome', 'notes', 'created_at', 'updated_at', 'closed_at', 'ext_id', 'batch',
-    'source', 'review', 'mz_state', 'mz_done_at', 'mz_done_by', 'mz_progress', 'mz_project', 'mz_owner', 'mz_assignees', 'mz_labels', 'mz_checklist', 'mz_deadline', 'mz_last_by', 'mz_last_at', 'mz_sig', 'synced_at', 'mz_change', 'mz_changed_at', 'mz_first', 'mz_link_ok'],
+    'source', 'review', 'mz_state', 'mz_done_at', 'mz_done_by', 'mz_progress', 'mz_project', 'mz_owner', 'mz_assignees', 'mz_labels', 'mz_checklist', 'mz_deadline', 'mz_last_by', 'mz_last_at', 'mz_sig', 'synced_at', 'mz_change', 'mz_changed_at', 'mz_first', 'mz_link_ok', 'mz_chat'],
   // account = whose Mizito the agent read it in; mz_id = the mention's id there, mz_comment = the comment that mentioned
   MizitoMentions: ['id', 'item_id', 'by', 'at', 'note', 'status', 'batch', 'mz_id', 'account', 'mz_comment'],
   // the conversation on a Mizito task, as the agent read it (one row per Mizito comment)
@@ -1787,6 +1787,8 @@ function mzIngest_(body, agent) {
       if (!m.title) m.title = long(t.title, 300);
       if (!m.description && t.notes) m.description = long(t.notes);
       // the link is Mizito's own («لینک وظیفه», learnt by the agent); a link typed by hand stays
+      // the task's conversation in Mizito (#/ws/im/<dialog>/): always opens
+      if (t.chat_link) m.mz_chat = String(t.chat_link);
       // only a link taken from Mizito's own «لینک وظیفه» is kept; an earlier, guessed one is cleared
       if (t.link) {
         if (t.link !== m.link && (m.source === 'agent' || !m.link || /\/inbox\/[0-9a-f]{24}$/.test(String(m.link)))) m.link = t.link;
@@ -1969,7 +1971,7 @@ function mzIngest_(body, agent) {
   return { made: made, updated: updated, mentions: mentions.length, comments: notes.length, gone: gone, removed: removed.length };
 }
 
-var MZ_AGENT_FIELDS = ['mz_state', 'mz_done_at', 'mz_done_by', 'mz_progress', 'mz_project', 'mz_owner', 'mz_assignees', 'mz_labels', 'mz_checklist', 'mz_deadline', 'mz_last_by', 'mz_last_at', 'synced_at', 'mz_change', 'mz_changed_at', 'mz_first', 'mz_link_ok', 'last_mention_at', 'last_mention_by', 'received_at', 'mentioned'];
+var MZ_AGENT_FIELDS = ['mz_state', 'mz_done_at', 'mz_done_by', 'mz_progress', 'mz_project', 'mz_owner', 'mz_assignees', 'mz_labels', 'mz_checklist', 'mz_deadline', 'mz_last_by', 'mz_last_at', 'synced_at', 'mz_change', 'mz_changed_at', 'mz_first', 'mz_link_ok', 'mz_chat', 'last_mention_at', 'last_mention_by', 'received_at', 'mentioned'];
 /**
  * A save from a page that loaded before the agent's last read must not take the agent's newer facts
  * back: those fields keep the sheet's values, and the task is read in full again (sig cleared) so

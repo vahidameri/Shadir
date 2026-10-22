@@ -24,12 +24,12 @@
       const text = String(e.data.text || '').trim()
       if (capturing) copiedLink = text
       // a link the person copied themselves is kept too (the hook knows which task was open)
-      else if (e.data.task) keepLinks({ [e.data.task]: text })
+      // (a link the person copies by hand is not kept: which task it belongs to is not certain)
     }
   })
   async function keepLinks(found) {
-    const { links = {} } = await chrome.storage.local.get('links')
-    await chrome.storage.local.set({ links: { ...links, ...found } })
+    const { links2: links = {} } = await chrome.storage.local.get('links2')
+    await chrome.storage.local.set({ links2: { ...links, ...found } })
   }
   // until the page makes its first call: Mizito keeps its session key in local storage
   function storedToken() {
@@ -186,12 +186,13 @@
     const list = [...tasks.values()].filter((x) => x.assistant)
 
     // 2. the links first: taken from Mizito itself, like a person would, for every task that has none yet
-    let { links = {} } = await chrome.storage.local.get('links')
+    // links2: matched to their task by its title (the earlier cache, matched by a call alone, is dropped)
+    let { links2: links = {} } = await chrome.storage.local.get('links2')
     const missing = list.filter((x) => !links[x.t._id]).map((x) => x.t._id)
     let capture = null
     if (missing.length) {
       progress(`برداشتن لینک ${missing.length} تسک از میزیتو…`)
-      capture = await chrome.runtime.sendMessage({ type: 'capture', job: { ids: missing, dialog: box ? box._id : '' } }).catch((e) => ({ links: {}, log: [String((e && e.message) || e)] }))
+      capture = await chrome.runtime.sendMessage({ type: 'capture', job: { ids: missing, dialog: box ? box._id : '', titles: Object.fromEntries(list.map((x) => [x.t._id, x.t.title || ''])) } }).catch((e) => ({ links: {}, log: [String((e && e.message) || e)] }))
       if (capture && capture.links && Object.keys(capture.links).length) {
         await keepLinks(capture.links)
         links = { ...links, ...capture.links }
@@ -236,6 +237,8 @@
         title: t.title || '',
         notes: t.notes || '',
         link: links[t._id] || '',
+        // the task's own conversation in Mizito (#/ws/im/<dialog>/), a link that always opens
+        chat_link: t.dialog ? location.origin + '/#/ws/im/' + t.dialog + '/' : '',
         first_at: list[i].first,
         project: projects[t.project] || '',
         owner: name(t.owner),
@@ -476,13 +479,12 @@
     return false
   }
   async function openTask(btn) {
-    const before = currentTask
     const hash = location.hash
+    const before = taskHead() ? panelText() : ''
     press1(btn)
-    // the task shows (its header) and Mizito asks for its key (the hook tells which task it is)
-    const shown = await waitFor(taskHead, 6000)
-    await waitFor(() => currentTask && currentTask !== before, 1500)
-    return { id: shown ? currentTask : '', hash }
+    // the panel shows a task, a different one from before (its title is what tells it apart)
+    const shown = await waitFor(() => taskHead() && panelText() && panelText() !== before, 6000)
+    return { id: shown ? currentTask || 'shown' : '', hash }
   }
   // the task panel: the block around «مشخصات وظیفه» (its ⋮ is at the top, «بستن» at the bottom)
   const taskHead = () => byText((t) => t.startsWith(TASK_HEAD) && t.length < 30)[0]
@@ -550,6 +552,23 @@
     }
     return link || ''
   }
+  /** the text of the open task's panel, with the values of its fields (the title sits in a field) */
+  function panelText() {
+    const panel = taskPanel()
+    if (!panel) return ''
+    const fields = [...panel.querySelectorAll('input, textarea')].map((i) => i.value).join(' ')
+    return squash(label(panel) + ' ' + fields)
+  }
+  /** the task whose title is in the panel (longest match); the opened-task call only as a tie-break */
+  function whichTask(titles, hinted) {
+    const text = panelText()
+    if (!text) return ''
+    const hits = Object.entries(titles).filter(([, t]) => squash(t).length > 3 && text.includes(squash(t)))
+    if (!hits.length) return ''
+    const best = Math.max(...hits.map(([, t]) => squash(t).length))
+    const top = hits.filter(([, t]) => squash(t).length === best).map(([id]) => id)
+    return top.length === 1 ? top[0] : top.includes(hinted) ? hinted : ''
+  }
   function keyOf(b, btns) {
     let e = b
     while (e.parentElement && e.parentElement !== document.body && btns.filter((x) => e.parentElement.contains(x)).length === 1) e = e.parentElement
@@ -591,7 +610,11 @@
           const b = fresh[fresh.length - 1]
           seenMsg.add(keyOf(b, btns))
           banner(`تسک‌ها: ${Object.keys(got).length} از ${job.ids.length} لینک برداشته شد`)
-          const { id, hash } = await openTask(b)
+          const opened = await openTask(b)
+          const hash = opened.hash
+          // which task opened: by its title in the panel (the call Mizito makes can be late or skipped)
+          const id = whichTask(job.titles || {}, opened.id)
+          if (opened.id && !id) say('یک تسک باز شد ولی عنوانش با تسک‌های دستیار جور نشد؛ لینکش برداشته نشد')
           if (id && !got[id]) {
             const link = await copyTaskLink()
             if (link) {
@@ -599,7 +622,7 @@
               need.delete(id)
               say(`لینک ${Object.keys(got).length} برداشته شد (${need.size} تسک لازم مانده)`)
             } else say('تسک باز شد ولی «لینک وظیفه» در منوی ⋮ پیدا نشد. آنچه در صفحه بود: ' + outline('menu'))
-          } else if (!id) say('با «مشاهده وظیفه» تسکی باز نشد. آنچه در صفحه بود: ' + outline('open'))
+          } else if (!opened.id && !taskHead()) say('با «مشاهده وظیفه» تسکی باز نشد. آنچه در صفحه بود: ' + outline('open'))
           await closeTask(hash)
         }
       }

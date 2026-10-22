@@ -435,6 +435,9 @@ export interface MizitoItem {
   mz_changed_at?: string
   /** "name=YYYY-MM-DD HH:mm" per line: when the Mizito assistant first wrote to each person about it */
   mz_first?: string
+  /** the task's conversation in Mizito (#/ws/im/<dialog>/) */
+  mz_chat?: string
+  mz_link_ok?: string
 }
 
 export interface MizitoMention {

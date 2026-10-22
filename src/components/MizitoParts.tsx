@@ -135,11 +135,22 @@ export function MzSignals({ m, compact }: { m: MizitoItem; compact?: boolean }) 
 }
 
 export function MzLink({ m, label }: { m: MizitoItem; label?: boolean }) {
-  if (!m.link) return null
+  // the task's own link (taken from Mizito's «لینک وظیفه»), and its conversation, which always opens
+  const cls = cx('inline-flex shrink-0 items-center gap-1 rounded-full border border-line px-2.5 text-xs text-sub transition hover:border-brand/40 hover:text-brand', label ? 'h-8' : 'h-7')
+  if (!m.link && !m.mz_chat) return null
   return (
-    <a href={m.link} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className={cx('inline-flex shrink-0 items-center gap-1 rounded-full border border-line px-2.5 text-xs text-sub transition hover:border-brand/40 hover:text-brand', label ? 'h-8' : 'h-7')} title={L('باز کردن در میزیتو', 'Open in Mizito')}>
-      <ExternalLink size={13} /> {label !== false && L('میزیتو', 'Mizito')}
-    </a>
+    <span className="inline-flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+      {m.link && (
+        <a href={m.link} target="_blank" rel="noreferrer" className={cls} title={L('باز کردن تسک در میزیتو', 'Open the task in Mizito')}>
+          <ExternalLink size={13} /> {label !== false && L('میزیتو', 'Mizito')}
+        </a>
+      )}
+      {m.mz_chat && (
+        <a href={m.mz_chat} target="_blank" rel="noreferrer" className={cls} title={L('گفتگوی این تسک در میزیتو', 'The task’s conversation in Mizito')}>
+          <MessageSquarePlus size={13} /> {label !== false && L('گفتگو', 'Chat')}
+        </a>
+      )}
+    </span>
   )
 }
 
