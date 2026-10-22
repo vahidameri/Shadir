@@ -538,9 +538,11 @@
       const m = pageText().match(/https?:\/\/\S+#\/ws\/\S+/)
       return m ? m[0] : ''
     }
+    // the link shown in the box is read before «کپی» (the box may close with it)
+    const shownLink = copyBtn && copyBtn !== 'copied' ? await waitFor(inBox, 1500) : ''
     if (copyBtn && copyBtn !== 'copied') press1(copyBtn)
     // the link Mizito copies (its full text), else the one shown in the box
-    const link = (await waitFor(() => copiedLink, 1500)) || inBox()
+    const link = (await waitFor(() => copiedLink, 1500)) || shownLink || inBox()
     // only «کپی» is pressed (never «تایید»); a box still open after it is dismissed with Esc
     if (copyBtn !== 'copied' && byText((t) => t === 'کپی')[0]) {
       press('Escape')
