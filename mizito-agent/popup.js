@@ -7,7 +7,7 @@ const ago = (t) => {
 }
 
 async function render() {
-  const { conn, status = {}, links = {} } = await chrome.storage.local.get(['conn', 'status', 'links'])
+  const { conn, status = {}, links3: links = {} } = await chrome.storage.local.get(['conn', 'status', 'links3'])
   $('connect').classList.toggle('hidden', !!conn)
   $('ready').classList.toggle('hidden', !conn)
   const since = conn && conn.cutoff ? new Intl.DateTimeFormat('fa-IR-u-ca-persian', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(conn.cutoff + 'T12:00')) : ''
@@ -34,6 +34,13 @@ async function render() {
   $('linkbox').classList.toggle('todo', all > 0 && !complete)
   $('link-title').textContent = !all ? 'لینک تسک‌ها با اولین همگام‌سازی برداشته می‌شود' : complete ? 'لینک همه‌ی تسک‌ها از میزیتو برداشته شد ✓' : `${fa(have)} از ${fa(all)} تسک لینک دارند`
   $('link-sub').textContent = `ایجنت در یک پنجره‌ی میزیتو گفتگوی «دستیار میزیتو» را باز می‌کند، هر تسک را با «مشاهده وظیفه» باز می‌کند و لینک را از ⋮ ← «لینک وظیفه» برمی‌دارد؛ فقط برای تسک‌هایی که هنوز لینک ندارند. ${fa(Object.keys(links).length)} لینک نگه داشته شده.`
+  // one of the links it took, to open right here and see that it works
+  const sample = Object.values(links)[0]
+  $('sample').classList.toggle('hidden', !sample)
+  if (sample) {
+    $('sample').href = sample
+    $('sample').title = sample
+  }
   const log = status.log || []
   $('report').classList.toggle('hidden', !log.length)
   $('log').innerHTML = ''

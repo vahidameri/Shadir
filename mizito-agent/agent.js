@@ -28,8 +28,8 @@
     }
   })
   async function keepLinks(found) {
-    const { links2: links = {} } = await chrome.storage.local.get('links2')
-    await chrome.storage.local.set({ links2: { ...links, ...found } })
+    const { links3: links = {} } = await chrome.storage.local.get('links3')
+    await chrome.storage.local.set({ links3: { ...links, ...found } })
   }
   // until the page makes its first call: Mizito keeps its session key in local storage
   function storedToken() {
@@ -186,8 +186,8 @@
     const list = [...tasks.values()].filter((x) => x.assistant)
 
     // 2. the links first: taken from Mizito itself, like a person would, for every task that has none yet
-    // links2: matched to their task by its title (the earlier cache, matched by a call alone, is dropped)
-    let { links2: links = {} } = await chrome.storage.local.get('links2')
+    // links3: whole links from the clipboard, matched to their task by title (earlier caches are dropped)
+    let { links3: links = {} } = await chrome.storage.local.get('links3')
     const missing = list.filter((x) => !links[x.t._id]).map((x) => x.t._id)
     let capture = null
     if (missing.length) {
@@ -319,7 +319,7 @@
   const waitFor = async (fn, ms) => {
     const end = Date.now() + ms
     for (;;) {
-      const v = fn()
+      const v = await fn()
       if (v) return v
       if (Date.now() > end) return null
       await sleep(120)
@@ -542,15 +542,44 @@
     }
     // the link shown in the box is read before «کپی» (the box may close with it)
     const shownLink = copyBtn && copyBtn !== 'copied' ? await waitFor(inBox, 1500) : ''
+    const before = await readClipboard()
     if (copyBtn && copyBtn !== 'copied') press1(copyBtn)
-    // the link Mizito copies (its full text), else the one shown in the box
-    const link = (await waitFor(() => copiedLink, 1500)) || shownLink || inBox()
+    // what «کپی» really put on the clipboard (the box may show the address cut short), else what
+    // the page handed over, else the box, and only a whole link (ending with an id) is kept
+    const fromClipboard = await waitFor(async () => {
+      const c = await readClipboard()
+      return c && c !== before && isWhole(c) ? c : ''
+    }, 2000)
+    const link = [fromClipboard, copiedLink, shownLink, inBox()].find(isWhole) || ''
+    lastSample = { clipboard: fromClipboard, page: copiedLink, box: shownLink }
     // only «کپی» is pressed (never «تایید»); a box still open after it is dismissed with Esc
     if (copyBtn !== 'copied' && byText((t) => t === 'کپی')[0]) {
       press('Escape')
       await waitFor(() => !byText((t) => t === 'کپی')[0], 1500)
     }
     return link || ''
+  }
+  // a whole task link: Mizito's address, the task route and an id at the end (not cut short)
+  const isWhole = (x) => typeof x === 'string' && /^https?:\/\/[^\s]+#\/ws\/[^\s]*[0-9a-f]{24}\/?$/.test(x.trim())
+  let lastSample = null
+  async function readClipboard() {
+    try {
+      window.focus()
+      return String((await navigator.clipboard.readText()) || '').trim()
+    } catch (e) {}
+    // the extension's own clipboard permission: paste into a hidden box and read it
+    try {
+      const box = document.createElement('textarea')
+      box.style.cssText = 'position:fixed;opacity:0;top:0;left:0;width:1px;height:1px'
+      document.documentElement.appendChild(box)
+      box.focus()
+      document.execCommand('paste')
+      const v = box.value
+      box.remove()
+      return String(v || '').trim()
+    } catch (e) {
+      return ''
+    }
   }
   /** the text of the open task's panel, with the values of its fields (the title sits in a field) */
   function panelText() {
@@ -617,11 +646,12 @@
           if (opened.id && !id) say('یک تسک باز شد ولی عنوانش با تسک‌های دستیار جور نشد؛ لینکش برداشته نشد')
           if (id && !got[id]) {
             const link = await copyTaskLink()
+            if (Object.keys(got).length === 0 && lastSample) say(`نمونه‌ی لینک: کلیپ‌بورد «${lastSample.clipboard || '—'}» · کادر «${lastSample.box || '—'}»`)
             if (link) {
               got[id] = link
               need.delete(id)
               say(`لینک ${Object.keys(got).length} برداشته شد (${need.size} تسک لازم مانده)`)
-            } else say('تسک باز شد ولی «لینک وظیفه» در منوی ⋮ پیدا نشد. آنچه در صفحه بود: ' + outline('menu'))
+            } else say(lastSample ? `لینک کامل به دست نیامد (کلیپ‌بورد «${lastSample.clipboard || '—'}» · کادر «${lastSample.box || '—'}»)` : 'تسک باز شد ولی «لینک وظیفه» در منوی ⋮ پیدا نشد. آنچه در صفحه بود: ' + outline('menu'))
           } else if (!opened.id && !taskHead()) say('با «مشاهده وظیفه» تسکی باز نشد. آنچه در صفحه بود: ' + outline('open'))
           await closeTask(hash)
         }

@@ -2,20 +2,51 @@
   "manifest_version": 3,
   "name": "ایجنت میزیتوی مدار",
   "short_name": "Madar agent",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "منشن‌ها، تسک‌های باز و گفتگوی هر تسک را از میزیتو می‌خواند و در مدار ثبت می‌کند. در میزیتو چیزی نمی‌نویسد.",
   "minimum_chrome_version": "111",
-  "permissions": ["storage", "alarms"],
+  "permissions": [
+    "storage",
+    "alarms",
+    "clipboardRead"
+  ],
   "host_permissions": [
     "https://mizito.noyanet.com/*",
     "https://script.google.com/*",
     "https://script.googleusercontent.com/*"
   ],
-  "background": { "service_worker": "background.js" },
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
-    { "matches": ["https://mizito.noyanet.com/*"], "js": ["hook.js"], "run_at": "document_start", "world": "MAIN" },
-    { "matches": ["https://mizito.noyanet.com/*"], "js": ["agent.js"], "run_at": "document_idle" }
+    {
+      "matches": [
+        "https://mizito.noyanet.com/*"
+      ],
+      "js": [
+        "hook.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://mizito.noyanet.com/*"
+      ],
+      "js": [
+        "agent.js"
+      ],
+      "run_at": "document_idle"
+    }
   ],
-  "action": { "default_popup": "popup.html", "default_title": "ایجنت میزیتوی مدار" },
-  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" }
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "ایجنت میزیتوی مدار"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
 }

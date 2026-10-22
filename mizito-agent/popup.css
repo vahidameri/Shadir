@@ -75,3 +75,5 @@ button.test { width: 100%; height: 34px; background: var(--brand-soft); color: v
 .report { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 8px 12px; font-size: 12px; }
 .report summary { cursor: pointer; color: var(--sub); }
 .report ol { margin: 6px 0; padding-inline-start: 18px; max-height: 160px; overflow: auto; line-height: 1.8; }
+
+.sample { margin-top: 4px; color: var(--brand); font-size: 12px; text-decoration: underline; }
