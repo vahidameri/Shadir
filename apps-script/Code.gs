@@ -1789,7 +1789,10 @@ function mzIngest_(body, agent) {
       // the link is Mizito's own («لینک وظیفه», learnt by the agent); a link typed by hand stays
       // only a link taken from Mizito's own «لینک وظیفه» is kept; an earlier, guessed one is cleared
       if (t.link) {
-        if (t.link !== m.link && (m.source === 'agent' || !m.link || /\/inbox\/[0-9a-f]{24}$/.test(String(m.link)))) m.link = t.link;
+        // a link the agent put on the wrong task (its _sl<id> is another task's id) is replaced too
+        var slOf = function (l) { var x = /_sl([0-9a-f]{24})/i.exec(String(l || '')); return x ? x[1].toLowerCase() : ''; };
+        var wrongTask = slOf(m.link) && slOf(m.link) !== key.toLowerCase();
+        if (t.link !== m.link && (m.source === 'agent' || !m.link || wrongTask || /\/inbox\/[0-9a-f]{24}$/.test(String(m.link)))) m.link = t.link;
         m.mz_link_ok = '1';
       } else if (m.source === 'agent' && String(m.mz_link_ok) !== '1') m.link = '';
       // when the assistant first wrote to each person about it; the earliest is "mentioned in Mizito"

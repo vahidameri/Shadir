@@ -27,9 +27,20 @@
       else if (e.data.task) keepLinks({ [e.data.task]: text })
     }
   })
+  // a task link: …/#/ws/tasks/inbox/<person id>_sl<task id>
+  const LINK_RE = /#\/ws\/tasks\/inbox\/([0-9a-f]{24})_sl([0-9a-f]{24})/i
+  const prefixOf = (list) => {
+    for (const l of list || []) {
+      const m = LINK_RE.exec(String(l || ''))
+      if (m) return m[1].toLowerCase()
+    }
+    return ''
+  }
+  const linkOf = (prefix, id) => `${location.origin}/#/ws/tasks/inbox/${prefix}_sl${id}`
   async function keepLinks(found) {
     const { links = {} } = await chrome.storage.local.get('links')
-    await chrome.storage.local.set({ links: { ...links, ...found } })
+    const prefix = prefixOf(Object.values(found))
+    await chrome.storage.local.set({ links: { ...links, ...found }, ...(prefix ? { link_prefix: prefix } : {}) })
   }
   // until the page makes its first call: Mizito keeps its session key in local storage
   function storedToken() {
@@ -185,18 +196,24 @@
     // what Madar holds is decided by the assistant's messages; the inbox only refreshes those tasks
     const list = [...tasks.values()].filter((x) => x.assistant)
 
-    // 2. the links first: taken from Mizito itself, like a person would, for every task that has none yet
-    let { links = {} } = await chrome.storage.local.get('links')
-    const missing = list.filter((x) => !links[x.t._id]).map((x) => x.t._id)
+    // 2. the links. Mizito's «لینک وظیفه» is always …/#/ws/tasks/inbox/<the person's own id>_sl<task id>:
+    // only the person's id has to be learnt (from any one real link), then every link is built from the
+    // task's own id. (Taking each link by clicking put links on the wrong tasks.)
+    let { links = {}, link_prefix = '' } = await chrome.storage.local.get(['links', 'link_prefix'])
+    if (!link_prefix) link_prefix = prefixOf(Object.values(links))
     let capture = null
-    if (missing.length) {
-      progress(`برداشتن لینک ${missing.length} تسک از میزیتو…`)
-      capture = await chrome.runtime.sendMessage({ type: 'capture', job: { ids: missing, dialog: box ? box._id : '' } }).catch((e) => ({ links: {}, log: [String((e && e.message) || e)] }))
-      if (capture && capture.links && Object.keys(capture.links).length) {
-        await keepLinks(capture.links)
-        links = { ...links, ...capture.links }
-      }
+    if (!link_prefix && list.length) {
+      // no real link seen yet: one is taken from Mizito, by hand's way, only to learn the person's id
+      progress('یادگرفتن ساختار لینک از میزیتو…')
+      capture = await chrome.runtime.sendMessage({ type: 'capture', job: { ids: list.map((x) => x.t._id), dialog: box ? box._id : '', one: true } }).catch((e) => ({ links: {}, log: [String((e && e.message) || e)] }))
+      link_prefix = prefixOf(Object.values((capture && capture.links) || {}))
     }
+    if (link_prefix) {
+      await chrome.storage.local.set({ link_prefix })
+      links = {}
+      for (const x of list) links[x.t._id] = linkOf(link_prefix, x.t._id)
+      await chrome.storage.local.set({ links })
+    } else links = {}
 
     // 3. the open tasks of this person's inbox
     progress('تسک‌های باز…')
@@ -220,7 +237,8 @@
     }
 
     // 4. what changed: the full snapshot and its comments; a task that did not change only adds its mentions
-    const sigOf = (t) => `${t.modified_at || ''}|${t.completed ? 1 : 0}|${links[t._id] ? 'L' : '-'}|a3`
+    // the link itself is in the signature: a task whose link was wrong is sent again with the right one
+    const sigOf = (t) => `${t.modified_at || ''}|${t.completed ? 1 : 0}|${links[t._id] || '-'}|a4`
     const out = []
     let commentsRead = 0
     for (let i = 0; i < list.length; i++) {
@@ -300,7 +318,7 @@
       seen: whole && inboxDone && mentionsDone ? [...new Set([...seen, ...list.filter((x) => !x.t.completed).map((x) => x.t._id)])] : undefined,
       assistant: whole && mentionsDone ? list.map((x) => x.t._id) : undefined,
       link: !list.length || withLink === list.length ? 'learned' : 'failed',
-      link_how: `${withLink} از ${list.length} تسک لینک دارند${capture && capture.log && capture.log.length ? ' · ' + capture.log.slice(-4).join(' · ') : ''}`.slice(0, 290),
+      link_how: `${withLink} از ${list.length} تسک لینک دارند${link_prefix ? ' (ساخته از شناسه‌ی تسک)' : ' · ساختار لینک هنوز یاد گرفته نشده؛ یک بار در میزیتو ⋮ ← «لینک وظیفه» ← «کپی» را بزنید'}${capture && capture.log && capture.log.length ? ' · ' + capture.log.slice(-3).join(' · ') : ''}`.slice(0, 290),
       stats,
       version: VERSION,
     })
@@ -598,6 +616,8 @@
               got[id] = link
               need.delete(id)
               say(`لینک ${Object.keys(got).length} برداشته شد (${need.size} تسک لازم مانده)`)
+              // one real link is enough to learn the person's id
+              if (job.one && prefixOf([link])) break
             } else say('تسک باز شد ولی «لینک وظیفه» در منوی ⋮ پیدا نشد. آنچه در صفحه بود: ' + outline('menu'))
           } else if (!id) say('با «مشاهده وظیفه» تسکی باز نشد. آنچه در صفحه بود: ' + outline('open'))
           await closeTask(hash)
