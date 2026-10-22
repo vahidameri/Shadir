@@ -323,8 +323,10 @@
     }
   }
   /** visible elements whose own text matches, innermost only (a wrapper repeats its child's text) */
+  // an element's words without its icon names (material icons are words: «check_circle مشاهده وظیفه»)
+  const label = (e) => norm(String(e.textContent || '').replace(/\b[a-z][a-z0-9_]*\b/g, ' '))
   function byText(test, sel = 'button, a, span, div, p, li, md-menu-item, [role="menuitem"], md-list-item, h1, h2, h3, h4') {
-    const all = [...document.querySelectorAll(sel)].filter((e) => visible(e) && e.textContent.length < 200 && test(norm(e.textContent)))
+    const all = [...document.querySelectorAll(sel)].filter((e) => visible(e) && e.textContent.length < 200 && test(label(e)))
     return all.filter((e) => !all.some((o) => o !== e && e.contains(o)))
   }
   const pageText = () => norm(document.body ? document.body.innerText : '')
@@ -479,31 +481,46 @@
     const hash = location.hash
     press1(btn)
     // the task shows (its header) and Mizito asks for its key (the hook tells which task it is)
-    const shown = await waitFor(() => pageText().includes(TASK_HEAD), 6000)
+    const shown = await waitFor(taskHead, 6000)
     await waitFor(() => currentTask && currentTask !== before, 1500)
     return { id: shown ? currentTask : '', hash }
+  }
+  // the task panel: the block around «مشخصات وظیفه» (its ⋮ is at the top, «بستن» at the bottom)
+  const taskHead = () => byText((t) => t.startsWith(TASK_HEAD) && t.length < 30)[0]
+  function taskPanel() {
+    const head = taskHead()
+    let e = head
+    // up to the block that also holds the panel's «بستن»
+    for (let i = 0; e && i < 12; i++, e = e.parentElement) if ([...e.querySelectorAll('button, a, span, div')].some((x) => visible(x) && label(x) === 'بستن')) return e
+    return head ? head.parentElement : null
   }
   async function closeTask(hash) {
     if (location.hash !== hash) {
       history.back()
       await waitFor(() => location.hash === hash, 3000)
-    } else {
-      press('Escape')
-      const close = byText((t) => t === 'close' || t === 'arrow_back' || t === 'arrow_forward' || t === 'بستن')[0]
-      if (close && pageText().includes(TASK_HEAD)) press1(close)
     }
-    await waitFor(() => !pageText().includes(TASK_HEAD) || viewButtons().length, 2500)
+    if (taskHead()) {
+      // the panel's own «بستن» (never the chat's ✕ at the top, which would close the chat)
+      const panel = taskPanel()
+      const close = panel && [...panel.querySelectorAll('button, a, span, div')].filter((x) => visible(x) && label(x) === 'بستن').pop()
+      // else a close icon inside the panel itself
+      const icon = !close && panel && [...panel.querySelectorAll('button, md-icon, i')].find((x) => visible(x) && /^(close|clear)$/.test(norm(x.textContent)))
+      if (close || icon) press1(close || icon)
+      else press('Escape')
+    }
+    await waitFor(() => !taskHead(), 2500)
   }
   async function copyTaskLink() {
     copiedLink = ''
     const items = () => byText((t) => t === 'لینک وظیفه')
     if (!items().length) {
-      // the ⋮ of the task: a menu opener next to «مشخصات وظیفه» (never the task's other buttons)
-      const head = byText((t) => t === TASK_HEAD)[0]
-      let openers = []
-      for (let e = head; e && !openers.length && e !== document.body; e = e.parentElement) {
-        openers = [...e.querySelectorAll('md-menu button, [aria-haspopup="true"], button, md-icon, i')].filter((o) => visible(o) && (o.matches('md-menu button, [aria-haspopup="true"]') || /^(more_vert|more_horiz|⋮)$/.test(norm(o.textContent))))
-      }
+      // the ⋮ of the task, at the top of its panel (only menu openers, never the task's other buttons)
+      const panel = taskPanel() || document.body
+      const isOpener = (o) =>
+        o.matches('md-menu button, [aria-haspopup="true"], [aria-haspopup="menu"]') ||
+        /^(more_vert|more_horiz|⋮)$/.test(norm(o.textContent)) ||
+        /more|dots|kebab|vert/i.test((o.getAttribute('class') || '') + ' ' + (o.getAttribute('md-svg-icon') || '') + ' ' + (o.getAttribute('md-font-icon') || '') + ' ' + (o.getAttribute('aria-label') || ''))
+      const openers = [...panel.querySelectorAll('md-menu button, [aria-haspopup], button, md-icon, i, svg')].filter((o) => visible(o) && isOpener(o))
       for (const o of openers.slice(0, 4)) {
         press1(o)
         if (await waitFor(() => items().length, 1500)) break
@@ -513,15 +530,24 @@
     const it = items()[0]
     if (!it) return ''
     press1(it)
-    // the link is copied, or shown in a small box to copy from
-    const link = await waitFor(() => {
-      if (copiedLink) return copiedLink
-      const box = [...document.querySelectorAll('input, textarea')].find((i) => visible(i) && /#\/ws\//.test(i.value))
-      if (box) return box.value.trim()
-      const shown = byText((t) => /^https?:\/\/\S+#\/ws\/\S+$/.test(t))[0]
-      return shown ? norm(shown.textContent) : ''
-    }, 2500)
-    press('Escape')
+    // «لینک وظیفه» opens a small box: the link, «کپی» and «تایید»
+    // (or the menu copies the link itself: then there is nothing to wait for)
+    const copyBtn = await waitFor(() => (copiedLink ? 'copied' : byText((t) => t === 'کپی')[0]), 3000)
+    const inBox = () => {
+      const field = [...document.querySelectorAll('input, textarea')].find((i) => visible(i) && /#\/ws\//.test(i.value))
+      if (field) return field.value.trim()
+      const m = pageText().match(/https?:\/\/\S+#\/ws\/\S+/)
+      return m ? m[0] : ''
+    }
+    if (copyBtn && copyBtn !== 'copied') press1(copyBtn)
+    // the link Mizito copies (its full text), else the one shown in the box
+    const link = (await waitFor(() => copiedLink, 1500)) || inBox()
+    if (copyBtn !== 'copied') {
+      const ok = byText((t) => t === 'تایید' || t === 'تأیید')[0]
+      if (ok) press1(ok)
+      else press('Escape')
+      await waitFor(() => !byText((t) => t === 'کپی')[0], 1500)
+    }
     return link || ''
   }
   function keyOf(b, btns) {
