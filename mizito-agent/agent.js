@@ -212,7 +212,7 @@
     let capture = null
     if (missing.length) {
       progress(`برداشتن لینک ${missing.length} تسک از میزیتو…`)
-      capture = await chrome.runtime.sendMessage({ type: 'capture', job: { ids: missing } }).catch((e) => ({ links: {}, log: [String((e && e.message) || e)] }))
+      capture = await chrome.runtime.sendMessage({ type: 'capture', job: { ids: missing, dialog: box ? box._id : '' } }).catch((e) => ({ links: {}, log: [String((e && e.message) || e)] }))
       if (capture && capture.links && Object.keys(capture.links).length) {
         await keepLinks(capture.links)
         links = { ...links, ...capture.links }
@@ -375,6 +375,16 @@
 
   // the path a person takes: the right-hand sidebar → «گفتگو» → the chat «دستیار میزیتو»
   async function openAssistant(say) {
+    // opened straight on the assistant's chat (#/ws/im/<dialog>/): just wait for its messages
+    if (/#\/ws\/im\//.test(location.hash)) {
+      banner('باز کردن گفتگوی «دستیار میزیتو»')
+      if (await waitFor(() => viewButtons().length, 20000)) {
+        say(`گفتگوی «دستیار میزیتو» باز شد (${viewButtons().length} پیام با «مشاهده وظیفه»)`)
+        return true
+      }
+      say('صفحه‌ی گفتگوی دستیار باز شد ولی دکمه‌ی «مشاهده وظیفه» دیده نشد. آنچه در صفحه بود: ' + outline('chat'))
+      return false
+    }
     const assistant = () => byText((t) => squash(t).startsWith('دستیارمیزیتو'))[0]
     banner('باز کردن «گفتگو» از سایدبار')
     await waitFor(() => document.querySelectorAll('button, a, [ng-click]').length > 10, 20000)

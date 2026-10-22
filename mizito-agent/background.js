@@ -39,7 +39,9 @@ async function madar(body) {
 const captures = new Map() // tabId → { job, done }
 async function capture(job) {
   const origin = 'https://mizito.noyanet.com'
-  const win = await chrome.windows.create({ url: origin + '/', focused: true, type: 'normal', width: 1280, height: 900 })
+  // straight to the assistant's chat when its id is known: #/ws/im/<dialog>/
+  const url = job.dialog ? `${origin}/#/ws/im/${job.dialog}/` : origin + '/'
+  const win = await chrome.windows.create({ url, focused: true, type: 'normal', width: 1280, height: 900 })
   const tabId = win.tabs && win.tabs[0] && win.tabs[0].id
   const timeout = Math.min(20 * 60000, 60000 + 7000 * job.ids.length)
   return new Promise((resolve) => {
