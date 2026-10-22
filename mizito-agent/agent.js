@@ -182,7 +182,23 @@
       mentionsDone = pages < 400
     }
 
-    // 2. the open tasks of this person's inbox
+    // what Madar holds is decided by the assistant's messages; the inbox only refreshes those tasks
+    const list = [...tasks.values()].filter((x) => x.assistant)
+
+    // 2. the links first: taken from Mizito itself, like a person would, for every task that has none yet
+    let { links = {} } = await chrome.storage.local.get('links')
+    const missing = list.filter((x) => !links[x.t._id]).map((x) => x.t._id)
+    let capture = null
+    if (missing.length) {
+      progress(`برداشتن لینک ${missing.length} تسک از میزیتو…`)
+      capture = await chrome.runtime.sendMessage({ type: 'capture', job: { ids: missing, dialog: box ? box._id : '' } }).catch((e) => ({ links: {}, log: [String((e && e.message) || e)] }))
+      if (capture && capture.links && Object.keys(capture.links).length) {
+        await keepLinks(capture.links)
+        links = { ...links, ...capture.links }
+      }
+    }
+
+    // 3. the open tasks of this person's inbox
     progress('تسک‌های باز…')
     // the inbox comes in pages: the first from getAll, the rest from upcoming (from = how many so far)
     const query = { inbox: true, sort_type: 'default', filter: null }
@@ -201,22 +217,6 @@
       seen.push(t._id)
       const activity = Math.max(ms(t.created_at), ms(t.modified_at), ms(t.last_mention_date))
       if (activity >= cutoff) take(t)
-    }
-
-    // what Madar holds is decided by the assistant's messages; the inbox only refreshes those tasks
-    const list = [...tasks.values()].filter((x) => x.assistant)
-
-    // 3. the links: taken from Mizito itself, like a person would, for every task that has none yet
-    let { links = {} } = await chrome.storage.local.get('links')
-    const missing = list.filter((x) => !links[x.t._id]).map((x) => x.t._id)
-    let capture = null
-    if (missing.length) {
-      progress(`برداشتن لینک ${missing.length} تسک از میزیتو…`)
-      capture = await chrome.runtime.sendMessage({ type: 'capture', job: { ids: missing, dialog: box ? box._id : '' } }).catch((e) => ({ links: {}, log: [String((e && e.message) || e)] }))
-      if (capture && capture.links && Object.keys(capture.links).length) {
-        await keepLinks(capture.links)
-        links = { ...links, ...capture.links }
-      }
     }
 
     // 4. what changed: the full snapshot and its comments; a task that did not change only adds its mentions
@@ -337,7 +337,6 @@
   // a real click: pointer and mouse events, the way a hand does it (some menus listen to mousedown)
   function press1(el) {
     const e = clickable(el)
-    e.scrollIntoView({ block: 'center', inline: 'center' })
     const r = e.getBoundingClientRect()
     const at = { bubbles: true, cancelable: true, view: window, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, button: 0 }
     for (const type of ['pointerover', 'mouseover', 'pointerdown', 'mousedown', 'pointerup', 'mouseup']) e.dispatchEvent(new (type.startsWith('pointer') ? PointerEvent : MouseEvent)(type, at))
@@ -542,10 +541,9 @@
     if (copyBtn && copyBtn !== 'copied') press1(copyBtn)
     // the link Mizito copies (its full text), else the one shown in the box
     const link = (await waitFor(() => copiedLink, 1500)) || inBox()
-    if (copyBtn !== 'copied') {
-      const ok = byText((t) => t === 'تایید' || t === 'تأیید')[0]
-      if (ok) press1(ok)
-      else press('Escape')
+    // only «کپی» is pressed (never «تایید»); a box still open after it is dismissed with Esc
+    if (copyBtn !== 'copied' && byText((t) => t === 'کپی')[0]) {
+      press('Escape')
       await waitFor(() => !byText((t) => t === 'کپی')[0], 1500)
     }
     return link || ''
@@ -592,12 +590,12 @@
           seenMsg.add(keyOf(b, btns))
           banner(`تسک‌ها: ${Object.keys(got).length} از ${job.ids.length} لینک برداشته شد`)
           const { id, hash } = await openTask(b)
-          if (id && need.has(id)) {
+          if (id && !got[id]) {
             const link = await copyTaskLink()
             if (link) {
               got[id] = link
               need.delete(id)
-              say(`لینک ${Object.keys(got).length} از ${job.ids.length} برداشته شد`)
+              say(`لینک ${Object.keys(got).length} برداشته شد (${need.size} تسک لازم مانده)`)
             } else say('تسک باز شد ولی «لینک وظیفه» در منوی ⋮ پیدا نشد. آنچه در صفحه بود: ' + outline('menu'))
           } else if (!id) say('با «مشاهده وظیفه» تسکی باز نشد. آنچه در صفحه بود: ' + outline('open'))
           await closeTask(hash)
@@ -607,7 +605,7 @@
       say('خطا: ' + String((e && e.message) || e))
     }
     clearInterval(beat)
-    say(`پایان: ${Object.keys(got).length} لینک از ${job.ids.length}`)
+    say(`پایان: ${Object.keys(got).length} لینک برداشته شد؛ ${job.ids.length - need.size} از ${job.ids.length} تسک لازم`)
     banner(`تمام شد: ${Object.keys(got).length} لینک`)
     chrome.runtime.sendMessage({ type: 'capture-result', result: { links: got, log } }).catch(() => {})
   }
