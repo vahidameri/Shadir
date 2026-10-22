@@ -329,28 +329,93 @@
   }
   const pageText = () => norm(document.body ? document.body.innerText : '')
   const press = (key) => document.body.dispatchEvent(new KeyboardEvent('keydown', { key, keyCode: key === 'Escape' ? 27 : 0, bubbles: true }))
-  const clickable = (e) => e.closest('button, a, [ng-click], md-list-item, li, [role="button"]') || e
+  const clickable = (e) => e.closest('button, a, [ng-click], [ui-sref], md-list-item, li, [role="button"]') || e
+  // text compared without spaces and half-spaces («دستیار میزیتو» = «دستیار‌میزیتو»)
+  const squash = (x) => norm(x).replace(/[\u200c\u200f\u200e\s]/g, '')
+  // a real click: pointer and mouse events, the way a hand does it (some menus listen to mousedown)
+  function press1(el) {
+    const e = clickable(el)
+    e.scrollIntoView({ block: 'center', inline: 'center' })
+    const r = e.getBoundingClientRect()
+    const at = { bubbles: true, cancelable: true, view: window, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, button: 0 }
+    for (const type of ['pointerover', 'mouseover', 'pointerdown', 'mousedown', 'pointerup', 'mouseup']) e.dispatchEvent(new (type.startsWith('pointer') ? PointerEvent : MouseEvent)(type, at))
+    e.click()
+  }
+  // what the agent is doing, shown on top of the window it works in
+  function banner(text) {
+    let b = document.getElementById('__madar_banner')
+    if (!b) {
+      b = document.createElement('div')
+      b.id = '__madar_banner'
+      b.style.cssText = 'position:fixed;z-index:2147483647;top:8px;left:50%;transform:translateX(-50%);background:#0f2f34;color:#fff;font:13px Tahoma,sans-serif;padding:8px 16px;border-radius:999px;box-shadow:0 6px 20px rgba(0,0,0,.25);pointer-events:none;direction:rtl'
+      document.documentElement.appendChild(b)
+    }
+    b.textContent = 'ایجنت مدار: ' + text
+  }
+  /** a short outline of what can be clicked on the page, for the report when a step fails (once per kind) */
+  const outlined = new Set()
+  function outline(kind = 'x') {
+    if (outlined.has(kind)) return '(مثل بالا)'
+    outlined.add(kind)
+    const els = [...document.querySelectorAll('button, a, [ng-click], [ui-sref], md-list-item, li, [role="button"], md-tab-item')].filter(visible)
+    return els
+      .slice(0, 400)
+      .map((e) => {
+        const r = e.getBoundingClientRect()
+        const t = norm(e.textContent).slice(0, 30) || e.getAttribute('aria-label') || e.getAttribute('title') || e.getAttribute('ui-sref') || e.getAttribute('href') || ''
+        return t ? `${e.tagName.toLowerCase()}${r.left > innerWidth * 0.66 ? '→' : r.right < innerWidth * 0.34 ? '←' : ''}:${t}` : ''
+      })
+      .filter(Boolean)
+      .filter((x, i, a) => a.indexOf(x) === i)
+      .slice(0, 70)
+      .join(' | ')
+  }
   const TASK_HEAD = 'مشخصات وظیفه'
-  const viewButtons = () => byText((t) => /^مشاهده( وظیفه)?$/.test(t))
+  const viewButtons = () => byText((t) => /^مشاهده/.test(t) && t.length < 25)
 
+  // the path a person takes: the right-hand sidebar → «گفتگو» → the chat «دستیار میزیتو»
   async function openAssistant(say) {
-    const find = () => byText((t) => t === 'دستیار میزیتو' || t.startsWith('دستیار میزیتو'))[0]
-    let item = await waitFor(find, 12000)
+    const assistant = () => byText((t) => squash(t).startsWith('دستیارمیزیتو'))[0]
+    banner('باز کردن «گفتگو» از سایدبار')
+    await waitFor(() => document.querySelectorAll('button, a, [ng-click]').length > 10, 20000)
+    // 1. «گفتگو» in the sidebar: by its text, or its tooltip / title (an icon-only sidebar), rightmost first
+    if (!assistant()) {
+      const entries = [...document.querySelectorAll('a, button, [ng-click], [ui-sref], md-list-item, li, [role="button"]')]
+        .filter((e) => visible(e) && /گفتگو/.test(squash(e.textContent + ' ' + (e.getAttribute('title') || '') + ' ' + (e.getAttribute('aria-label') || '') + ' ' + (e.getAttribute('ui-sref') || ''))) && squash(e.textContent).length < 30)
+        .sort((a, b) => b.getBoundingClientRect().right - a.getBoundingClientRect().right)
+      const inner = entries.filter((e) => !entries.some((o) => o !== e && e.contains(o)))
+      if (!inner.length) {
+        say('«گفتگو» در سایدبار پیدا نشد. آنچه در صفحه بود: ' + outline())
+        return false
+      }
+      press1(inner[0])
+      say('«گفتگو» از سایدبار باز شد')
+    }
+    // 2. the chat «دستیار میزیتو»: in the list, or through the chats' search box
+    banner('انتخاب «دستیار میزیتو»')
+    let item = await waitFor(assistant, 8000)
     if (!item) {
-      // the chats may sit behind a menu entry
-      for (const label of ['گفتگوها', 'گفتگو', 'پیام‌ها', 'چت']) {
-        const nav = byText((t) => t === label)[0]
-        if (!nav) continue
-        clickable(nav).click()
-        item = await waitFor(find, 4000)
-        if (item) break
+      const search = [...document.querySelectorAll('input')].find((i) => visible(i) && /جستجو|search/i.test((i.placeholder || '') + (i.getAttribute('aria-label') || '')))
+      if (search) {
+        search.focus()
+        search.value = 'دستیار میزیتو'
+        search.dispatchEvent(new Event('input', { bubbles: true }))
+        search.dispatchEvent(new Event('change', { bubbles: true }))
+        item = await waitFor(assistant, 5000)
       }
     }
-    if (!item) return say('گفتگوی «دستیار میزیتو» در صفحه پیدا نشد'), false
-    clickable(item).click()
+    if (!item) {
+      say('«دستیار میزیتو» در فهرست گفتگوها پیدا نشد. آنچه در صفحه بود: ' + outline())
+      return false
+    }
+    press1(item)
     const ok = await waitFor(() => viewButtons().length, 10000)
-    say(ok ? `گفتگوی دستیار باز شد (${viewButtons().length} پیام با «مشاهده وظیفه»)` : 'گفتگوی دستیار باز شد ولی دکمه‌ی «مشاهده وظیفه» دیده نشد')
-    return !!ok
+    if (!ok) {
+      say('گفتگوی دستیار باز شد ولی دکمه‌ی «مشاهده وظیفه» دیده نشد. آنچه در صفحه بود: ' + outline())
+      return false
+    }
+    say(`گفتگوی «دستیار میزیتو» باز شد (${viewButtons().length} پیام با «مشاهده وظیفه»)`)
+    return true
   }
   /** the scrollable list around the chat messages */
   function scroller(from) {
@@ -363,7 +428,7 @@
   async function openTask(btn) {
     const before = currentTask
     const hash = location.hash
-    clickable(btn).click()
+    press1(btn)
     // the task shows (its header) and Mizito asks for its key (the hook tells which task it is)
     const shown = await waitFor(() => pageText().includes(TASK_HEAD), 6000)
     await waitFor(() => currentTask && currentTask !== before, 1500)
@@ -376,7 +441,7 @@
     } else {
       press('Escape')
       const close = byText((t) => t === 'close' || t === 'arrow_back' || t === 'arrow_forward' || t === 'بستن')[0]
-      if (close && pageText().includes(TASK_HEAD)) clickable(close).click()
+      if (close && pageText().includes(TASK_HEAD)) press1(close)
     }
     await waitFor(() => !pageText().includes(TASK_HEAD) || viewButtons().length, 2500)
   }
@@ -391,14 +456,14 @@
         openers = [...e.querySelectorAll('md-menu button, [aria-haspopup="true"], button, md-icon, i')].filter((o) => visible(o) && (o.matches('md-menu button, [aria-haspopup="true"]') || /^(more_vert|more_horiz|⋮)$/.test(norm(o.textContent))))
       }
       for (const o of openers.slice(0, 4)) {
-        clickable(o).click()
+        press1(o)
         if (await waitFor(() => items().length, 1500)) break
         press('Escape')
       }
     }
     const it = items()[0]
     if (!it) return ''
-    clickable(it).click()
+    press1(it)
     // the link is copied, or shown in a small box to copy from
     const link = await waitFor(() => {
       if (copiedLink) return copiedLink
@@ -449,6 +514,7 @@
           // newest first: the bottom of the list
           const b = fresh[fresh.length - 1]
           seenMsg.add(keyOf(b))
+          banner(`تسک‌ها: ${Object.keys(got).length} از ${job.ids.length} لینک برداشته شد`)
           const { id, hash } = await openTask(b)
           if (id && need.has(id)) {
             const link = await copyTaskLink()
@@ -456,8 +522,8 @@
               got[id] = link
               need.delete(id)
               say(`لینک ${Object.keys(got).length} از ${job.ids.length} برداشته شد`)
-            } else say('تسک باز شد ولی «لینک وظیفه» در منوی ⋮ پیدا نشد')
-          } else if (!id) say('با «مشاهده وظیفه» تسکی باز نشد')
+            } else say('تسک باز شد ولی «لینک وظیفه» در منوی ⋮ پیدا نشد. آنچه در صفحه بود: ' + outline('menu'))
+          } else if (!id) say('با «مشاهده وظیفه» تسکی باز نشد. آنچه در صفحه بود: ' + outline('open'))
           await closeTask(hash)
         }
       }
@@ -466,6 +532,7 @@
     }
     clearInterval(beat)
     say(`پایان: ${Object.keys(got).length} لینک از ${job.ids.length}`)
+    banner(`تمام شد: ${Object.keys(got).length} لینک`)
     chrome.runtime.sendMessage({ type: 'capture-result', result: { links: got, log } }).catch(() => {})
   }
 
