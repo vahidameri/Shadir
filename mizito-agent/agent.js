@@ -431,9 +431,48 @@
   function scroller(from) {
     for (let e = from; e && e !== document.body; e = e.parentElement) {
       const st = getComputedStyle(e)
-      if (e.scrollHeight > e.clientHeight + 40 && /(auto|scroll)/.test(st.overflowY)) return e
+      if (e.scrollHeight > e.clientHeight + 40 && /(auto|scroll|overlay)/.test(st.overflowY)) return e
     }
-    return null
+    // the tallest scrolling box that holds the messages
+    const boxes = [...document.querySelectorAll('*')].filter((e) => e.contains(from) && e.scrollHeight > e.clientHeight + 40)
+    return boxes.sort((a, b) => b.scrollHeight - b.clientHeight - (a.scrollHeight - a.clientHeight))[0] || document.scrollingElement
+  }
+  /** brings older messages in, the ways a chat list loads them; true when new ones showed up */
+  async function loadOlder(keyOf) {
+    const btns = viewButtons()
+    const before = new Set(btns.map((b) => keyOf(b, btns)))
+    const more = () => viewButtons().some((b, _i, all) => !before.has(keyOf(b, all)))
+    const first = btns[0]
+    const sc = scroller(first)
+    const wheel = (el) => el && el.dispatchEvent(new WheelEvent('wheel', { deltaY: -1200, bubbles: true, cancelable: true }))
+    const tries = [
+      () => first && first.scrollIntoView({ block: 'start' }),
+      () => sc && ((sc.scrollTop = 0), sc.dispatchEvent(new Event('scroll', { bubbles: true }))),
+      // a list that is already at the top only loads on a fresh scroll: go down a little and up again
+      async () => {
+        if (!sc) return
+        sc.scrollTop = Math.min(400, sc.scrollHeight)
+        sc.dispatchEvent(new Event('scroll', { bubbles: true }))
+        await sleep(250)
+        sc.scrollTop = 0
+        sc.dispatchEvent(new Event('scroll', { bubbles: true }))
+        wheel(sc)
+      },
+      // newest-at-the-bottom lists drawn upside down
+      () => sc && ((sc.scrollTop = -sc.scrollHeight), sc.dispatchEvent(new Event('scroll', { bubbles: true }))),
+      () => {
+        const btn = byText((t) => /(پیام|موارد)?\s*(قبلی|بیشتر|قدیمی)/.test(t) && t.length < 25)[0]
+        if (btn) press1(btn)
+      },
+      () => {
+        for (let i = 0; i < 6; i++) wheel(first)
+      },
+    ]
+    for (const step of tries) {
+      await step()
+      if (await waitFor(more, 2500)) return true
+    }
+    return false
   }
   async function openTask(btn) {
     const before = currentTask
@@ -485,6 +524,11 @@
     press('Escape')
     return link || ''
   }
+  function keyOf(b, btns) {
+    let e = b
+    while (e.parentElement && e.parentElement !== document.body && btns.filter((x) => e.parentElement.contains(x)).length === 1) e = e.parentElement
+    return norm(e.textContent).slice(0, 240)
+  }
   async function runCapture(job) {
     capturing = true
     const need = new Set(job.ids)
@@ -504,26 +548,22 @@
           // a message is known by its text (the list is redrawn when a task opens)
           // the message = the largest block around the button that holds no other «مشاهده وظیفه»
           const btns = viewButtons()
-          const keyOf = (b) => {
-            let e = b
-            while (e.parentElement && e.parentElement !== document.body && btns.filter((x) => e.parentElement.contains(x)).length === 1) e = e.parentElement
-            return norm(e.textContent).slice(0, 240)
-          }
-          const fresh = btns.filter((b) => !seenMsg.has(keyOf(b)))
+          const fresh = btns.filter((b) => !seenMsg.has(keyOf(b, btns)))
           if (!fresh.length) {
-            // older messages: scroll the list up and wait for them
-            const sc = scroller(viewButtons()[0])
-            if (!sc || idle >= 4) break
-            sc.scrollTop = 0
+            // older messages
+            banner(`بارگذاری پیام‌های قدیمی‌تر… (${Object.keys(got).length} از ${job.ids.length})`)
+            if (await loadOlder(keyOf)) continue
             idle++
-            const count = btns.length
-            await waitFor(() => viewButtons().length > count, 3000)
+            if (idle >= 2) {
+              say(`پیام قدیمی‌تری بارگذاری نشد (${need.size} تسک مانده). آنچه در صفحه بود: ` + outline('older'))
+              break
+            }
             continue
           }
           idle = 0
           // newest first: the bottom of the list
           const b = fresh[fresh.length - 1]
-          seenMsg.add(keyOf(b))
+          seenMsg.add(keyOf(b, btns))
           banner(`تسک‌ها: ${Object.keys(got).length} از ${job.ids.length} لینک برداشته شد`)
           const { id, hash } = await openTask(b)
           if (id && need.has(id)) {
