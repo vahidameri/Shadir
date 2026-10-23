@@ -31,7 +31,7 @@ export default function Settings({ embedded }: { embedded?: boolean }) {
     setTest({ state: 'loading' })
     try {
       const r = await fetchAll({ apiUrl: url.trim(), token: token.trim() })
-      const n = Object.values(r.data).reduce((s, rows) => s + (rows as unknown[]).length, 0)
+      const n = Object.values(r.data || {}).reduce((s: number, rows) => s + (rows as unknown[]).length, 0)
       setTest({ state: 'ok', msg: L(`اتصال موفق — ${fa(n)} ردیف · ${r.user.name} (${lbl(ROLE, r.user.role)})`, `Connected — ${n} rows · ${r.user.name} (${lbl(ROLE, r.user.role)})`) })
     } catch (e) {
       setTest({ state: 'err', msg: e instanceof Error ? e.message : String(e) })

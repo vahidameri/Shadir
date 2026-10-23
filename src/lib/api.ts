@@ -70,21 +70,22 @@ async function readJson(res: Response) {
   return JSON.parse(text)
 }
 
-export async function fetchAll(c: Config): Promise<{ data: DB; user: RemoteUser; version: string }> {
-  const q = new URLSearchParams({ action: 'all', ...auth(c) }).toString()
+/** The whole data; with `since` (the data version last received) the server only says "same" when nothing changed. */
+export async function fetchAll(c: Config, since = ''): Promise<{ data: DB | null; user: RemoteUser; version: string; ver: string }> {
+  const q = new URLSearchParams({ action: 'all', ...auth(c), ...(since ? { v: since } : {}) }).toString()
   const url = `${c.apiUrl}${c.apiUrl.includes('?') ? '&' : '?'}${q}`
   const res = await fetch(url, { method: 'GET', redirect: 'follow' })
-  const json = (await readJson(res)) as AllResponse
+  const json = (await readJson(res)) as AllResponse & { same?: boolean; ver?: string; version?: string }
   if (!json.ok) throw new Error(json.error || 'خطای ناشناخته از سرور')
-  return { data: json.data, user: json.user, version: String((json as { version?: string }).version || '') }
+  return { data: json.same ? null : json.data, user: json.user, version: String(json.version || ''), ver: String(json.ver || '') }
 }
 
 // text/plain avoids a CORS preflight, which Apps Script doesn't answer.
 async function post(c: Config, body: Record<string, unknown>) {
   // a request that never answers must not hold the app (refreshes wait for writes): give up after
-  // 60s, or 3 minutes for an upload
+  // 60s, 3 minutes for an upload, 6 for a Mizito read on the server
   const ctl = new AbortController()
-  const timer = setTimeout(() => ctl.abort(), body.action === 'upload' ? 180000 : 60000)
+  const timer = setTimeout(() => ctl.abort(), body.action === 'mzServerRun' ? 360000 : body.action === 'upload' ? 180000 : 60000)
   let res: Response
   try {
     res = await fetch(c.apiUrl, {

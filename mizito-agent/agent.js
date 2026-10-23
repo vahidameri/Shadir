@@ -10,6 +10,9 @@
   const GAP = 350 // ms between calls, to stay gentle with Mizito
   const BATCH = 10 // tasks per message to Madar
   const TEHRAN = '+03:30'
+  // taking each task's «لینک وظیفه» in a separate window did not hold up on the real Mizito: off.
+  // Each task carries its Mizito conversation link (chat_link) instead.
+  const LINKS = false
 
   let token = ''
   let capturing = false
@@ -190,7 +193,7 @@
     let { links3: links = {} } = await chrome.storage.local.get('links3')
     const missing = list.filter((x) => !links[x.t._id]).map((x) => x.t._id)
     let capture = null
-    if (missing.length) {
+    if (LINKS && missing.length) {
       progress(`برداشتن لینک ${missing.length} تسک از میزیتو…`)
       capture = await chrome.runtime.sendMessage({ type: 'capture', job: { ids: missing, dialog: box ? box._id : '', titles: Object.fromEntries(list.map((x) => [x.t._id, x.t.title || ''])) } }).catch((e) => ({ links: {}, log: [String((e && e.message) || e)] }))
       if (capture && capture.links && Object.keys(capture.links).length) {
@@ -229,7 +232,7 @@
       const mentions = list[i].mentions.filter((x) => !knownMentions.has(x.id))
       const sig = sigOf(t)
       if (!force && known[t._id] === sig) {
-        if (mentions.length) out.push({ key: t._id, mentions })
+        if (mentions.length) out.push({ key: t._id, first_at: list[i].first, mentions })
         continue
       }
       const item = {
@@ -286,7 +289,8 @@
       progress(`تسک‌ها: ${i + 1} از ${list.length}`)
     }
 
-    // 5. to Madar, a few tasks at a time
+    // 5. to Madar, a few tasks at a time, oldest mention first
+    out.sort((a, b) => ms(a.first_at) - ms(b.first_at))
     for (let i = 0; i < out.length; i += BATCH) {
       progress(`ارسال به مدار: ${Math.min(i + BATCH, out.length)} از ${out.length}`)
       await madar({ action: 'mzIngest', items: out.slice(i, i + BATCH), version: VERSION })
@@ -302,7 +306,7 @@
       full: whole,
       seen: whole && inboxDone && mentionsDone ? [...new Set([...seen, ...list.filter((x) => !x.t.completed).map((x) => x.t._id)])] : undefined,
       assistant: whole && mentionsDone ? list.map((x) => x.t._id) : undefined,
-      link: !list.length || withLink === list.length ? 'learned' : 'failed',
+      link: !LINKS ? 'off' : !list.length || withLink === list.length ? 'learned' : 'failed',
       link_how: `${withLink} از ${list.length} تسک لینک دارند${capture && capture.log && capture.log.length ? ' · ' + capture.log.slice(-4).join(' · ') : ''}`.slice(0, 290),
       stats,
       version: VERSION,

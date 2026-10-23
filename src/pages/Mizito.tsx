@@ -36,7 +36,8 @@ export default function MizitoPage() {
   const [capture, setCapture] = useState<false | string>(false)
   const openId = get('id')
   const [picked, setPicked] = useState<Set<string>>(new Set())
-  const sort = get('s') || 'p'
+  // default: by mention date, newest first
+  const sort = get('s') || 'new'
   // paste a Mizito link anywhere on the page (outside a field) to log it
   useEffect(() => {
     // not while an item or the capture sheet is open: the paste belongs to that sheet
@@ -184,13 +185,13 @@ export default function MizitoPage() {
             ]}
           />
           <FilterSelect
-            value={sort === 'p' ? '' : sort}
+            value={sort === 'new' ? '' : sort}
             onChange={(v) => set('s', v)}
-            placeholder={L('مرتب: اولویت و SLA', 'Sort: priority & SLA')}
+            placeholder={L('مرتب: تاریخ منشن (جدیدترین)', 'Sort: mention date (newest)')}
             options={[
+              { value: 'old', label: L('مرتب: تاریخ منشن (قدیمی‌ترین)', 'Sort: mention date (oldest)') },
               { value: 'recent', label: L('مرتب: آخرین منشن', 'Sort: latest mention') },
-              { value: 'old', label: L('مرتب: قدیمی‌ترین پیام دستیار', 'Sort: oldest assistant message') },
-              { value: 'new', label: L('مرتب: جدیدترین پیام دستیار', 'Sort: newest assistant message') },
+              { value: 'p', label: L('مرتب: اولویت و SLA', 'Sort: priority & SLA') },
               { value: 'due', label: L('مرتب: ددلاین', 'Sort: deadline') },
             ]}
           />

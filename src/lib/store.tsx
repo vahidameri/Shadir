@@ -277,6 +277,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     } catch {}
   }
 
+  // the version of the data last received (the server answers "same" while it has not changed)
+  const dataVer = useRef({ ver: '', who: '' })
   const refresh = useCallback(async () => {
     if (mode === 'demo') {
       setLastSync(new Date())
@@ -290,13 +292,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const seq = writeSeq.current
     setLoading(true)
     try {
-      const { data, user, version } = await fetchAll(config)
+      // after a save of our own the data is asked for in full; otherwise "same" saves the whole download
+      const since = dataVer.current.who === (session?.email || '') ? dataVer.current.ver : ''
+      const { data, user, version, ver } = await fetchAll(config, since)
       if (seq !== writeSeq.current) return retryLater(1500)
       setServerVersion(version)
-      const fresh = normalize(data)
-      dbRef.current = fresh
-      setDb(fresh)
-      saveSnap(session?.email || user?.email || '', fresh, user?.role || 'viewer', user?.name || '')
+      dataVer.current = { ver, who: session?.email || '' }
+      if (data) {
+        const fresh = normalize(data)
+        dbRef.current = fresh
+        setDb(fresh)
+        saveSnap(session?.email || user?.email || '', fresh, user?.role || 'viewer', user?.name || '')
+      }
       setRole(user?.role || 'viewer')
       setRemoteName(user?.name || '')
       setRemoteEmail(user?.email || session?.email || '')

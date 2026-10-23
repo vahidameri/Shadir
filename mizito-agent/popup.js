@@ -7,7 +7,7 @@ const ago = (t) => {
 }
 
 async function render() {
-  const { conn, status = {}, links3: links = {} } = await chrome.storage.local.get(['conn', 'status', 'links3'])
+  const { conn, status = {} } = await chrome.storage.local.get(['conn', 'status'])
   $('connect').classList.toggle('hidden', !!conn)
   $('ready').classList.toggle('hidden', !conn)
   const since = conn && conn.cutoff ? new Intl.DateTimeFormat('fa-IR-u-ca-persian', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(conn.cutoff + 'T12:00')) : ''
@@ -25,30 +25,7 @@ async function render() {
   const s = status.stats || {}
   $('t-tasks').textContent = fa(s.tasks || 0)
   $('t-mentions').textContent = fa(s.mentions || 0)
-  $('t-links').textContent = fa(s.links || 0)
-  // links: taken from Mizito («مشاهده وظیفه» → ⋮ → «لینک وظیفه») in a window the agent opens
-  const s2 = status.stats || {}
-  const all = s2.tasks || 0
-  const have = s2.links || 0
-  const complete = all > 0 && have === all
-  $('linkbox').classList.toggle('todo', all > 0 && !complete)
-  $('link-title').textContent = !all ? 'لینک تسک‌ها با اولین همگام‌سازی برداشته می‌شود' : complete ? 'لینک همه‌ی تسک‌ها از میزیتو برداشته شد ✓' : `${fa(have)} از ${fa(all)} تسک لینک دارند`
-  $('link-sub').textContent = `ایجنت در یک پنجره‌ی میزیتو گفتگوی «دستیار میزیتو» را باز می‌کند، هر تسک را با «مشاهده وظیفه» باز می‌کند و لینک را از ⋮ ← «لینک وظیفه» برمی‌دارد؛ فقط برای تسک‌هایی که هنوز لینک ندارند. ${fa(Object.keys(links).length)} لینک نگه داشته شده.`
-  // one of the links it took, to open right here and see that it works
-  const sample = Object.values(links)[0]
-  $('sample').classList.toggle('hidden', !sample)
-  if (sample) {
-    $('sample').href = sample
-    $('sample').title = sample
-  }
-  const log = status.log || []
-  $('report').classList.toggle('hidden', !log.length)
-  $('log').innerHTML = ''
-  log.forEach((line) => {
-    const li = document.createElement('li')
-    li.textContent = line
-    $('log').appendChild(li)
-  })
+  $('t-comments').textContent = fa(s.comments || 0)
   $('error').textContent = failed ? status.error : ''
   $('error').classList.toggle('hidden', !failed)
 }
@@ -64,10 +41,6 @@ $('go').onclick = async () => {
 }
 $('now').onclick = () => chrome.runtime.sendMessage({ type: 'request', reason: 'manual' }).then(render)
 $('test').onclick = () => chrome.runtime.sendMessage({ type: 'request', days: 7, reason: 'test' }).then(render)
-$('copylog').onclick = async () => {
-  const { status = {} } = await chrome.storage.local.get('status')
-  navigator.clipboard.writeText((status.log || []).join('\n'))
-}
 $('full').onclick = () => chrome.runtime.sendMessage({ type: 'request', force: true, reason: 'manual' }).then(render)
 $('out').onclick = async () => {
   if (!confirm('اتصال افزونه به مدار قطع شود؟')) return
