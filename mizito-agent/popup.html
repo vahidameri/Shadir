@@ -44,7 +44,9 @@
       <div class="tile"><b id="t-tasks">۰</b><span>تسک</span></div>
       <div class="tile"><b id="t-mentions">۰</b><span>منشن</span></div>
       <div class="tile"><b id="t-comments">۰</b><span>کامنت</span></div>
+      <div class="tile"><b id="t-links">۰</b><span>لینک</span></div>
     </div>
+    <div id="detail" class="sub small"></div>
 
     <div id="error" class="error hidden"></div>
 
@@ -52,9 +54,17 @@
       <button class="primary" id="now">همگام‌سازی الان</button>
       <button class="ghost" id="full" title="همه‌ی تسک‌ها و کامنت‌ها دوباره خوانده می‌شوند">بازخوانی کامل</button>
     </div>
+    <details class="findlink">
+      <summary>پیدا کردن لینک تسک‌ها</summary>
+      <p class="note">در میزیتو یکی از تسک‌های خودتان را باز کنید، از ⋮ «لینک وظیفه» را بزنید و لینک را کپی کنید. همان لینک را اینجا بچسبانید. ایجنت پیدا می‌کند میزیتو لینک را کجا نگه می‌دارد و از این به بعد لینک همه‌ی تسک‌ها را از همان‌جا برمی‌دارد.</p>
+      <input id="sample" placeholder="https://mizito.noyanet.com/#/ws/…" spellcheck="false" dir="ltr" />
+      <button class="ghost wide" id="find">پیدا کردن</button>
+      <div id="fres" class="sub small"></div>
+      <textarea id="freport" class="hidden" readonly dir="ltr"></textarea>
+    </details>
     <button class="test" id="test">تست سریع: فقط تسک‌های یک هفته‌ی اخیر</button>
 
-    <p class="note">هر ۱۵ دقیقه و با هر پیام تازه، گفتگوی «دستیار میزیتو» خوانده می‌شود و هر تسکی که در آن آمده، به ترتیب تاریخ، به مدار می‌رود. کافی است یک تب میزیتو باز باشد. در میزیتو چیزی نوشته نمی‌شود.</p>
+    <p class="note">هر ۱۵ دقیقه و با هر پیام تازه، گفتگوی «دستیار میزیتو» و صندوق تسک‌های شما خوانده می‌شود و هر تسک، به ترتیب تاریخ، با لینکش به مدار می‌رود. کافی است یک تب میزیتو باز باشد. در میزیتو چیزی نوشته نمی‌شود.</p>
     <button class="link" id="out">قطع اتصال</button>
   </section>
 </main>

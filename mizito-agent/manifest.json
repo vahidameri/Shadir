@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "ایجنت میزیتوی مدار",
   "short_name": "Madar agent",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "منشن‌ها، تسک‌های باز و گفتگوی هر تسک را از میزیتو می‌خواند و در مدار ثبت می‌کند. در میزیتو چیزی نمی‌نویسد.",
   "minimum_chrome_version": "111",
   "permissions": [

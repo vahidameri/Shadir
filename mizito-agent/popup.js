@@ -26,6 +26,8 @@ async function render() {
   $('t-tasks').textContent = fa(s.tasks || 0)
   $('t-mentions').textContent = fa(s.mentions || 0)
   $('t-comments').textContent = fa(s.comments || 0)
+  $('t-links').textContent = fa(s.links || 0)
+  $('detail').textContent = s.inbox !== undefined ? `صندوق: ${fa(s.inbox)} تسک · ${fa(s.from_inbox || 0)} تسک بدون پیام دستیار` : ''
   $('error').textContent = failed ? status.error : ''
   $('error').classList.toggle('hidden', !failed)
 }
@@ -42,6 +44,28 @@ $('go').onclick = async () => {
 $('now').onclick = () => chrome.runtime.sendMessage({ type: 'request', reason: 'manual' }).then(render)
 $('test').onclick = () => chrome.runtime.sendMessage({ type: 'request', days: 7, reason: 'test' }).then(render)
 $('full').onclick = () => chrome.runtime.sendMessage({ type: 'request', force: true, reason: 'manual' }).then(render)
+$('find').onclick = async () => {
+  $('fres').textContent = 'در حال جستجو…'
+  $('freport').classList.add('hidden')
+  const tabs = await chrome.tabs.query({ url: 'https://mizito.noyanet.com/*' })
+  if (!tabs.length) return ($('fres').textContent = 'یک تب میزیتو باز کنید')
+  let r
+  try {
+    r = await chrome.tabs.sendMessage(tabs[0].id, { type: 'findLink', sample: $('sample').value })
+  } catch (e) {
+    r = { ok: false, error: 'صفحه‌ی میزیتو را یک بار رفرش کنید' }
+  }
+  if (!r || !r.ok) return ($('fres').textContent = (r && r.error) || 'پیدا نشد')
+  const rep = r.report
+  $('fres').textContent = rep.saved
+    ? `پیدا شد: لینک در «${rep.saved}» است. همگام‌سازی بعدی لینک همه‌ی تسک‌ها را می‌آورد.`
+    : rep.page.length
+      ? 'لینک در داده‌ی تسک نیست ولی میزیتو آن را از یک درخواست جدا آورد. متن زیر را برای پشتیبانی مدار بفرستید.'
+      : 'پیدا نشد. اول در میزیتو «لینک وظیفه» همین تسک را بزنید، بعد دوباره «پیدا کردن» را بزنید و متن زیر را بفرستید.'
+  $('freport').value = JSON.stringify(rep, null, 1)
+  $('freport').classList.remove('hidden')
+  if (rep.saved) chrome.runtime.sendMessage({ type: 'request', force: true, reason: 'link' })
+}
 $('out').onclick = async () => {
   if (!confirm('اتصال افزونه به مدار قطع شود؟')) return
   await chrome.storage.local.remove(['conn', 'status'])
