@@ -729,15 +729,10 @@ function OptionList({ title, items, onSave, kind }: { title: string; items: (MzO
 }
 
 /** The Mizito agent (browser extension): a key per person, the cutoff, and each agent's last run. */
-// A bookmark that, on the Mizito page, shows the person's Mizito session key to copy (nothing is sent anywhere)
-const TOKEN_BOOKMARK = String.raw`javascript:(()=>{for(let i=0;i<localStorage.length;i++){const v=String(localStorage.getItem(localStorage.key(i))||'').replace(/^"|"$/g,'');if(!/^eyJ[\w-]+\.eyJ[\w-]+\.[\w-]+$/.test(v))continue;try{const b=JSON.parse(atob(v.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));if(b&&b.jti){prompt('کلید نشست میزیتو را کپی کنید و در مدار بچسبانید:',v);return}}catch(e){}}alert('نشست میزیتو پیدا نشد؛ اول وارد میزیتو شوید')})()`
-
 function AgentCard({ admin }: { admin: boolean }) {
   const { db, action, config, setting, setSetting, toast, refresh } = useStore()
   const [code, setCode] = useState<{ name: string; code: string } | null>(null)
   const [busy, setBusy] = useState('')
-  const [paste, setPaste] = useState<{ name: string; token: string } | null>(null)
-  const [how, setHow] = useState(false)
   const leaders = db.Team.filter((x) => (x.access === 'super' || x.access === 'exec') && String(x.active) !== 'false')
   const cutoff = setting(MZ_KEYS.cutoff) || MZ_CUTOFF
   const when = (s?: string) => (s ? timeAgo(toDate(s)) : '—')
@@ -766,36 +761,9 @@ function AgentCard({ admin }: { admin: boolean }) {
       fail(e)
     }
   }
-  const saveToken = async (name: string, token: string) => {
-    setBusy(name)
-    try {
-      const row = (await action('mzServerToken', { name, token })) as { ok?: boolean; removed?: boolean; exp?: string } | undefined
-      if (!row) return toast(L('در حالت نمایشی وصل نمی‌شود', 'Not in demo mode'), 'err')
-      toast(row.removed ? L('اتصال سرور برداشته شد', 'Server connection removed') : L('سرور مدار به میزیتو وصل شد؛ هر ۱۵ دقیقه می‌خواند', 'Madar’s server reached Mizito; it reads every 15 minutes'))
-      setPaste(null)
-      void refresh()
-    } catch (e) {
-      fail(e)
-    } finally {
-      setBusy('')
-    }
-  }
-  const runNow = async (name: string, days = 0) => {
-    setBusy(name)
-    toast(L('خواندن میزیتو از سرور شروع شد؛ ممکن است چند دقیقه طول بکشد', 'Reading Mizito on the server; this can take a few minutes'))
-    try {
-      const r = (await action('mzServerRun', { name, days })) as { tasks?: number; sent?: number; more?: number } | undefined
-      if (r) toast(L(`${fa(r.tasks || 0)} تسک خوانده شد، ${fa(r.sent || 0)} مورد به مدار آمد${r.more ? ' — بقیه در خواندن بعدی' : ''}`, `${r.tasks} tasks read, ${r.sent} sent`))
-      void refresh()
-    } catch (e) {
-      fail(e)
-    } finally {
-      setBusy('')
-    }
-  }
   const reset = async () => {
     const word = L('پاک کن', 'delete')
-    const typed = window.prompt(L(`همه‌ی داده‌های میزیتو در مدار پاک می‌شود: تسک‌ها، منشن‌ها، گفتگوها و سابقه‌ی تغییراتشان (دسته، وضعیت و یادداشتی که در مدار گذاشته‌اید هم). کامنت‌ها، فایل‌ها و کارتابل مدار می‌مانند و با برگشتن تسک دوباره به آن وصل می‌شوند. بعد، خواندن بعدی (سرور یا افزونه) همه‌چیز را از ${fmtDate(cutoff)} به ترتیب تاریخ منشن دوباره می‌آورد.\n\nبرای تأیید بنویسید: ${word}`, `All Mizito data in Madar will be deleted. Type “${word}” to confirm.`))
+    const typed = window.prompt(L(`همه‌ی داده‌های میزیتو در مدار پاک می‌شود: تسک‌ها، منشن‌ها، گفتگوها و سابقه‌ی تغییراتشان (دسته، وضعیت و یادداشتی که در مدار گذاشته‌اید هم). کامنت‌ها، فایل‌ها و کارتابل مدار می‌مانند. بعد در افزونه «بازخوانی کامل» بزنید تا همه از ${fmtDate(cutoff)} به ترتیب تاریخ دوباره بیایند.\n\nبرای تأیید بنویسید: ${word}`, `All Mizito data in Madar will be deleted. Type “${word}” to confirm.`))
     if (typed === null) return
     if (typed.trim() !== word) return toast(L('تأیید نشد؛ چیزی پاک نشد', 'Not confirmed; nothing deleted'), 'err')
     setBusy('reset')
@@ -810,78 +778,41 @@ function AgentCard({ admin }: { admin: boolean }) {
     }
   }
   return (
-    <Card eyebrow={<span className="flex items-center gap-1.5"><Bot size={12} /> {L('اتصال میزیتو', 'Mizito connection')}</span>} title={L('خواندن خودکار میزیتو', 'Reading Mizito automatically')} className="@2xl:col-span-2">
+    <Card eyebrow={<span className="flex items-center gap-1.5"><Bot size={12} /> {L('ایجنت میزیتو', 'Mizito agent')}</span>} title={L('آوردن تسک‌ها از «دستیار میزیتو»', 'Tasks from the Mizito assistant')} className="@2xl:col-span-2">
       <p className="mb-4 text-xs leading-6 text-sub">
-        {L('مدار پیام‌های «دستیار میزیتو»، تسک‌های باز و گفتگوی هر تسک را می‌خواند و اینجا می‌آورد؛ در میزیتو چیزی نمی‌نویسد. دو راه دارد: «سرور مدار» (بدون افزونه؛ کلید نشست میزیتوی هر نفر یک بار اینجا چسبانده می‌شود و سرور هر ۱۵ دقیقه می‌خواند) یا افزونه‌ی کروم. موارد به ترتیب تاریخ اولین منشن وارد می‌شوند.', 'Madar reads the Mizito assistant’s messages, open tasks and each task’s conversation; it never writes in Mizito. Either Madar’s server reads with each person’s Mizito session key (no extension), or the Chrome extension does.')}
+        {L('افزونه‌ی کروم در مرورگری که وارد میزیتو هستید، گفتگوی «دستیار میزیتو» را می‌خواند و هر تسکی که در آن آمده، به ترتیب تاریخ، اینجا می‌نشیند (با کامنت‌هایش). لینک تسک را خودتان روی هر مورد بگذارید. در میزیتو چیزی نوشته نمی‌شود.', 'The Chrome extension reads the “Mizito assistant” chat and brings every task in it here, in date order, with its comments. Add each task’s link yourself.')}
       </p>
       <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
-        <span>{L('تسک‌هایی که از این روز به بعد فعالیت داشته‌اند:', 'Tasks with activity since:')}</span>
+        <span>{L('پیام‌های دستیار از این روز به بعد:', 'Assistant messages since:')}</span>
         <DatePicker compact value={cutoff} onChange={(v) => admin && v && setSetting(MZ_KEYS.cutoff, v)} />
-        <span className="text-xs text-sub">{L('(پیش‌فرض ۱ تیر ۱۴۰۵)', '(default 1 Tir 1405)')}</span>
       </div>
       <ul className="divide-y divide-line rounded-2xl border border-line">
         {leaders.map((p) => {
           const r = agentRun(setting(MZ_KEYS.agent + p.name))
-          const ext = !!r.key_at && !r.revoked
-          const server = !!r.server_at
+          const live = !!r.key_at && !r.revoked
           return (
-            <li key={p.id} className="px-4 py-3">
-              <div className="flex flex-wrap items-center gap-3">
-                <Avatar name={p.name} size="sm" />
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium">{p.name}</div>
-                  <div className="mt-0.5 flex flex-wrap gap-x-3 text-[0.6875rem] text-sub">
-                    <span className={server ? 'text-good' : ''}>{server ? L('سرور مدار: وصل', 'Server: connected') : L('سرور مدار: وصل نیست', 'Server: not connected')}</span>
-                    {server && r.server_exp && <span>{L(`اعتبار کلید تا ${fmtDate(r.server_exp.slice(0, 10))}`, `Key valid until ${r.server_exp.slice(0, 10)}`)}</span>}
-                    <span>{ext ? L('افزونه: کلید دارد', 'Extension: has a key') : r.revoked ? L('افزونه: کلید باطل شده', 'Extension: key revoked') : L('افزونه: بدون کلید', 'Extension: no key')}</span>
-                    {(server || ext) && (
-                      <>
-                        <span>{L(`آخرین خواندن: ${when(r.done_at || r.at)}`, `Last read: ${when(r.done_at || r.at)}`)}{r.run?.via === 'server' ? L(' (سرور)', ' (server)') : r.done_at ? L(' (افزونه)', ' (extension)') : ''}</span>
-                        <span>{L(`آخرین خواندن کامل: ${when(r.full)}`, `Last full read: ${when(r.full)}`)}</span>
-                        {r.run?.tasks !== undefined && <span className="num">{L(`${fa(r.run.tasks || 0)} تسک · ${fa(r.run.mentions || 0)} منشن`, `${r.run.tasks} tasks · ${r.run.mentions || 0} mentions`)}</span>}
-                      </>
-                    )}
-                    {r.reset_at && !r.done_at && <span className="text-warn">{L(`از نو شروع شد (${when(r.reset_at)})؛ منتظر خواندن بعدی`, 'Started over; waiting for the next read')}</span>}
-                  </div>
-                  {r.error && <div className="mt-1 text-xs text-bad">⚠ {r.error}</div>}
-                </div>
-                {admin && (
-                  <div className="flex flex-wrap gap-1.5">
-                    <button className="btn-outline btn-sm" disabled={!!busy} onClick={() => setPaste(paste?.name === p.name ? null : { name: p.name, token: '' })}><KeyRound size={13} /> {server ? L('کلید میزیتوی تازه', 'New Mizito key') : L('وصل کردن سرور', 'Connect server')}</button>
-                    {server && <button className="btn-outline btn-sm" disabled={!!busy} onClick={() => runNow(p.name)}>{busy === p.name ? L('در حال خواندن…', 'Reading…') : L('خواندن الان', 'Read now')}</button>}
-                    {server && <button className="btn-ghost btn-sm text-sub" disabled={!!busy} onClick={() => runNow(p.name, 7)} title={L('فقط یک هفته‌ی اخیر؛ برای آزمایش', 'Only the last week; a test')}>{L('آزمایش ۷ روز', '7-day test')}</button>}
-                    {server && <button className="btn-ghost btn-sm text-sub" disabled={!!busy} onClick={() => window.confirm(L(`اتصال سرور برای ${p.name} برداشته شود؟`, 'Remove the server connection?')) && saveToken(p.name, '')}>{L('قطع', 'Disconnect')}</button>}
-                    <button className="btn-ghost btn-sm text-sub" disabled={!!busy} onClick={() => makeKey(p.name)}>{ext ? L('کد افزونه‌ی تازه', 'New extension code') : L('کد افزونه', 'Extension code')}</button>
-                    {ext && <button className="btn-ghost btn-sm text-sub" onClick={() => revoke(p.name)}>{L('باطل کردن افزونه', 'Revoke extension')}</button>}
-                  </div>
-                )}
-              </div>
-              {paste?.name === p.name && (
-                <div className="mt-3 rounded-2xl border border-brand/30 bg-brand-soft/30 p-3">
-                  <p className="mb-2 text-xs leading-6 text-sub">
-                    {L(`کلید نشست میزیتوی ${p.name} را بچسبانید. سرور مدار با همین کلید فقط می‌خواند؛ کلید در تنظیمات محرمانه‌ی اسکریپت می‌ماند، نه در شیت.`, `Paste ${p.name}’s Mizito session key. Madar’s server only reads with it; it is kept in the script’s private properties, not in the sheet.`)}{' '}
-                    <button className="text-brand underline" onClick={() => setHow(!how)}>{L('کلید را از کجا بیاورم؟', 'Where do I get it?')}</button>
-                  </p>
-                  {how && (
-                    <div className="mb-3 space-y-2 rounded-xl bg-surface p-3 text-xs leading-6">
-                      <ol className="list-decimal space-y-1 ps-5">
-                        <li>{L('متن زیر را کپی کنید.', 'Copy the text below.')}</li>
-                        <li>{L('در کروم یک بوکمارک تازه بسازید (Ctrl+D ← «بیشتر») و همین متن را جای «آدرس» آن بچسبانید؛ اسمش را بگذارید «کلید میزیتو».', 'Make a new bookmark and paste it as its URL.')}</li>
-                        <li>{L('در تبی که وارد میزیتو هستید روی همین بوکمارک بزنید؛ کلید نشان داده می‌شود: کپی کنید و اینجا بچسبانید.', 'On the Mizito tab, click the bookmark; copy the key it shows and paste it here.')}</li>
-                      </ol>
-                      <div className="flex gap-2">
-                        <input readOnly dir="ltr" value={TOKEN_BOOKMARK} onFocus={(e) => e.target.select()} className="input h-8 min-w-0 flex-1 font-mono text-[0.625rem]" />
-                        <button className="btn-outline btn-sm h-8" onClick={() => navigator.clipboard?.writeText(TOKEN_BOOKMARK).then(() => toast(L('کپی شد', 'Copied')))}><Copy size={12} /> {L('کپی', 'Copy')}</button>
-                      </div>
-                      <p className="text-sub">{L('اگر از میزیتو خارج شوید (Log out) کلید باطل می‌شود و باید دوباره بچسبانید.', 'Signing out of Mizito ends the key; paste a new one then.')}</p>
-                    </div>
+            <li key={p.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+              <Avatar name={p.name} size="sm" />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium">{p.name}</div>
+                <div className="mt-0.5 flex flex-wrap gap-x-3 text-[0.6875rem] text-sub">
+                  {live ? (
+                    <>
+                      <span>{L(`آخرین خواندن: ${when(r.done_at || r.at)}`, `Last read: ${when(r.done_at || r.at)}`)}</span>
+                      {r.run?.tasks !== undefined && <span className="num">{L(`${fa(r.run.tasks || 0)} تسک`, `${r.run.tasks} tasks`)}</span>}
+                      {r.reset_at && !r.done_at && <span className="text-warn">{L('پاک شد؛ در افزونه «بازخوانی کامل» بزنید', 'Cleared; run a full read in the extension')}</span>}
+                    </>
+                  ) : (
+                    <span>{r.revoked ? L('کلید باطل شده', 'Key revoked') : L('هنوز وصل نشده', 'Not connected yet')}</span>
                   )}
-                  <div className="flex gap-2">
-                    <input dir="ltr" autoFocus value={paste.token} onChange={(e) => setPaste({ name: p.name, token: e.target.value })} placeholder="eyJ…" className="input h-9 min-w-0 flex-1 font-mono text-[0.6875rem]" />
-                    <button className="btn-primary btn-sm h-9" disabled={!paste.token.trim() || !!busy} onClick={() => saveToken(p.name, paste.token)}>{busy === p.name ? L('در حال آزمایش…', 'Testing…') : L('آزمایش و ذخیره', 'Test and save')}</button>
-                    <button className="btn-ghost btn-sm h-9" onClick={() => setPaste(null)}><X size={14} /></button>
-                  </div>
                 </div>
+                {live && r.error && <div className="mt-1 text-xs text-bad">⚠ {r.error}</div>}
+              </div>
+              {admin && (
+                <>
+                  <button className="btn-outline btn-sm" disabled={!!busy} onClick={() => makeKey(p.name)}><KeyRound size={13} /> {live ? L('کد اتصال تازه', 'New code') : L('کد اتصال', 'Connection code')}</button>
+                  {live && <button className="btn-ghost btn-sm text-sub" onClick={() => revoke(p.name)}>{L('باطل کردن', 'Revoke')}</button>}
+                </>
               )}
             </li>
           )
@@ -889,8 +820,8 @@ function AgentCard({ admin }: { admin: boolean }) {
       </ul>
       {code && (
         <div className="mt-4 rounded-2xl border border-brand/30 bg-brand-soft/30 p-4">
-          <div className="mb-2 text-sm font-medium">{L(`کد اتصال افزونه‌ی ${code.name}`, `${code.name}’s extension code`)}</div>
-          <p className="mb-2 text-xs leading-6 text-sub">{L('فقط همین یک بار نشان داده می‌شود. در افزونه (روی آیکن مدار ← اتصال) بچسبانید. اگر گم شد، کد تازه بسازید؛ قبلی خودبه‌خود باطل می‌شود.', 'Shown only once. Paste it into the extension (Madar icon → connect). If lost, make a new one; the old one stops working.')}</p>
+          <div className="mb-2 text-sm font-medium">{L(`کد اتصال ${code.name}`, `${code.name}’s connection code`)}</div>
+          <p className="mb-2 text-xs leading-6 text-sub">{L('فقط همین یک بار نشان داده می‌شود. در افزونه (روی آیکن مدار) بچسبانید. اگر گم شد، کد تازه بسازید؛ قبلی خودبه‌خود باطل می‌شود.', 'Shown only once. Paste it into the extension. If lost, make a new one.')}</p>
           <div className="flex gap-2">
             <input readOnly dir="ltr" value={code.code} onFocus={(e) => e.target.select()} className="input h-9 min-w-0 flex-1 font-mono text-[0.6875rem]" />
             <button className="btn-primary btn-sm h-9" onClick={() => navigator.clipboard?.writeText(code.code).then(() => toast(L('کپی شد', 'Copied')))}><Copy size={13} /> {L('کپی', 'Copy')}</button>
@@ -902,7 +833,7 @@ function AgentCard({ admin }: { admin: boolean }) {
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-bad/30 p-3">
           <div className="min-w-0 flex-1 text-xs leading-6">
             <div className="font-medium text-bad">{L('شروع دوباره از صفر', 'Start over')}</div>
-            <div className="text-sub">{L('همه‌ی داده‌های میزیتو در مدار پاک می‌شود و خواندن بعدی همه را از تاریخ شروع، به ترتیب تاریخ منشن، دوباره می‌آورد.', 'Deletes all Mizito data in Madar; the next read brings everything back in mention order.')}</div>
+            <div className="text-sub">{L('همه‌ی داده‌های میزیتو در مدار پاک می‌شود؛ بعد «بازخوانی کامل» در افزونه همه را به ترتیب تاریخ دوباره می‌آورد.', 'Deletes all Mizito data in Madar; a full read in the extension brings it back in date order.')}</div>
           </div>
           <button className="btn-outline btn-sm border-bad/40 text-bad" disabled={!!busy} onClick={reset}><Trash2 size={13} /> {busy === 'reset' ? L('در حال پاک کردن…', 'Deleting…') : L('پاک کردن داده‌های میزیتو', 'Delete Mizito data')}</button>
         </div>

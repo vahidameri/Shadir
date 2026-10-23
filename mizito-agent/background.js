@@ -33,30 +33,6 @@ async function madar(body) {
   }
 }
 
-// ---- taking links from Mizito, like a person ----
-// The reading tab asks for the links of some tasks; a Mizito window is opened, the agent in it walks
-// the «دستیار میزیتو» chat and hands the links back, and the window closes.
-const captures = new Map() // tabId → { job, done }
-async function capture(job) {
-  const origin = 'https://mizito.noyanet.com'
-  // straight to the assistant's chat when its id is known: #/ws/im/<dialog>/
-  const url = job.dialog ? `${origin}/#/ws/im/${job.dialog}/` : origin + '/'
-  const win = await chrome.windows.create({ url, focused: true, type: 'normal', width: 1280, height: 900 })
-  const tabId = win.tabs && win.tabs[0] && win.tabs[0].id
-  const timeout = Math.min(20 * 60000, 60000 + 7000 * job.ids.length)
-  return new Promise((resolve) => {
-    const finish = (r) => {
-      if (!captures.has(tabId)) return
-      captures.delete(tabId)
-      clearTimeout(timer)
-      chrome.windows.remove(win.id).catch(() => {})
-      resolve(r)
-    }
-    const timer = setTimeout(() => finish({ links: {}, log: ['زمان برداشتن لینک‌ها تمام شد'] }), timeout + 15000)
-    captures.set(tabId, { job: { ...job, timeout }, done: finish })
-  })
-}
-
 let running = false
 /** One read at a time, in the first open Mizito tab. full: null = decide (a full read once a day). */
 async function start(full, reason, force, days) {
@@ -65,7 +41,7 @@ async function start(full, reason, force, days) {
   if (!conn) return { ok: false, error: 'افزونه به مدار وصل نیست' }
   const st = (await get('status')) || {}
   if (full === null) full = !st.full_at || Date.now() - st.full_at > FULL_EVERY
-  const tabs = (await chrome.tabs.query({ url: 'https://mizito.noyanet.com/*' })).filter((t) => !captures.has(t.id))
+  const tabs = await chrome.tabs.query({ url: 'https://mizito.noyanet.com/*' })
   if (!tabs.length) {
     await status({ state: 'idle', note: 'تب میزیتو باز نیست؛ با باز کردن میزیتو، خواندن ادامه پیدا می‌کند', due: true })
     return { ok: false, error: 'یک تب میزیتو باز کنید' }
@@ -84,7 +60,7 @@ async function start(full, reason, force, days) {
       }
     }
     if (res && res.ok) {
-      await status({ state: 'idle', ok_at: Date.now(), error: '', stats: res.stats, log: (res.stats && res.stats.log) || [], ...(full ? { full_at: Date.now() } : {}), progress: '' })
+      await status({ state: 'idle', ok_at: Date.now(), error: '', stats: res.stats, ...(full ? { full_at: Date.now() } : {}), progress: '' })
     } else {
       const error = (res && res.error) || 'خطای ناشناخته'
       await status({ state: 'idle', error, error_at: Date.now(), progress: '' })
@@ -114,23 +90,9 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     return true
   }
   if (msg.type === 'hello') {
-    const c = sender.tab && captures.get(sender.tab.id)
-    if (c) {
-      reply({ capture: c.job })
-      return
-    }
     // a Mizito tab opened: run a read that was due while none was open
     get('status').then((st) => st && st.due && start(null, 'tab'))
     reply({})
-    return
-  }
-  if (msg.type === 'capture') {
-    capture(msg.job).then(reply)
-    return true
-  }
-  if (msg.type === 'capture-result') {
-    const c = sender.tab && captures.get(sender.tab.id)
-    if (c) c.done(msg.result)
     return
   }
   if (msg.type === 'connect') {

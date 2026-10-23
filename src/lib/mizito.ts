@@ -404,9 +404,6 @@ export interface AgentRun {
   /** how the link is built, or what was tried */
   link_how?: string
   run?: { tasks?: number; mentions?: number; comments?: number; pages?: number; via?: string; more?: number }
-  /** the server reads this person's Mizito with their session key (no extension) */
-  server_at?: string
-  server_exp?: string
   reset_at?: string
 }
 export function agentRun(raw?: string): AgentRun {

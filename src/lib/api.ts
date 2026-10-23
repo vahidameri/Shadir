@@ -83,9 +83,9 @@ export async function fetchAll(c: Config, since = ''): Promise<{ data: DB | null
 // text/plain avoids a CORS preflight, which Apps Script doesn't answer.
 async function post(c: Config, body: Record<string, unknown>) {
   // a request that never answers must not hold the app (refreshes wait for writes): give up after
-  // 60s, 3 minutes for an upload, 6 for a Mizito read on the server
+  // 60s, or 3 minutes for an upload
   const ctl = new AbortController()
-  const timer = setTimeout(() => ctl.abort(), body.action === 'mzServerRun' ? 360000 : body.action === 'upload' ? 180000 : 60000)
+  const timer = setTimeout(() => ctl.abort(), body.action === 'upload' ? 180000 : 60000)
   let res: Response
   try {
     res = await fetch(c.apiUrl, {

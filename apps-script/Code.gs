@@ -18,7 +18,7 @@
  *   viewer — read only (leadership)
  */
 
-var MADAR_VERSION = '2.0.0'; // shown on the login page and by diagnose()
+var MADAR_VERSION = '2.0.1'; // shown on the login page and by diagnose()
 
 var SCHEMA = {
   Projects: ['id', 'code', 'name', 'description', 'category', 'owner', 'client', 'liaison', 'liaison_contact', 'status', 'priority', 'phase', 'start_date', 'end_date', 'progress', 'health_override', 'objective', 'paused_at', 'pause_reason', 'delivery_day', 'last_delivery', 'archived', 'archived_at', 'links', 'team', 'kind', 'batch'],
@@ -144,10 +144,8 @@ function doPost(e) {
       lock.waitLock(20000);
       return json_({ ok: true, row: body.action === 'mzAgentKey' ? mzAgentKey_(body.name) : mzAgentRevoke_(body.name) });
     }
-    if (body.action === 'mzReset' || body.action === 'mzServerToken' || body.action === 'mzServerRun') {
+    if (body.action === 'mzReset') {
       if (user.access !== 'super') throw new Error('فقط مدیر برنامه به این بخش دسترسی دارد');
-      if (body.action === 'mzServerToken') return json_({ ok: true, row: mzServerToken_(body.name, body.token) });
-      if (body.action === 'mzServerRun') return json_({ ok: true, row: mzServerRead_(body.name, { force: !!body.force, days: Number(body.days) || 0 }) });
       lock.waitLock(30000);
       return json_({ ok: true, row: mzReset_(user) });
     }
@@ -2076,7 +2074,7 @@ function deleteRows_(name, ids) {
 
 // --------------------------------------------------------------------------
 // Starting Mizito over: every Mizito row, mention, comment and change log goes, and each person's
-// read status is cleared, so the next read (agent or server) brings everything back from the cutoff,
+// read status is cleared, so the next read of the agent brings everything back from the cutoff,
 // oldest mention first. Row ids are MZ-<Mizito id>, so comments, files and cartable items written
 // in Madar find their task again once it is back.
 // --------------------------------------------------------------------------
@@ -2120,7 +2118,7 @@ function mzReset_(user) {
     var st = {};
     try { st = JSON.parse(c.value) || {}; } catch (e) {}
     var keep = {};
-    ['key_at', 'revoked', 'server_at', 'server_exp', 'server_uid'].forEach(function (k) { if (st[k]) keep[k] = st[k]; });
+    ['key_at', 'revoked'].forEach(function (k) { if (st[k]) keep[k] = st[k]; });
     keep.reset_at = mzNow_();
     upsert_('Config', { id: id, value: JSON.stringify(keep) }, MZ_AGENT);
   });
@@ -2128,241 +2126,9 @@ function mzReset_(user) {
   return out;
 }
 
-// --------------------------------------------------------------------------
-// Reading Mizito from Madar's own server — no browser extension. Each person pastes their Mizito
-// session key once (Madar → میزیتو → تنظیمات); every 15 minutes the server reads the assistant's
-// messages, the open tasks and the comments the same way the extension does, through the same
-// read-only calls, and writes them in with mzIngest_. The key is kept in the script's properties,
-// never in the sheet.
-// --------------------------------------------------------------------------
-
-var MZ_HOST = 'https://mizito.noyanet.com';
-var MZ_BOT = '592d81b962bd6e0e6a6cfc00'; // «دستیار میزیتو»
-var MZ_READ = { 'workspace/userId': 1, 'workspace/getUsers': 1, 'projects/getList': 1, 'labels/getAll': 1, 'chat/getDialogs': 1, 'chat/getHistory': 1, 'tasks/getAll': 1, 'tasks/upcoming': 1, 'tasks/getComments': 1 };
-
-function mzTokens_() {
-  try { return JSON.parse(PropertiesService.getScriptProperties().getProperty('MZ_TOKENS') || '{}') || {}; } catch (e) { return {}; }
-}
-function mzSaveTokens_(all) { PropertiesService.getScriptProperties().setProperty('MZ_TOKENS', JSON.stringify(all)); }
-
-function mzApi_(token, path, body) {
-  if (!MZ_READ[path]) throw new Error('blocked: ' + path);
-  for (var attempt = 0; ; attempt++) {
-    Utilities.sleep(150);
-    var res;
-    try {
-      res = UrlFetchApp.fetch(MZ_HOST + '/api/api/' + path, {
-        method: 'post', contentType: 'application/json;charset=UTF-8', payload: JSON.stringify(body || {}),
-        headers: { 'x-token': token, accept: 'application/json, text/plain, */*' }, muteHttpExceptions: true, followRedirects: true,
-      });
-    } catch (e) {
-      if (attempt < 1) { Utilities.sleep(2000); continue; }
-      throw new Error('سرور مدار به میزیتو نرسید (' + String(e.message || e).slice(0, 120) + ')');
-    }
-    var code = res.getResponseCode();
-    if (code === 401 || code === 403) throw new Error('کلید نشست میزیتو منقضی شده یا نادرست است؛ کلید تازه بچسبانید');
-    if ((code === 429 || code >= 500) && attempt < 2) { Utilities.sleep(3000 * (attempt + 1)); continue; }
-    if (code !== 200) throw new Error('میزیتو پاسخ نداد (' + code + ' · ' + path + ')');
-    var text = res.getContentText();
-    try { return JSON.parse(text); } catch (e2) { throw new Error('میزیتو به‌جای داده صفحه برگرداند (' + path + ')'); }
-  }
-}
-
-/** The expiry inside a Mizito session key (a JWT), as "YYYY-MM-DD HH:mm", or ''. */
-function mzTokenExp_(token) {
-  try {
-    var p = String(token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-    while (p.length % 4) p += '=';
-    var body = JSON.parse(Utilities.newBlob(Utilities.base64Decode(p)).getDataAsString());
-    return body.exp ? Utilities.formatDate(new Date(body.exp * 1000), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm') : '';
-  } catch (e) { return ''; }
-}
-
-/** Saves (or, with an empty token, removes) a person's Mizito key after checking it works. */
-function mzServerToken_(name, token) {
-  var m = (rawAll_().Team || []).filter(function (x) { return x.name === name; })[0];
-  if (!m || (m.access !== 'super' && m.access !== 'exec')) throw new Error('اتصال میزیتو فقط برای مدیر برنامه و CPTO است');
-  var all = mzTokens_();
-  token = String(token || '').trim().replace(/^"|"$/g, '');
-  if (!token) {
-    delete all[name];
-    mzSaveTokens_(all);
-    mzSetStatus_(name, { server_at: '', server_exp: '', server_uid: '' });
-    return { name: name, removed: true };
-  }
-  var me = mzApi_(token, 'workspace/userId', { regId: null });
-  all[name] = { token: token, at: mzNow_() };
-  mzSaveTokens_(all);
-  var exp = mzTokenExp_(token);
-  mzSetStatus_(name, { server_at: mzNow_(), server_exp: exp, server_uid: String((me && me.uid) || '') });
-  mzServerTrigger_();
-  return { name: name, ok: true, exp: exp, uid: (me && me.uid) || '' };
-}
-
-function mzServerTrigger_() {
-  var has = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'mzServerSyncAll'; });
-  if (!has) ScriptApp.newTrigger('mzServerSyncAll').timeBased().everyMinutes(15).create();
-}
-
-/** Time trigger: reads Mizito for everyone with a key. A full read (to the cutoff) once a day. */
+// An earlier version read Mizito from the server on a 15-minute trigger; that trigger, if it was
+// made, removes itself here.
 function mzServerSyncAll() {
-  var all = mzTokens_();
-  Object.keys(all).forEach(function (name) {
-    try { mzServerRead_(name, {}); } catch (e) {
-      try { mzSetStatus_(name, { error: String(e.message || e).slice(0, 300), error_at: mzNow_(), via: 'server' }); } catch (e2) {}
-    }
-  });
-}
-
-/** One read for one person, the same steps as the extension's (mizito-agent/agent.js run()). */
-function mzServerRead_(name, opts) {
-  opts = opts || {};
-  var tok = (mzTokens_()[name] || {}).token;
-  if (!tok) throw new Error('برای ' + name + ' کلید نشست میزیتو ثبت نشده');
-  var started = Date.now();
-  var api = function (path, body) { return mzApi_(tok, path, body); };
-  var ms = function (iso) { var t = Date.parse(iso || ''); return isFinite(t) ? t : 0; };
-  var tehran = function (s) { s = String(s); return ms(s.replace(' ', 'T') + (s.length <= 10 ? 'T00:00' : '') + ':00+03:30'); };
-  var agent = { name: name };
-  var hello = mzHello_(agent);
-  var cutoff = tehran(hello.cutoff);
-  var since = opts.days ? Math.max(cutoff, Date.now() - opts.days * 86400000) : cutoff;
-  var known = hello.known || {};
-  var knownMentions = {};
-  (hello.mentions || []).forEach(function (id) { knownMentions[id] = 1; });
-
-  var me = api('workspace/userId', { regId: null });
-  var clean = function (s) { return String(s || '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/\s+/g, ' ').trim(); };
-  var users = {};
-  ((api('workspace/getUsers', {}) || {}).users || []).forEach(function (u) { users[u._id] = clean([u.first_name, u.last_name].filter(Boolean).join(' ')); });
-  var who = function (id) { return (id && users[id]) || ''; };
-  var projects = {};
-  ((api('projects/getList', {}) || {}).projects || []).forEach(function (p) { projects[p._id] = p.title; });
-  var labels = {};
-  try { var l = api('labels/getAll', { type: 'task' }); ((l && l.labels) || l || []).forEach(function (x) { if (x && x._id) labels[x._id] = x.title; }); } catch (e) {}
-
-  var tasks = {};
-  var take = function (t) {
-    if (!t || !t._id || t.deleted) return null;
-    var cur = tasks[t._id];
-    if (!cur) tasks[t._id] = { t: t, mentions: [], first: '', assistant: false };
-    else if (ms(t.modified_at) >= ms(cur.t.modified_at)) {
-      var merged = {};
-      for (var k in cur.t) merged[k] = cur.t[k];
-      for (var k2 in t) merged[k2] = t[k2];
-      merged.last_comment = t.last_comment || cur.t.last_comment;
-      cur.t = merged;
-    }
-    return tasks[t._id];
-  };
-
-  // 1. the assistant's messages, newest first, back to the cutoff
-  var dialogs = (api('chat/getDialogs', {}) || {}).dialogs || [];
-  var box = dialogs.filter(function (d) { return !d.is_group && (d.peer_user === MZ_BOT || /^دستیار میزیتو/.test(who(d.peer_user))); })[0];
-  var pages = 0, mentionCount = 0, mentionsDone = false;
-  if (box) {
-    for (var offset = 0; pages < 400; pages++) {
-      var page = api('chat/getHistory', { dialog: box._id, offset: offset });
-      if (!Array.isArray(page) || !page.length) { pages++; break; }
-      var older = false;
-      page.forEach(function (msg) {
-        var at = ms(msg.date);
-        if (at && at < since) older = true;
-        var media = msg.media;
-        if (msg.deleted || !media || !media.task || at < since) return;
-        var slot = take(media.task);
-        if (slot) {
-          slot.assistant = true;
-          if (!slot.first || ms(msg.date) < ms(slot.first)) slot.first = msg.date;
-        }
-        if (slot && media._ === 'messageMediaMentionInTask') {
-          slot.mentions.push({ id: msg._id, by: who(media.from_user), at: msg.date, comment: media.comment || '' });
-          mentionCount++;
-        }
-      });
-      if (older) break;
-      offset += page.length;
-    }
-    mentionsDone = pages < 400;
-  }
-  var list = Object.keys(tasks).map(function (k) { return tasks[k]; }).filter(function (x) { return x.assistant; });
-
-  // 2. the open tasks of the inbox refresh those tasks
-  var query = { inbox: true, sort_type: 'default', filter: null };
-  var open = [].concat(api('tasks/getAll', query) || []);
-  var inboxDone = false;
-  for (var i = 0; i < 40; i++) {
-    var more = api('tasks/upcoming', { inbox: true, sort_type: 'default', filter: null, from: open.length });
-    if (!Array.isArray(more) || !more.length) { inboxDone = true; break; }
-    open = open.concat(more);
-  }
-  var seen = [];
-  open.forEach(function (t) {
-    seen.push(t._id);
-    if (Math.max(ms(t.created_at), ms(t.modified_at), ms(t.last_mention_date)) >= cutoff) take(t);
-  });
-
-  // 3. what changed: the full snapshot and its comments; within the time a run may take
-  var sigOf = function (t) { return (t.modified_at || '') + '|' + (t.completed ? 1 : 0) + '|-|a3'; };
-  var out = [], commentsRead = 0, cut = false;
-  list.sort(function (a, b) { return ms(a.first) - ms(b.first); });
-  list.forEach(function (x) {
-    var t = x.t;
-    var mentions = x.mentions.filter(function (y) { return !knownMentions[y.id]; });
-    var sig = sigOf(t);
-    if (!opts.force && known[t._id] === sig) {
-      if (mentions.length) out.push({ key: t._id, first_at: x.first, mentions: mentions });
-      return;
-    }
-    if (Date.now() - started > 240000) { cut = true; return; } // the rest on the next run
-    var item = {
-      key: t._id, title: t.title || '', notes: t.notes || '', link: '',
-      chat_link: t.dialog ? MZ_HOST + '/#/ws/im/' + t.dialog + '/' : '',
-      first_at: x.first, project: projects[t.project] || '', owner: who(t.owner),
-      assignees: (t.assignee || []).map(who).filter(Boolean),
-      labels: (t.labels || []).map(function (id) { return labels[id]; }).filter(Boolean),
-      created_at: t.created_at, completed: !!t.completed, completed_at: t.completed_at || '',
-      completed_by: who(t.completed_by_responsible || (t.completed_by || [])[0]), progress: t.progress,
-      deadline: t.has_deadline && t.deadline ? t.deadline : '',
-      checklist: (t.checklist || []).map(function (c) { return { t: c.title, ok: !!c.checked }; }),
-      mentions: mentions, sig: sig,
-    };
-    if (t.last_comment && t.last_comment.comment_owner) { item.last_by = who(t.last_comment.comment_owner); item.last_at = t.last_comment.comment_at; }
-    if (t.access_token) {
-      try {
-        var cs = api('tasks/getComments', { token: t.access_token });
-        var live = (Array.isArray(cs) ? cs : []).filter(function (c) { return !c.deleted; });
-        item.comments = live.map(function (c) {
-          return {
-            id: c._id, by: who(c.comment_owner), at: c.comment_at, body: c.comment || '',
-            mentions: (c.mention || []).map(who).filter(Boolean), reply_to: c.replied_comment_id || '',
-            files: (c.attachments || []).map(function (a) { return a && a.media && a.media.document && a.media.document.name; }).filter(Boolean),
-          };
-        });
-        var newest = null;
-        live.forEach(function (c) { if (!newest || ms(c.comment_at) > ms(newest.comment_at)) newest = c; });
-        if (newest) { item.last_by = who(newest.comment_owner); item.last_at = newest.comment_at; }
-        commentsRead += live.length;
-      } catch (e) { item.sig = ''; }
-    }
-    out.push(item);
-  });
-
-  // 4. into Madar, oldest mention first
-  var whole = !opts.days && !cut;
-  var stats = { tasks: list.length, sent: out.length, mentions: mentionCount, comments: commentsRead, pages: pages + 1, open: seen.length, links: 0, test: opts.days || 0, uid: me && me.uid, via: 'server', more: cut ? 1 : 0 };
-  var lock = LockService.getScriptLock();
-  lock.waitLock(30000);
-  try {
-    for (var b = 0; b < out.length; b += 25) mzIngest_({ items: out.slice(b, b + 25), version: 'server' }, agent);
-    mzIngest_({
-      items: [], final: true, full: whole,
-      seen: whole && inboxDone && mentionsDone ? seen.concat(list.filter(function (x) { return !x.t.completed; }).map(function (x) { return x.t._id; })) : undefined,
-      assistant: whole && mentionsDone ? list.map(function (x) { return x.t._id; }) : undefined,
-      link: 'off', link_how: 'خواندن از سرور مدار', stats: stats, version: 'server',
-    }, agent);
-  } finally {
-    lock.releaseLock();
-  }
-  return stats;
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'mzServerSyncAll') ScriptApp.deleteTrigger(t); });
+  PropertiesService.getScriptProperties().deleteProperty('MZ_TOKENS');
 }
