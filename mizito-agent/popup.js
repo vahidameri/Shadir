@@ -27,7 +27,7 @@ async function render() {
   $('t-mentions').textContent = fa(s.mentions || 0)
   $('t-comments').textContent = fa(s.comments || 0)
   $('t-links').textContent = fa(s.links || 0)
-  $('detail').textContent = s.inbox !== undefined ? `صندوق: ${fa(s.inbox)} تسک · ${fa(s.from_inbox || 0)} تسک بدون پیام دستیار` : ''
+  $('detail').textContent = s.inbox !== undefined ? `وظایف سپرده‌شده به شما: ${fa(s.inbox)} · ${fa(s.from_inbox || 0)} بدون پیام دستیار` : ''
   $('error').textContent = failed ? status.error : ''
   $('error').classList.toggle('hidden', !failed)
 }

@@ -211,14 +211,14 @@
 
     // 2. the person's task inbox: tasks given to them without a word from the assistant, and the
     // current state of the ones above (a chat message carries the task as it was when it was sent)
-    progress('تسک‌های صندوق…')
+    progress('وظایف سپرده‌شده به شما…')
     const query = { inbox: true, sort_type: 'default', filter: null }
     const inbox = [...((await api('tasks/getAll', query)) || [])]
     for (let i = 0; i < 60; i++) {
       const more = await api('tasks/upcoming', { ...query, from: inbox.length })
       if (!Array.isArray(more) || !more.length) break
       inbox.push(...more)
-      progress(`تسک‌های صندوق: ${inbox.length}`)
+      progress(`وظایف سپرده‌شده به شما: ${inbox.length}`)
     }
     let fromInbox = 0
     for (const t of inbox) {
