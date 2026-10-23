@@ -4,7 +4,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Attachments } from './Files'
 import { CartableButton } from './CartableParts'
-import { AtSign, Ban, Bot, Check, CheckCheck, Clock, Crown, Star, Copy, ExternalLink, FileText, Flame, Hourglass, KeyRound, Link2, MessageSquarePlus, MoonStar, Paperclip, Plus, Reply, Settings2, Trash2, UserRound, X } from 'lucide-react'
+import { AtSign, Ban, Bot, Check, CheckCheck, Clock, Crown, Star, Copy, ExternalLink, FileText, Flame, Hourglass, Link2, MessageSquarePlus, MoonStar, Paperclip, Plus, Reply, Settings2, Trash2, UserRound, X } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { useEditor } from './Editor'
 import { SaveClose } from './SaveClose'
@@ -15,9 +15,10 @@ import { L, locale } from '../lib/i18n'
 import { fa, fmtDate, fmtDayMonth, timeAgo, todayISO } from '../lib/jalali'
 import { uid } from '../lib/api'
 import { historyOf } from '../lib/history'
+import { mzClaudePrompt, parseMzImport } from '../lib/mzImport'
 import { historyText } from './TaskTracking'
 import {
-  MZ_CUTOFF, MZ_KEYS, P_COLOR, P_HINT, agentRun, isExecTier, markSeen, recentlyChanged, allPeople, askersOf, commentsOf, firstMzStatus, isMizitoLink, mentionsOf, mzCat, mzCfg, mzClosed, mzFlags, mzKeyOf, mzSignals, nowStampMz, optLabel, reminderText, statusById, tierOf,
+  MZ_CUTOFF, MZ_KEYS, P_COLOR, P_HINT, isExecTier, markSeen, recentlyChanged, allPeople, askersOf, commentsOf, firstMzStatus, isMizitoLink, mentionsOf, mzCat, mzCfg, mzClosed, mzFlags, mzKeyOf, mzSignals, nowStampMz, optLabel, reminderText, statusById, tierOf,
   type MzCat, type MzOption, type MzStatus,
 } from '../lib/mizito'
 import type { MizitoComment, MizitoItem, MizitoMention } from '../lib/types'
@@ -729,21 +730,34 @@ function OptionList({ title, items, onSave, kind }: { title: string; items: (MzO
 }
 
 /** The Mizito agent (browser extension): a key per person, the cutoff, and each agent's last run. */
-function AgentCard({ admin }: { admin: boolean }) {
-  const { db, action, config, setting, setSetting, toast, refresh } = useStore()
-  const [code, setCode] = useState<{ name: string; code: string } | null>(null)
-  const [busy, setBusy] = useState('')
+/** Mizito import: the prompt for Claude in Chrome, the box its answer is pasted into, and starting over. */
+export function MizitoImport({ admin }: { admin: boolean }) {
+  const { db, action, me: myName, setting, setSetting, toast, refresh } = useStore()
   const leaders = db.Team.filter((x) => (x.access === 'super' || x.access === 'exec') && String(x.active) !== 'false')
+  const me = leaders.find((x) => x.name === myName)?.name || leaders[0]?.name || ''
+  const [account, setAccount] = useState(me)
+  const [raw, setRaw] = useState('')
+  const [busy, setBusy] = useState('')
+  const [showPrompt, setShowPrompt] = useState(false)
   const cutoff = setting(MZ_KEYS.cutoff) || MZ_CUTOFF
-  const when = (s?: string) => (s ? timeAgo(toDate(s)) : '—')
+  const prompt = mzClaudePrompt(account || me, fmtDate(cutoff, 'long'))
+  const parsed = useMemo(() => (raw.trim() ? parseMzImport(raw, account, db.Mizito) : null), [raw, account, db.Mizito])
+  const who = parsed?.account && leaders.some((x) => x.name === parsed.account) ? parsed.account : account
   const fail = (e: unknown) => toast(e instanceof Error ? e.message : String(e), 'err')
-  const makeKey = async (name: string) => {
-    setBusy(name)
+  const run = async () => {
+    if (!parsed?.items.length) return
+    setBusy('import')
     try {
-      const row = (await action('mzAgentKey', { name })) as { token?: string } | undefined
-      if (!row?.token) return toast(L('در حالت نمایشی کلید ساخته نمی‌شود', 'No keys in demo mode'), 'err')
-      // one code carries both the data address and the key, so the extension needs a single paste
-      setCode({ name, code: `madar:${btoa(unescape(encodeURIComponent(JSON.stringify({ u: config.apiUrl, k: row.token, n: name }))))}` })
+      const all = parsed.items
+      let made = 0, updated = 0
+      for (let i = 0; i < all.length; i += 25) {
+        const r = (await action('mzImport', { account: who, items: all.slice(i, i + 25), last: i + 25 >= all.length, total: all.length })) as { made?: number; updated?: number } | undefined
+        if (!r) return toast(L('در حالت نمایشی ایمپورت نمی‌شود', 'No import in demo mode'), 'err')
+        made += r.made || 0
+        updated += r.updated || 0
+      }
+      toast(L(`ایمپورت شد: ${fa(made)} تسک تازه، ${fa(updated)} به‌روز`, `Imported: ${made} new, ${updated} updated`))
+      setRaw('')
       void refresh()
     } catch (e) {
       fail(e)
@@ -751,19 +765,9 @@ function AgentCard({ admin }: { admin: boolean }) {
       setBusy('')
     }
   }
-  const revoke = async (name: string) => {
-    if (!window.confirm(L(`کلید ایجنت ${name} باطل شود؟ افزونه‌اش دیگر چیزی نمی‌فرستد.`, `Revoke ${name}’s agent key?`))) return
-    try {
-      await action('mzAgentRevoke', { name })
-      toast(L('کلید باطل شد', 'Key revoked'))
-      void refresh()
-    } catch (e) {
-      fail(e)
-    }
-  }
   const reset = async () => {
     const word = L('پاک کن', 'delete')
-    const typed = window.prompt(L(`همه‌ی داده‌های میزیتو در مدار پاک می‌شود: تسک‌ها، منشن‌ها، گفتگوها و سابقه‌ی تغییراتشان (دسته، وضعیت و یادداشتی که در مدار گذاشته‌اید هم). کامنت‌ها، فایل‌ها و کارتابل مدار می‌مانند. بعد در افزونه «بازخوانی کامل» بزنید تا همه از ${fmtDate(cutoff)} به ترتیب تاریخ دوباره بیایند.\n\nبرای تأیید بنویسید: ${word}`, `All Mizito data in Madar will be deleted. Type “${word}” to confirm.`))
+    const typed = window.prompt(L(`همه‌ی داده‌های میزیتو در مدار پاک می‌شود: تسک‌ها، منشن‌ها، گفتگوها و سابقه‌ی تغییراتشان (دسته، وضعیت و یادداشتی که در مدار گذاشته‌اید هم). کامنت‌ها، فایل‌ها و کارتابل مدار می‌مانند.\n\nبرای تأیید بنویسید: ${word}`, `All Mizito data in Madar will be deleted. Type “${word}” to confirm.`))
     if (typed === null) return
     if (typed.trim() !== word) return toast(L('تأیید نشد؛ چیزی پاک نشد', 'Not confirmed; nothing deleted'), 'err')
     setBusy('reset')
@@ -777,63 +781,57 @@ function AgentCard({ admin }: { admin: boolean }) {
       setBusy('')
     }
   }
+  const stats = parsed && {
+    tasks: parsed.items.length,
+    links: parsed.items.filter((x) => x.link).length,
+    mentions: parsed.items.reduce((a, x) => a + x.mentions.length, 0),
+    comments: parsed.items.reduce((a, x) => a + x.comments.length, 0),
+    done: parsed.items.filter((x) => x.completed).length,
+  }
   return (
-    <Card eyebrow={<span className="flex items-center gap-1.5"><Bot size={12} /> {L('ایجنت میزیتو', 'Mizito agent')}</span>} title={L('آوردن تسک‌ها از «دستیار میزیتو»', 'Tasks from the Mizito assistant')} className="@2xl:col-span-2">
-      <p className="mb-4 text-xs leading-6 text-sub">
-        {L('افزونه‌ی کروم در مرورگری که وارد میزیتو هستید، گفتگوی «دستیار میزیتو» را می‌خواند و هر تسکی که در آن آمده، به ترتیب تاریخ، اینجا می‌نشیند (با کامنت‌هایش). لینک تسک را خودتان روی هر مورد بگذارید. در میزیتو چیزی نوشته نمی‌شود.', 'The Chrome extension reads the “Mizito assistant” chat and brings every task in it here, in date order, with its comments. Add each task’s link yourself.')}
-      </p>
-      <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
-        <span>{L('پیام‌های دستیار از این روز به بعد:', 'Assistant messages since:')}</span>
+    <Card eyebrow={<span className="flex items-center gap-1.5"><Bot size={12} /> {L('ایمپورت میزیتو', 'Mizito import')}</span>} title={L('آوردن تسک‌ها از «دستیار میزیتو» با Claude', 'Tasks from the Mizito assistant, via Claude')} className="@2xl:col-span-2">
+      <ol className="mb-4 list-decimal space-y-1 ps-5 text-xs leading-6 text-sub">
+        <li>{L('میزیتو را در کروم باز کنید و افزونه‌ی Claude را روی همان تب باز کنید.', 'Open Mizito in Chrome and open the Claude extension on that tab.')}</li>
+        <li>{L('«متن آماده برای Claude» را کپی کنید و به Claude بدهید. اگر بخش‌بخش جواب داد، بعد از هر بخش بگویید «ادامه».', 'Copy the prompt below and give it to Claude; say “continue” after each part.')}</li>
+        <li>{L('جواب Claude (همه‌ی بخش‌ها، پشت سر هم) را در کادر پایین بچسبانید ← «ایمپورت». تکراری‌ها دوباره اضافه نمی‌شوند.', 'Paste Claude’s answer (all parts) below → Import. Nothing is added twice.')}</li>
+      </ol>
+      <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+        <span>{L('میزیتوی چه کسی:', 'Whose Mizito:')}</span>
+        <select value={account} onChange={(e) => setAccount(e.target.value)} className="input h-8 w-auto text-xs">
+          {leaders.map((x) => <option key={x.id} value={x.name}>{x.name}</option>)}
+        </select>
+        <span className="ms-2">{L('از تاریخ:', 'Since:')}</span>
         <DatePicker compact value={cutoff} onChange={(v) => admin && v && setSetting(MZ_KEYS.cutoff, v)} />
+        <span className="flex-1" />
+        <button className="btn-outline btn-sm" onClick={() => setShowPrompt(!showPrompt)}>{showPrompt ? L('بستن متن', 'Hide prompt') : L('دیدن متن آماده', 'Show prompt')}</button>
+        <button className="btn-primary btn-sm" onClick={() => navigator.clipboard?.writeText(prompt).then(() => toast(L('متن برای Claude کپی شد', 'Prompt copied')))}><Copy size={13} /> {L('کپی متن آماده برای Claude', 'Copy the prompt for Claude')}</button>
       </div>
-      <ul className="divide-y divide-line rounded-2xl border border-line">
-        {leaders.map((p) => {
-          const r = agentRun(setting(MZ_KEYS.agent + p.name))
-          const live = !!r.key_at && !r.revoked
-          return (
-            <li key={p.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-              <Avatar name={p.name} size="sm" />
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium">{p.name}</div>
-                <div className="mt-0.5 flex flex-wrap gap-x-3 text-[0.6875rem] text-sub">
-                  {live ? (
-                    <>
-                      <span>{L(`آخرین خواندن: ${when(r.done_at || r.at)}`, `Last read: ${when(r.done_at || r.at)}`)}</span>
-                      {r.run?.tasks !== undefined && <span className="num">{L(`${fa(r.run.tasks || 0)} تسک`, `${r.run.tasks} tasks`)}</span>}
-                      {r.reset_at && !r.done_at && <span className="text-warn">{L('پاک شد؛ در افزونه «بازخوانی کامل» بزنید', 'Cleared; run a full read in the extension')}</span>}
-                    </>
-                  ) : (
-                    <span>{r.revoked ? L('کلید باطل شده', 'Key revoked') : L('هنوز وصل نشده', 'Not connected yet')}</span>
-                  )}
-                </div>
-                {live && r.error && <div className="mt-1 text-xs text-bad">⚠ {r.error}</div>}
-              </div>
-              {admin && (
-                <>
-                  <button className="btn-outline btn-sm" disabled={!!busy} onClick={() => makeKey(p.name)}><KeyRound size={13} /> {live ? L('کد اتصال تازه', 'New code') : L('کد اتصال', 'Connection code')}</button>
-                  {live && <button className="btn-ghost btn-sm text-sub" onClick={() => revoke(p.name)}>{L('باطل کردن', 'Revoke')}</button>}
-                </>
-              )}
-            </li>
-          )
-        })}
-      </ul>
-      {code && (
-        <div className="mt-4 rounded-2xl border border-brand/30 bg-brand-soft/30 p-4">
-          <div className="mb-2 text-sm font-medium">{L(`کد اتصال ${code.name}`, `${code.name}’s connection code`)}</div>
-          <p className="mb-2 text-xs leading-6 text-sub">{L('فقط همین یک بار نشان داده می‌شود. در افزونه (روی آیکن مدار) بچسبانید. اگر گم شد، کد تازه بسازید؛ قبلی خودبه‌خود باطل می‌شود.', 'Shown only once. Paste it into the extension. If lost, make a new one.')}</p>
-          <div className="flex gap-2">
-            <input readOnly dir="ltr" value={code.code} onFocus={(e) => e.target.select()} className="input h-9 min-w-0 flex-1 font-mono text-[0.6875rem]" />
-            <button className="btn-primary btn-sm h-9" onClick={() => navigator.clipboard?.writeText(code.code).then(() => toast(L('کپی شد', 'Copied')))}><Copy size={13} /> {L('کپی', 'Copy')}</button>
-            <button className="btn-ghost btn-sm h-9" onClick={() => setCode(null)}><X size={14} /></button>
-          </div>
-        </div>
+      {showPrompt && <pre dir="rtl" className="mb-4 max-h-72 overflow-auto whitespace-pre-wrap rounded-2xl bg-muted/60 p-3 text-[0.6875rem] leading-6">{prompt}</pre>}
+      <textarea value={raw} onChange={(e) => setRaw(e.target.value)} rows={7} dir="ltr" placeholder={L('جواب Claude را اینجا بچسبانید (JSON)…', 'Paste Claude’s answer here (JSON)…')} className="input w-full py-2 font-mono text-[0.6875rem] leading-5" />
+      <div className="mt-2 flex flex-wrap items-center gap-3">
+        <label className="btn-ghost btn-sm cursor-pointer text-sub">
+          <Paperclip size={13} /> {L('یا فایل JSON', 'or a JSON file')}
+          <input type="file" accept=".json,.txt,application/json,text/plain" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void f.text().then(setRaw); e.target.value = '' }} />
+        </label>
+        {stats && (
+          <span className="num text-xs text-sub">
+            {L(`${fa(stats.tasks)} تسک · ${fa(stats.links)} با لینک · ${fa(stats.mentions)} منشن · ${fa(stats.comments)} کامنت · ${fa(stats.done)} انجام‌شده · به نام ${who}`, `${stats.tasks} tasks · ${stats.links} with link · ${stats.mentions} mentions · ${stats.comments} comments · for ${who}`)}
+          </span>
+        )}
+        <span className="flex-1" />
+        <button className="btn-primary btn-sm" disabled={!stats?.tasks || !!busy} onClick={run}>{busy === 'import' ? L('در حال ایمپورت…', 'Importing…') : L('ایمپورت', 'Import')}</button>
+      </div>
+      {parsed && parsed.problems.length > 0 && (
+        <details className="mt-2 text-xs text-warn">
+          <summary className="cursor-pointer">{L(`${fa(parsed.problems.length)} نکته`, `${parsed.problems.length} notes`)}</summary>
+          <ul className="mt-1 list-disc space-y-0.5 ps-5 text-sub">{parsed.problems.slice(0, 50).map((p, i) => <li key={i}>{p}</li>)}</ul>
+        </details>
       )}
       {admin && (
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-bad/30 p-3">
           <div className="min-w-0 flex-1 text-xs leading-6">
             <div className="font-medium text-bad">{L('شروع دوباره از صفر', 'Start over')}</div>
-            <div className="text-sub">{L('همه‌ی داده‌های میزیتو در مدار پاک می‌شود؛ بعد «بازخوانی کامل» در افزونه همه را به ترتیب تاریخ دوباره می‌آورد.', 'Deletes all Mizito data in Madar; a full read in the extension brings it back in date order.')}</div>
+            <div className="text-sub">{L('همه‌ی داده‌های میزیتو در مدار پاک می‌شود؛ بعد دوباره ایمپورت کنید.', 'Deletes all Mizito data in Madar; then import again.')}</div>
           </div>
           <button className="btn-outline btn-sm border-bad/40 text-bad" disabled={!!busy} onClick={reset}><Trash2 size={13} /> {busy === 'reset' ? L('در حال پاک کردن…', 'Deleting…') : L('پاک کردن داده‌های میزیتو', 'Delete Mizito data')}</button>
         </div>
@@ -858,7 +856,7 @@ export function MizitoSettings({ admin }: { admin: boolean }) {
   const t = (k: keyof typeof c.thresholds) => (v: number) => setSetting(MZ_KEYS.thresholds, JSON.stringify({ ...c.thresholds, [k]: v }))
   return (
     <div className="grid gap-4 @2xl:grid-cols-2">
-      <AgentCard admin={admin} />
+      <MizitoImport admin={admin} />
       <Card eyebrow={<span className="flex items-center gap-1.5"><Settings2 size={12} /> {L('میزیتو', 'Mizito')}</span>} title={L('فهرست‌ها', 'Lists')}>
         <fieldset disabled={!admin} className="space-y-5">
           <label className="block">

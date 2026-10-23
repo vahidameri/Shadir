@@ -9,7 +9,7 @@ import { L } from '../lib/i18n'
 import { fa, fmtDate, timeAgo } from '../lib/jalali'
 import { MZ_KEYS, MZ_VIEWS, agentRun, changeUnseen, firstFor, firstMzStatus, isExecTier, mzFlags as flagsOf, recentlyChanged, inMzView, isMizitoLink, mzCat, mzCfg, mzFlags, mzSignals, optLabel, statusById, tierById, type MzView } from '../lib/mizito'
 import { daysFromToday } from '../lib/jalali'
-import { CaptureSheet, MzBadges, MizitoSettings, MizitoSheet, MzLink, MzSignals, MzStatusChip, PBadge, useReminder } from '../components/MizitoParts'
+import { CaptureSheet, MzBadges, MizitoImport, MizitoSettings, MizitoSheet, MzLink, MzSignals, MzStatusChip, PBadge, useReminder } from '../components/MizitoParts'
 import type { MizitoItem } from '../lib/types'
 
 const VIEW_LABEL: Record<MzView, [string, string]> = {
@@ -55,6 +55,7 @@ export default function MizitoPage() {
     return () => window.removeEventListener('paste', onPaste)
   }, [canEdit, openId, capture])
   const [settings, setSettings] = useState(false)
+  const [importing, setImporting] = useState(false)
   const remind = useReminder()
   const c = mzCfg()
   const leaders = db.Team.filter((m) => m.access === 'super' || m.access === 'exec').map((m) => m.name)
@@ -113,7 +114,7 @@ export default function MizitoPage() {
     toast(keep ? L(`${fa(ids.length)} مورد به صف اضافه شد`, `${ids.length} added to the queue`) : L(`${fa(ids.length)} مورد کنار گذاشته شد`, `${ids.length} set aside`))
     setPicked(new Set())
   }
-  const runs = leaders.map((n) => ({ name: n, run: agentRun(setting(MZ_KEYS.agent + n)) })).filter((x) => x.run.key_at && !x.run.revoked)
+  const runs = leaders.map((n) => ({ name: n, run: agentRun(setting(MZ_KEYS.agent + n)) })).filter((x) => x.run.done_at || (x.run.key_at && !x.run.revoked))
   const togglePick = (id: string) => setPicked((p) => {
     const n = new Set(p)
     if (n.has(id)) n.delete(id)
@@ -128,7 +129,7 @@ export default function MizitoPage() {
             <span className="inline-flex items-center gap-1.5"><AtSign size={12} /> {c.base.replace(/^https?:\/\//, '')}</span>
             {runs.map((x) => (
               <span key={x.name} className={cx('inline-flex items-center gap-1', x.run.error && 'text-red-200')} title={x.run.error || ''}>
-                <Bot size={12} /> {x.name}: {x.run.at ? L(`همگام ${timeAgo(new Date(x.run.at.replace(' ', 'T')))}`, `synced ${timeAgo(new Date(x.run.at.replace(' ', 'T')))}`) : L('هنوز همگام نشده', 'not synced yet')}
+                <Bot size={12} /> {x.name}: {x.run.at ? L(`${x.run.via === 'import' ? 'ایمپورت' : 'همگام'} ${timeAgo(new Date(x.run.at.replace(' ', 'T')))}`, `synced ${timeAgo(new Date(x.run.at.replace(' ', 'T')))}`) : L('هنوز همگام نشده', 'not synced yet')}
                 {x.run.error && ' ⚠'}
               </span>
             ))}
@@ -137,6 +138,11 @@ export default function MizitoPage() {
         title={L('میزیتو', 'Mizito')}
         actions={
           <>
+            {(access === 'super' || access === 'exec') && (
+              <button className="btn h-10 bg-white/10 text-white hover:bg-white/20" onClick={() => setImporting(true)}>
+                <Bot size={16} /> {L('ایمپورت از Claude', 'Import from Claude')}
+              </button>
+            )}
             {access === 'super' && (
               <button className="btn h-10 w-10 bg-white/10 px-0 text-white hover:bg-white/20" onClick={() => setSettings(true)} title={L('تنظیمات میزیتو', 'Mizito settings')} aria-label={L('تنظیمات میزیتو', 'Mizito settings')}>
                 <Settings2 size={17} />
@@ -325,6 +331,11 @@ export default function MizitoPage() {
       </Overlap>
       {capture !== false && <CaptureSheet initialLink={capture} onClose={() => setCapture(false)} onOpen={(id) => set('id', id)} />}
       {openId && <MizitoSheet id={openId} onClose={() => set('id', '')} />}
+      {importing && (
+        <Sheet open wide onClose={() => setImporting(false)} header={<h2 className="font-semibold">{L('ایمپورت میزیتو', 'Mizito import')}</h2>}>
+          <div className="p-4"><MizitoImport admin={access === 'super'} /></div>
+        </Sheet>
+      )}
       {settings && (
         <Sheet open wide onClose={() => setSettings(false)} header={<h2 className="font-semibold">{L('تنظیمات میزیتو', 'Mizito settings')}</h2>}>
           <div className="p-4"><MizitoSettings admin={access === 'super'} /></div>

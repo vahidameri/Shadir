@@ -405,6 +405,8 @@ export interface AgentRun {
   link_how?: string
   run?: { tasks?: number; mentions?: number; comments?: number; pages?: number; via?: string; more?: number }
   reset_at?: string
+  /** import = the last data came from a Claude import */
+  via?: string
 }
 export function agentRun(raw?: string): AgentRun {
   try {

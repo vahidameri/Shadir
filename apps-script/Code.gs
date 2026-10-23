@@ -18,7 +18,7 @@
  *   viewer — read only (leadership)
  */
 
-var MADAR_VERSION = '2.0.1'; // shown on the login page and by diagnose()
+var MADAR_VERSION = '2.1.0'; // shown on the login page and by diagnose()
 
 var SCHEMA = {
   Projects: ['id', 'code', 'name', 'description', 'category', 'owner', 'client', 'liaison', 'liaison_contact', 'status', 'priority', 'phase', 'start_date', 'end_date', 'progress', 'health_override', 'objective', 'paused_at', 'pause_reason', 'delivery_day', 'last_delivery', 'archived', 'archived_at', 'links', 'team', 'kind', 'batch'],
@@ -143,6 +143,11 @@ function doPost(e) {
       if (user.access !== 'super') throw new Error('فقط مدیر برنامه می‌تواند کلید ایجنت بسازد');
       lock.waitLock(20000);
       return json_({ ok: true, row: body.action === 'mzAgentKey' ? mzAgentKey_(body.name) : mzAgentRevoke_(body.name) });
+    }
+    if (body.action === 'mzImport') {
+      if (user.access !== 'super' && user.access !== 'exec') throw new Error('فقط مدیر برنامه و CPTO میزیتو را ایمپورت می‌کنند');
+      lock.waitLock(30000);
+      return json_({ ok: true, row: mzImport_(body, user) });
     }
     if (body.action === 'mzReset') {
       if (user.access !== 'super') throw new Error('فقط مدیر برنامه به این بخش دسترسی دارد');
@@ -1809,7 +1814,7 @@ function mzIngest_(body, agent) {
         asked_by: first ? first.by : t.owner || '', mentioned: agent.name, category: '', action: '',
         status: t.completed ? firstOf('done') : t.last_by && t.last_by === agent.name ? firstOf('waiting') : firstOf('open'),
         priority_override: '', override_reason: '', urgent: '', assigned_to: '', due_date: ts(t.deadline).slice(0, 10),
-        received_at: first ? ts(first.at) : ts(t.created_at) || now, last_mention_at: '', last_mention_by: '',
+        received_at: first ? ts(first.at) : ts(t.first_at) || ts(t.created_at) || now, last_mention_at: '', last_mention_by: '',
         outcome: '', notes: '', created_at: now.slice(0, 10), updated_at: now, closed_at: '', ext_id: first ? String(first.id) : '',
         source: 'agent', review: t.completed ? '' : 'new', mz_state: '', mz_deadline: ts(t.deadline).slice(0, 10),
       };
@@ -1840,7 +1845,8 @@ function mzIngest_(body, agent) {
       if (t.link) {
         if (t.link !== m.link && (m.source === 'agent' || !m.link || /\/inbox\/[0-9a-f]{24}$/.test(String(m.link)))) m.link = t.link;
         m.mz_link_ok = '1';
-      } else if (m.source === 'agent' && String(m.mz_link_ok) !== '1') m.link = '';
+      }
+      // a link added by hand in Madar stays
       // when the assistant first wrote to each person about it; the earliest is "mentioned in Mizito"
       if (t.first_at) {
         var firsts = mzFirsts_(m.mz_first);
@@ -2124,6 +2130,22 @@ function mzReset_(user) {
   });
   log_(user || MZ_AGENT, 'mizito reset', 'Mizito', JSON.stringify(out));
   return out;
+}
+
+// --------------------------------------------------------------------------
+// Import: what Claude (in Chrome, on the Mizito page) read from the «دستیار میزیتو» chat, pasted in
+// Madar and turned into the same items the agent sends (src/lib/mzImport.ts). The tasks go in under
+// the person whose Mizito it was read in, merged by Mizito id; ids of mentions and comments come from
+// their content, so importing the same thing again adds nothing twice.
+// --------------------------------------------------------------------------
+function mzImport_(body, user) {
+  var account = String(body.account || user.name);
+  var m = (rawAll_().Team || []).filter(function (x) { return x.name === account; })[0];
+  if (!m || (m.access !== 'super' && m.access !== 'exec')) throw new Error('ایمپورت میزیتو فقط به نام مدیر برنامه یا CPTO است');
+  var items = (body.items || []).filter(function (t) { return t && t.key && t.title; });
+  var r = mzIngest_({ items: items, version: 'import' }, { name: account });
+  if (body.last) mzSetStatus_(account, { done_at: mzNow_(), via: 'import', run: { tasks: Number(body.total) || items.length } });
+  return r;
 }
 
 // An earlier version read Mizito from the server on a 15-minute trigger; that trigger, if it was
