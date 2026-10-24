@@ -1,5 +1,6 @@
 // Overview: the department at a glance. Its sections (and their order) are a setting:
 // back office → settings → overview sections (Config dash.widgets).
+import { dirOf } from '../lib/dir'
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { AtSign, Ban, CalendarClock, MoonStar, Settings2 } from 'lucide-react'
@@ -269,7 +270,7 @@ function List({ rows, today }: { rows: Row[]; today: string }) {
           <Item r={r}>
             <span className="mt-0.5 shrink-0">{r.icon}</span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm">{r.title}</span>
+              <span dir={dirOf(r.title)} className="block truncate text-sm">{r.title}</span>
               <span className="block truncate text-[0.6875rem] text-sub">{r.sub}</span>
             </span>
             {r.date && <span className={cx('shrink-0 text-[0.6875rem]', r.date === today ? 'font-medium text-warn' : 'text-sub')}>{r.date === today ? L('امروز', 'Today') : fmtDayMonth(r.date)}</span>}

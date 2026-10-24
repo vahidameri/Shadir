@@ -1,4 +1,5 @@
 import { assigneesOf } from '../lib/assignees'
+import { dirOf } from '../lib/dir'
 import { closed } from '../lib/columns'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
@@ -126,7 +127,7 @@ export default function Weekly() {
                       <div className="text-sm font-semibold num">{fa(m.time || '—')}</div>
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium">{m.title}</div>
+                      <div dir={dirOf(m.title)} className="truncate text-sm font-medium">{m.title}</div>
                       <div className={cx('mt-0.5 flex items-center gap-1.5 text-[0.6875rem]', 'text-sub')}>
                         {m.status === 'held' ? <CheckCircle2 size={11} /> : m.status === 'cancelled' ? <Ban size={11} /> : null}
                         {m.date === today ? L('امروز', 'Today') : fmtDayMonth(m.date)} · {L(`${fa(names(m.attendees).length)} نفر`, `${names(m.attendees).length} people`)}
@@ -194,7 +195,7 @@ function MeetingRoom({ m }: { m: Meeting }) {
                 </Link>
               )}
             </div>
-            <h2 className="display mt-3 text-2xl">{m.title}</h2>
+            <h2 dir={dirOf(m.title)} className="display mt-3 text-2xl">{m.title}</h2>
             <div className="mt-1 text-sm text-sub num">
               {fmtWeekday(m.date)} {fmtDayMonth(m.date)} · {fa(m.time || '')} · {relDays(m.date)}
             </div>
@@ -505,7 +506,7 @@ function Agenda({ m }: { m: Meeting }) {
             <div className="mb-1.5 flex items-center gap-2">
               <span className="grid h-6 w-6 place-items-center rounded-full bg-muted text-[0.6875rem] font-semibold num">{fa(i + 1)}</span>
               <s.icon size={14} className="text-sub" />
-              <span className="text-sm font-semibold">{s.title}</span>
+              <span dir={dirOf(s.title)} className="text-sm font-semibold">{s.title}</span>
               <span className="ms-auto text-[0.6875rem] text-sub num">{fa(s.items.length)}</span>
             </div>
             {s.items.length ? (
@@ -571,7 +572,7 @@ function CalendarPanel({ ws, onPick }: { ws: string; onPick: (id: string) => voi
               <li key={e.id} className={cx('flex items-center gap-2 rounded-xl px-2 py-1.5 text-xs', !r.related && 'opacity-55')}>
                 <CalendarDays size={13} className="shrink-0 text-[#1a73e8]" />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate">{e.title}</span>
+                  <span dir={dirOf(e.title)} className="block truncate">{e.title}</span>
                   <span className="block text-[0.625rem] text-sub num">
                     {fmtWeekday(e.date, true)} {fa(e.time)}
                     {r.related && ` · ${r.projectId ? db.Projects.find((p) => p.id === r.projectId)?.name : L(`${fa(r.members.length)} نفر از تیم`, `${r.members.length} teammates`)}`}

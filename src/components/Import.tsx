@@ -2,6 +2,7 @@
 // sheets used before Madar. Source: a Google Sheet link, pasted cells or a CSV file. Columns and values
 // are guessed and can be corrected; duplicates are skipped; Mizito rows of the same task become one
 // item with a thread. Every import is a batch that can be taken back.
+import { dirOf } from '../lib/dir'
 import { useEffect, useMemo, useState } from 'react'
 import { CheckCircle2, ClipboardPaste, FileUp, Link2, RotateCcw, Sheet as SheetIcon, Upload } from 'lucide-react'
 import { useStore } from '../lib/store'
@@ -297,8 +298,8 @@ export function ImportPage() {
                 const n = built.MizitoMentions.filter((x) => x.item_id === m.id).length
                 return (
                   <div key={m.id} className="flex items-center gap-2 border-b border-line px-3 py-1.5 last:border-0">
-                    <span className="min-w-0 flex-1 truncate">{m.title}</span>
-                    <span className="text-sub">{m.asked_by}</span>
+                    <span dir={dirOf(m.title)} className="min-w-0 flex-1 truncate">{m.title}</span>
+                    <span dir={dirOf(m.asked_by)} className="text-sub">{m.asked_by}</span>
                     {n > 0 && <span className="rounded-full bg-brand/10 px-2 text-brand">+{fa(n)} {L('منشن', 'mentions')}</span>}
                   </div>
                 )

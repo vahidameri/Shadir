@@ -1,4 +1,5 @@
 import { Check, CornerUpLeft, CalendarClock } from 'lucide-react'
+import { dirOf } from '../lib/dir'
 import type { Deliverable } from '../lib/types'
 import { useStore } from '../lib/store'
 import { useEditor } from './Editor'
@@ -84,7 +85,7 @@ export function DeliverableRow({ d, showProject = true }: { d: Deliverable; show
       <button className="min-w-0 flex-1 basis-48 text-start" onClick={() => open('Deliverables', d as never)}>
         <span className="flex items-center gap-2">
           <TrackDot d={d} />
-          <span className="truncate text-sm font-medium group-hover:underline">{d.title}</span>
+          <span dir={dirOf(d.title)} className="truncate text-sm font-medium group-hover:underline">{d.title}</span>
         </span>
         <span className="mt-0.5 block truncate text-[0.6875rem] text-sub">
           {showProject && `${name(d.project_id)} · `}

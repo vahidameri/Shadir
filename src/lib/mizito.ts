@@ -2,6 +2,7 @@
 // One row per Mizito task (the link's task id is the key); every new mention threads into it.
 // Priority is computed from who asked (their tier), the deadline, the SLA and the urgent flag —
 // every list, weight and threshold here is a setting (Config keys mz.*), edited in the back office.
+import { mzTitleKey } from './mzImport'
 import type { Contact, DB, MizitoComment, MizitoItem, MizitoMention } from './types'
 import { daysFromToday, todayISO } from './jalali'
 import { L, type T2 } from './i18n'
@@ -145,6 +146,8 @@ function indexOf(db: DB): MzIndex {
     for (const c of db.Contacts) {
       if (c.name_en) contacts.set(c.name_en, c)
       contacts.set(c.name, c)
+      // the same name written with other spaces, half-spaces or letter forms
+      contacts.set('~' + mzTitleKey(c.name), c)
     }
     ix = { mentions, comments, contacts }
     indexes.set(db, ix)
@@ -155,7 +158,8 @@ function indexOf(db: DB): MzIndex {
 // ------------------------------------------------------------------ people
 /** Everyone who can ask or be chased: the department (Team) and the registry (Contacts). */
 function contactOf(db: DB, name: string): Contact | undefined {
-  return indexOf(db).contacts.get(String(name || '').trim())
+  const ix = indexOf(db).contacts
+  return ix.get(String(name || '').trim()) || ix.get('~' + mzTitleKey(name))
 }
 /** A person's tier: their Contacts row, else the lowest tier. */
 export function tierOf(db: DB, name: string): Tier | undefined {

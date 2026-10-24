@@ -1,5 +1,6 @@
 // Team plans (roadmap) for teams that work without sprints: every item on a quarter timeline, with
 // its progress, how it stands against its own window, and how far its end has moved.
+import { dirOf } from '../lib/dir'
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, FileBarChart, Plus } from 'lucide-react'
@@ -102,7 +103,7 @@ export default function Plan() {
                   const h = health(p)
                   return (
                     <tr key={p.id} className="cursor-pointer border-b border-line last:border-0 hover:bg-muted/40" onClick={() => set('id', p.id)}>
-                      <td className="td"><span className="font-medium">{p.title}</span>{p.note && <span className="block max-w-md truncate text-[0.6875rem] text-sub">{p.note}</span>}</td>
+                      <td className="td"><span dir={dirOf(p.title)} className="font-medium">{p.title}</span>{p.note && <span dir={dirOf(p.note)} className="block max-w-md truncate text-[0.6875rem] text-sub">{p.note}</span>}</td>
                       <td className="td text-xs">{teamName(p.team)}</td>
                       <td className="td text-xs text-sub">{tr(PLAN_KIND[p.kind] || PLAN_KIND.other)}</td>
                       <td className="td text-xs">{p.owner || '—'}</td>
@@ -159,7 +160,7 @@ function Timeline({ q, teams, items, onOpen, onAdd }: { q: string; teams: string
               return (
                 <div key={p.id} className="grid grid-cols-[17rem_1fr] border-b border-line last:border-0 hover:bg-muted/30">
                   <button onClick={() => onOpen(p.id)} className="min-w-0 px-4 py-2.5 text-start">
-                    <span className="flex items-center gap-1.5 text-sm"><HealthDot h={h === 'on_track' ? 'green' : h === 'at_risk' ? 'amber' : 'red'} /><span className="truncate">{p.title}</span></span>
+                    <span className="flex items-center gap-1.5 text-sm"><HealthDot h={h === 'on_track' ? 'green' : h === 'at_risk' ? 'amber' : 'red'} /><span dir={dirOf(p.title)} className="truncate">{p.title}</span></span>
                     <span className="mt-0.5 flex items-center gap-1.5 text-[0.6875rem] text-sub"><PlanStatusChip p={p} /> {p.owner}</span>
                   </button>
                   <div className="relative">

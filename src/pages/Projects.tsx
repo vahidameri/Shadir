@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { dirOf } from '../lib/dir'
 import { Plus, Archive } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ArchiveButton } from '../components/ArchiveButton'
@@ -75,7 +76,7 @@ export default function Projects() {
                   <li key={p.id} className="flex flex-wrap items-center gap-3 px-5 py-3.5">
                     <Archive size={16} className="text-sub" />
                     <Link to={`/projects/${p.id}`} className="min-w-0 flex-1">
-                      <div className="truncate font-medium">{p.name}</div>
+                      <div dir={dirOf(p.name)} className="truncate font-medium">{p.name}</div>
                       <div className="text-xs text-sub">
                         <span dir="ltr">{p.code}</span> · {p.owner || '—'} · {L(`آرشیو از ${fmtDate(p.archived_at || '')}`, `archived ${fmtDate(p.archived_at || '')}`)}
                       </div>

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type CSSProperties } from 'react'
+import { dirOf } from '../lib/dir'
 import { createPortal } from 'react-dom'
 import { X, Inbox, ChevronDown, Check } from 'lucide-react'
 import type { Health, Priority, TaskStatus } from '../lib/types'
@@ -71,7 +72,7 @@ export function StatStrip({ items }: { items: { label: ReactNode; value: ReactNo
       {items.map((it, i) => (
         <div key={i} className="border-b border-band-line px-0 py-4 pe-4 @sm:border-e @sm:last:border-e-0 @sm:ps-4 @sm:first:ps-0 @lg:border-b-0">
           <div className={cx('display text-2xl @sm:text-[1.75rem] num', it.tone === 'red' ? 'text-[#ff8a9a]' : it.tone === 'amber' ? 'text-[#f5c565]' : it.tone === 'green' ? 'text-[#7fe0b0]' : 'text-on-band')}>{it.value}</div>
-          <div className="mt-2 text-xs text-band-sub">{it.label}</div>
+          <div dir={dirOf(it.label)} className="mt-2 text-xs text-band-sub">{it.label}</div>
           {it.sub && <div className="mt-0.5 text-[0.6875rem] text-band-sub/70">{it.sub}</div>}
         </div>
       ))}

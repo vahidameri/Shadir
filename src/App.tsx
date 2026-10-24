@@ -14,6 +14,7 @@ import Tasks from './pages/Tasks'
 import MizitoPage from './pages/Mizito'
 import CartablePage from './pages/Cartable'
 import Teams from './pages/Teams'
+import TeamDetail from './pages/TeamDetail'
 import Overview from './pages/Overview'
 import OkrPage from './pages/Okr'
 import Resources from './pages/Resources'
@@ -116,6 +117,7 @@ export default function App() {
                 <Route path="/weekly" element={<Navigate to="/meetings" replace />} />
                 <Route path="/calendar" element={<CalendarPage />} />
                 <Route path="/teams" element={<Teams />} />
+                <Route path="/teams/:id" element={<TeamDetail />} />
                 <Route path="/overview" element={<Overview />} />
                 <Route path="/okr" element={<OkrPage />} />
                 <Route path="/resources" element={<Resources />} />

@@ -1,4 +1,5 @@
 import { assigneesOf, isAssignee } from '../lib/assignees'
+import { dirOf } from '../lib/dir'
 import { mzClosed, mzSignals } from '../lib/mizito'
 import { MzSignals, PBadge } from '../components/MizitoParts'
 import { CartableCard, TodoCard } from '../components/DeskParts'
@@ -298,10 +299,10 @@ export default function MyDesk() {
                   <Link to={`/mizito?id=${m.id}`} className="flex items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-muted/60">
                     <PBadge p={s.p} />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm">{m.title}</span>
+                      <span dir={dirOf(m.title)} className="block truncate text-sm">{m.title}</span>
                       <span className="mt-0.5 block"><MzSignals m={m} compact /></span>
                     </span>
-                    <span className="hidden shrink-0 text-[0.6875rem] text-sub sm:inline">{m.asked_by}</span>
+                    <span dir={dirOf(m.asked_by)} className="hidden shrink-0 text-[0.6875rem] text-sub sm:inline">{m.asked_by}</span>
                   </Link>
                 </li>
               ))}
@@ -357,7 +358,7 @@ export default function MyDesk() {
                     <button onClick={() => open('Tasks', t as never)} className="group flex w-full items-center gap-3 rounded-2xl border border-line p-3 text-start transition hover:border-line-strong hover:shadow-card">
                       <span className="display grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-ink text-base text-surface num">{fa(i + 1)}</span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">{t.title}</span>
+                        <span dir={dirOf(t.title)} className="block truncate text-sm font-medium">{t.title}</span>
                         <span className="mt-0.5 flex items-center gap-2 text-[0.6875rem] text-sub">
                           <PriorityIcon p={t.priority} /> {pname(t.project_id) || L('بدون پروژه', 'No project')}
                         </span>
@@ -429,7 +430,7 @@ export default function MyDesk() {
                     {suggestions.map((s) => (
                       <div key={s.key} className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3">
                         <span className={cx('mt-2 h-1.5 w-1.5 shrink-0 rounded-full', s.tone === 'bad' ? 'bg-[#ff8a9a]' : s.tone === 'warn' ? 'bg-[#f5c565]' : 'bg-[#C1D6DE]')} />
-                        <div className="flex-1 text-[0.8125rem] leading-6 text-white/85">{s.text}</div>
+                        <div dir={dirOf(s.text)} className="flex-1 text-[0.8125rem] leading-6 text-white/85">{s.text}</div>
                         {canEdit && (
                           <button className="btn h-7 shrink-0 bg-white px-3 text-[0.6875rem] text-band" onClick={s.run}>
                             {s.action}
@@ -466,7 +467,7 @@ export default function MyDesk() {
                           <li key={t.id}>
                             <button onClick={() => open('Tasks', t as never)} className="flex w-full items-center gap-2 rounded-lg px-1 py-0.5 text-start text-xs hover:bg-muted">
                               <span className={cx('h-1.5 w-1.5 rounded-full', t.status === 'blocked' ? 'bg-bad' : 'bg-warn')} />
-                              <span className="flex-1 truncate">{t.title}</span>
+                              <span dir={dirOf(t.title)} className="flex-1 truncate">{t.title}</span>
                               {t.status === 'blocked' ? <Chip className="bg-bad/10 text-bad">{L('مسدود', 'Blocked')}</Chip> : <span className="text-bad num">{L(`${fa(-daysFromToday(t.due_date))} روز`, `${-daysFromToday(t.due_date)}d`)}</span>}
                             </button>
                           </li>

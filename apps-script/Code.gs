@@ -18,7 +18,7 @@
  *   viewer — read only (leadership)
  */
 
-var MADAR_VERSION = '2.1.0'; // shown on the login page and by diagnose()
+var MADAR_VERSION = '2.2.0'; // shown on the login page and by diagnose()
 
 var SCHEMA = {
   Projects: ['id', 'code', 'name', 'description', 'category', 'owner', 'client', 'liaison', 'liaison_contact', 'status', 'priority', 'phase', 'start_date', 'end_date', 'progress', 'health_override', 'objective', 'paused_at', 'pause_reason', 'delivery_day', 'last_delivery', 'archived', 'archived_at', 'links', 'team', 'kind', 'batch'],
@@ -148,6 +148,11 @@ function doPost(e) {
       if (user.access !== 'super' && user.access !== 'exec') throw new Error('فقط مدیر برنامه و CPTO میزیتو را ایمپورت می‌کنند');
       lock.waitLock(30000);
       return json_({ ok: true, row: mzImport_(body, user) });
+    }
+    if (body.action === 'mzDedupe') {
+      if (user.access !== 'super' && user.access !== 'exec') throw new Error('فقط مدیر برنامه و CPTO');
+      lock.waitLock(30000);
+      return json_({ ok: true, row: mzDedupe_(!!body.dry) });
     }
     if (body.action === 'mzReset') {
       if (user.access !== 'super') throw new Error('فقط مدیر برنامه به این بخش دسترسی دارد');
@@ -1801,6 +1806,8 @@ function mzIngest_(body, agent) {
     if (!t || !t.key) return;
     var key = String(t.key);
     var cur = items[key] || byKey[key];
+    // an import may leave a field empty (Claude did not see it): Madar keeps what it has
+    if (body.version === 'import') t = mzFill_(t, cur);
     var ments = (t.mentions || []).filter(function (x) { return x && x.id && x.at; }).sort(function (a, b) { return a.at < b.at ? -1 : 1; });
     var m;
     if (cur) {
@@ -1811,8 +1818,8 @@ function mzIngest_(body, agent) {
       var first = ments[0];
       m = {
         id: 'MZ-' + key, mz_key: key, link: t.link || '', title: long(t.title, 300), description: long(t.notes), docs: '',
-        asked_by: first ? first.by : t.owner || '', mentioned: agent.name, category: '', action: '',
-        status: t.completed ? firstOf('done') : t.last_by && t.last_by === agent.name ? firstOf('waiting') : firstOf('open'),
+        asked_by: first && first.by ? first.by : t.owner || '', mentioned: agent.name, category: '', action: '',
+        status: t.completed ? firstOf('done') : mzAnsweredLast_(t, ments, agent.name, ts) ? firstOf('waiting') : firstOf('open'),
         priority_override: '', override_reason: '', urgent: '', assigned_to: '', due_date: ts(t.deadline).slice(0, 10),
         received_at: first ? ts(first.at) : ts(t.first_at) || ts(t.created_at) || now, last_mention_at: '', last_mention_by: '',
         outcome: '', notes: '', created_at: now.slice(0, 10), updated_at: now, closed_at: '', ext_id: first ? String(first.id) : '',
@@ -1837,7 +1844,7 @@ function mzIngest_(body, agent) {
         m.mz_deadline = dl;
       }
       if (!m.title) m.title = long(t.title, 300);
-      if (!m.description && t.notes) m.description = long(t.notes);
+      if (t.notes && (!m.description || (m.source === 'agent' && String(t.notes).length > String(m.description).length))) m.description = long(t.notes);
       // the link is Mizito's own («لینک وظیفه», learnt by the agent); a link typed by hand stays
       // the task's conversation in Mizito (#/ws/im/<dialog>/): always opens
       if (t.chat_link) m.mz_chat = String(t.chat_link);
@@ -1889,11 +1896,7 @@ function mzIngest_(body, agent) {
       if (t.last_at) {
         m.mz_last_at = ts(t.last_at);
         m.mz_last_by = t.last_by || '';
-        // a task that came without a mention (just assigned): someone else's latest word is the ask
-        if (!m.ext_id && m.source === 'agent' && m.mz_last_by && !listed(m.mentioned, m.mz_last_by) && m.mz_last_at > String(m.last_mention_at || '')) {
-          m.last_mention_at = m.mz_last_at;
-          m.last_mention_by = m.mz_last_by;
-        }
+        // the ask (and its SLA) is always the person who mentioned: a later comment never takes its place
       }
       var was = String(m.mz_state || '');
       m.mz_state = t.completed ? 'done' : 'open';
@@ -1916,6 +1919,14 @@ function mzIngest_(body, agent) {
       if (t.sig) m.mz_sig = String(t.sig);
     }
 
+    // who asked = whoever mentioned first (the SLA follows their tier); the owner only while no mention is known
+    if (m.source === 'agent' && ments.length && ments[0].by) {
+      var firstAt = ts(ments[0].at);
+      if (!m.ext_id || !m.asked_by || m.asked_by === m.mz_owner || (firstAt && firstAt < String(m.received_at || '9999'))) {
+        if (m.asked_by !== ments[0].by && cur) log(m, 'asked_by', m.asked_by, ments[0].by);
+        m.asked_by = ments[0].by;
+      }
+    }
     ments.forEach(function (x) {
       var id = String(x.id);
       if (mentionIds[id] || id === String(m.ext_id || '')) return;
@@ -2143,9 +2154,160 @@ function mzImport_(body, user) {
   var m = (rawAll_().Team || []).filter(function (x) { return x.name === account; })[0];
   if (!m || (m.access !== 'super' && m.access !== 'exec')) throw new Error('ایمپورت میزیتو فقط به نام مدیر برنامه یا CPTO است');
   var items = (body.items || []).filter(function (t) { return t && t.key && t.title; });
+  // the same task already in Madar under another key (an older import, or the agent): same row
+  var have = {}, byTitle = {};
+  (rawAll_().Mizito || []).forEach(function (r) {
+    var k = String(r.mz_key || '').replace(/^.*_sl/i, '');
+    if (!k) return;
+    have[k] = 1;
+    var tk = mzTitleKey_(r.title);
+    if (tk) (byTitle[tk] = byTitle[tk] || []).push(r);
+  });
+  var linkKey = function (l) { var x = /_sl([0-9a-f]{24})/i.exec(String(l || '')); return x ? x[1].toLowerCase() : ''; };
+  items.forEach(function (t) {
+    if (have[String(t.key)]) return;
+    var lk = linkKey(t.link);
+    var same = (byTitle[mzTitleKey_(t.title)] || []).filter(function (r) { var rk = linkKey(r.link); return !(lk && rk && rk !== lk); });
+    if (same.length) t.key = String(same[0].mz_key).replace(/^.*_sl/i, '');
+  });
   var r = mzIngest_({ items: items, version: 'import' }, { name: account });
   if (body.last) mzSetStatus_(account, { done_at: mzNow_(), via: 'import', run: { tasks: Number(body.total) || items.length } });
   return r;
+}
+
+/** The person wrote the last word on the task, after the latest mention to them: the ball is with the others. */
+function mzAnsweredLast_(t, ments, me, ts) {
+  if (!t.last_by || t.last_by !== me) return false;
+  var lastAsk = ments.reduce(function (a, x) { var at = ts(x.at); return at > a ? at : a; }, '');
+  return ts(t.last_at) >= lastAsk;
+}
+
+/** Same compare key as src/lib/mzImport.ts mzTitleKey: no spaces, half-spaces, punctuation or letter-form differences. */
+function mzTitleKey_(s) {
+  return String(s || '')
+    .replace(/[۰-۹]/g, function (d) { return String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)); })
+    .replace(/[٠-٩]/g, function (d) { return String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)); })
+    .replace(/ي/g, 'ی').replace(/ى/g, 'ی').replace(/ك/g, 'ک').replace(/ة/g, 'ه').replace(/[أإآ]/g, 'ا')
+    .toLowerCase()
+    .replace(/[\s\u200c\u200f\u200e\u00a0.,،:;!?؟«»"'`()[\]{}\-_/\\|*#@…ـ+=<>~^%$&]+/g, '');
+}
+
+/** An imported task with fields left empty takes them from its row (Claude did not see them; nothing was removed). */
+function mzFill_(t, cur) {
+  var o = {};
+  for (var k in t) o[k] = t[k];
+  if (!cur) {
+    if (o.completed === undefined || o.completed === null) o.completed = false;
+    return o;
+  }
+  var none = function (v) { return v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length); };
+  if (o.completed === undefined || o.completed === null) {
+    o.completed = cur.mz_state === 'done';
+    if (o.completed) { o.completed_at = o.completed_at || cur.mz_done_at || ''; o.completed_by = o.completed_by || cur.mz_done_by || ''; }
+  }
+  if (none(o.notes)) o.notes = cur.description || '';
+  if (none(o.project)) o.project = cur.mz_project || '';
+  if (none(o.owner)) o.owner = cur.mz_owner || '';
+  if (none(o.assignees)) o.assignees = names_(cur.mz_assignees);
+  if (none(o.labels)) o.labels = names_(cur.mz_labels);
+  if (none(o.checklist)) o.checklist = String(cur.mz_checklist || '').split('\n').filter(Boolean).map(function (l) { return { t: l.replace(/^[✓○]\s*/, ''), ok: l.charAt(0) === '✓' }; });
+  if (none(o.progress)) o.progress = cur.mz_progress === '' || cur.mz_progress === undefined ? undefined : Number(cur.mz_progress);
+  if (none(o.deadline) && cur.mz_deadline) o.deadline = String(cur.mz_deadline).slice(0, 10) + 'T00:00:00+03:30';
+  return o;
+}
+
+/**
+ * The same Mizito task in several rows (imports before 2.2, or the agent and an import): one row.
+ * Rows are the same task when their titles match (see mzTitleKey_) and they do not carry two different
+ * task links. The kept row is the one with the link (else the oldest); it takes the others' facts where
+ * it has none, their mentions and Mizito comments, and whatever was written in Madar about them
+ * (comments, files, cartable, history). With dry = true it only counts.
+ */
+function mzDedupe_(dry) {
+  var data = rawAll_();
+  var linkKey = function (l) { var x = /_sl([0-9a-f]{24})/i.exec(String(l || '')); return x ? x[1].toLowerCase() : ''; };
+  var groups = {};
+  (data.Mizito || []).forEach(function (m) { var tk = mzTitleKey_(m.title); if (tk) (groups[tk] = groups[tk] || []).push(m); });
+  var merges = [];
+  Object.keys(groups).forEach(function (tk) {
+    var rows = groups[tk];
+    if (rows.length < 2) return;
+    var links = {};
+    rows.forEach(function (m) { var k = linkKey(m.link); if (k) links[k] = 1; });
+    if (Object.keys(links).length > 1) return; // two real tasks with the same title
+    rows.sort(function (a, b) { return (linkKey(b.link) ? 1 : 0) - (linkKey(a.link) ? 1 : 0) || (String(a.received_at || '9') < String(b.received_at || '9') ? -1 : 1); });
+    merges.push(rows);
+  });
+  if (dry) return { groups: merges.length, rows: merges.reduce(function (a, g) { return a + g.length - 1; }, 0) };
+
+  var keepRows = [], gone = {}, moveTo = {};
+  var madar = ['category', 'action', 'priority_override', 'override_reason', 'urgent', 'assigned_to', 'outcome', 'notes', 'docs', 'link', 'description'];
+  var mzFacts = ['mz_project', 'mz_owner', 'mz_assignees', 'mz_labels', 'mz_checklist', 'mz_deadline', 'mz_progress', 'mz_last_by', 'mz_last_at', 'mz_chat'];
+  var extra = [];
+  merges.forEach(function (rows) {
+    var k = {};
+    for (var f in rows[0]) k[f] = rows[0][f];
+    rows.slice(1).forEach(function (o) {
+      gone[o.id] = 1;
+      moveTo[o.id] = k.id;
+      madar.concat(mzFacts).forEach(function (f) { if ((k[f] === '' || k[f] === undefined) && o[f] !== '' && o[f] !== undefined) k[f] = o[f]; });
+      if (String(o.description || '').length > String(k.description || '').length) k.description = o.description;
+      k.mentioned = names_(k.mentioned).concat(names_(o.mentioned).filter(function (n) { return names_(k.mentioned).indexOf(n) === -1; })).join(', ');
+      var fk = mzFirsts_(k.mz_first), fo = mzFirsts_(o.mz_first);
+      Object.keys(fo).forEach(function (n) { if (!fk[n] || fo[n] < fk[n]) fk[n] = fo[n]; });
+      k.mz_first = Object.keys(fk).map(function (n) { return n + '=' + fk[n]; }).join('\n');
+      // the earlier ask wins; the other row's first mention becomes a mention of this one
+      if (o.received_at && String(o.received_at) < String(k.received_at || '9999')) {
+        if (k.ext_id) extra.push({ id: 'MM-' + k.ext_id, item_id: k.id, by: k.asked_by, at: k.received_at, note: '', status: '', mz_id: k.ext_id, account: names_(k.mentioned)[0] || '', mz_comment: '' });
+        k.received_at = o.received_at; k.asked_by = o.asked_by || k.asked_by; k.ext_id = o.ext_id || k.ext_id;
+      } else if (o.ext_id && o.ext_id !== k.ext_id) {
+        extra.push({ id: 'MM-' + o.ext_id, item_id: k.id, by: o.asked_by, at: o.received_at, note: '', status: '', mz_id: o.ext_id, account: names_(o.mentioned)[0] || '', mz_comment: '' });
+      }
+      if (String(o.last_mention_at || '') > String(k.last_mention_at || '')) { k.last_mention_at = o.last_mention_at; k.last_mention_by = o.last_mention_by; }
+      // a status set in Madar on the other row (and not on this one) is kept
+      if (o.review !== 'new' && k.review === 'new') { k.status = o.status; k.review = o.review; k.closed_at = o.closed_at; }
+    });
+    k.mz_sig = '';
+    keepRows.push(k);
+  });
+  if (!keepRows.length) return { groups: 0, rows: 0 };
+
+  // mentions and comments of the merged rows: moved, the same one twice kept once
+  var seenM = {}, mentions = [], dropM = [];
+  (data.MizitoMentions || []).concat(extra).forEach(function (x) {
+    var item = moveTo[x.item_id] || x.item_id;
+    var sig = item + '|' + mzTitleKey_(x.by) + '|' + String(x.at).slice(0, 16);
+    if (seenM[sig] || seenM['id:' + x.id]) { if (!extra.some(function (e) { return e === x; })) dropM.push(x.id); return; }
+    seenM[sig] = 1; seenM['id:' + x.id] = 1;
+    if (item !== x.item_id || extra.indexOf(x) !== -1) { var y = {}; for (var f in x) y[f] = x[f]; y.item_id = item; mentions.push(y); }
+  });
+  var seenC = {}, notes = [], dropC = [];
+  (data.MizitoComments || []).forEach(function (c) {
+    var item = moveTo[c.item_id] || c.item_id;
+    var sig = item + '|' + mzTitleKey_(c.by) + '|' + mzTitleKey_(c.body).slice(0, 300);
+    if (seenC[sig]) { dropC.push(c.id); return; }
+    seenC[sig] = 1;
+    if (item !== c.item_id) { var y = {}; for (var f in c) y[f] = c[f]; y.item_id = item; notes.push(y); }
+  });
+  var repoint = function (sheet, field) {
+    var out = [];
+    (data[sheet] || []).forEach(function (r) {
+      if (r.entity === 'Mizito' && moveTo[r[field]]) { var y = {}; for (var f in r) y[f] = r[f]; y[field] = moveTo[r[field]]; out.push(y); }
+    });
+    if (out.length) writeRows_(sheet, out);
+    return out.length;
+  };
+  writeRows_('Mizito', keepRows);
+  if (mentions.length) writeRows_('MizitoMentions', mentions);
+  if (notes.length) writeRows_('MizitoComments', notes);
+  repoint('Comments', 'entity_id');
+  repoint('Files', 'entity_id');
+  repoint('Cartable', 'entity_id');
+  repoint('History', 'entity_id');
+  deleteRows_('MizitoMentions', dropM);
+  deleteRows_('MizitoComments', dropC);
+  deleteRows_('Mizito', Object.keys(gone));
+  return { groups: keepRows.length, rows: Object.keys(gone).length };
 }
 
 // An earlier version read Mizito from the server on a 15-minute trigger; that trigger, if it was

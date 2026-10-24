@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import { dirOf } from '../lib/dir'
 import { Sparkles, Check, CornerUpLeft, AlertTriangle, Loader } from 'lucide-react'
 import type { Deliverable, Health, Update } from '../lib/types'
 import { useStore } from '../lib/store'
@@ -258,7 +259,7 @@ function Composer({ projectId, update, onClose }: { projectId?: string; update?:
                     <div key={d.id} className="rounded-xl border border-line bg-surface p-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <div className="truncate text-sm font-medium">{d.title}</div>
+                          <div dir={dirOf(d.title)} className="truncate text-sm font-medium">{d.title}</div>
                           <div className={cx('text-[0.6875rem] num', isOverdue(d) && !c.push && st !== 'delivered' ? 'text-bad' : 'text-sub')}>
                             {fmtDayMonth(target)}
                             {c.push ? <span className="text-bad"> ({L(`+${fa(c.push / 7)} هفته`, `+${c.push / 7}w`)})</span> : isOverdue(d) ? ` · ${L('عقب‌افتاده', 'overdue')}` : ''}

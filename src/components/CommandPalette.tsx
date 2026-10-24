@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { dirOf } from '../lib/dir'
 import { JOB_TITLE } from '../lib/labels'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
@@ -139,7 +140,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                 {head && <div className="eyebrow px-3 pb-1 pt-3">{i.group}</div>}
                 <button data-i={n} onMouseMove={() => setIdx(n)} onClick={() => run(i)} className={cx('flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-start', n === idx && 'bg-muted')}>
                   <span className="grid w-5 shrink-0 place-items-center text-sub">{i.icon}</span>
-                  <span className="min-w-0 flex-1 truncate text-sm">{i.label}</span>
+                  <span dir={dirOf(i.label)} className="min-w-0 flex-1 truncate text-sm">{i.label}</span>
                   {i.sub && <span className="max-w-[40%] truncate text-xs text-sub">{i.sub}</span>}
                   {n === idx && <CornerDownLeft size={14} className="text-sub" />}
                 </button>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { dirOf } from '../lib/dir'
 import { Plus } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { useEditor } from '../components/Editor'
@@ -87,7 +88,7 @@ export default function Risks() {
                           <span className={cx('inline-grid h-8 w-8 place-items-center rounded-xl text-xs font-bold num', riskTone(r))}>{fa(riskScore(r))}</span>
                         </td>
                         <td className="td max-w-sm">
-                          <div className="font-medium">{r.title}</div>
+                          <div dir={dirOf(r.title)} className="font-medium">{r.title}</div>
                           <div className="line-clamp-1 text-xs text-sub">{r.mitigation}</div>
                         </td>
                         <td className="td">

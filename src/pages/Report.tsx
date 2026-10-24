@@ -2,6 +2,7 @@
 // plan (what is moving, what is at risk or late, what got done, what starts next), the running
 // sprint for sprint teams, and the highest open risks. Everything is computed from the live data;
 // the only writing it needs is each plan item's weekly status line.
+import { dirOf } from '../lib/dir'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Printer } from 'lucide-react'
@@ -60,17 +61,17 @@ export default function Report() {
       <li key={p.id} className="py-2">
         <div className="flex items-center gap-2 text-sm">
           <HealthDot h={h === 'on_track' ? 'green' : h === 'at_risk' ? 'amber' : 'red'} />
-          <Link to={`/plan?id=${p.id}`} className="min-w-0 flex-1 truncate hover:underline">{p.title}</Link>
+          <Link dir={dirOf(p.title)} to={`/plan?id=${p.id}`} className="min-w-0 flex-1 truncate hover:underline">{p.title}</Link>
           <PlanStatusChip p={p} />
           <span className="w-10 text-end text-xs font-medium num">{fa(planProgress(db, p))}٪</span>
         </div>
         <div className="ms-4 mt-0.5 flex flex-wrap gap-x-3 text-[0.6875rem] text-sub">
-          {p.owner && <span>{p.owner}</span>}
+          {p.owner && <span dir={dirOf(p.owner)}>{p.owner}</span>}
           <span className="num">{fmtDayMonth(p.start_date)} → {fmtDayMonth(p.end_date)}</span>
           {isLate(p, today) && <span className="text-bad">{L('از موعد گذشته', 'past its end')}</span>}
           {slipDays(p) > 0 && <span className="text-warn">{L(`${fa(slipDays(p))} روز جابه‌جا`, `moved ${slipDays(p)}d`)}</span>}
         </div>
-        {p.note && <div className="ms-4 mt-1 text-xs leading-6 text-ink/80">{p.note}</div>}
+        {p.note && <div dir={dirOf(p.note)} className="ms-4 mt-1 text-xs leading-6 text-ink/80">{p.note}</div>}
       </li>
     )
   }
@@ -113,7 +114,7 @@ export default function Report() {
                 </div>
                 {d.sprint && d.sprintSt && (
                   <Link to={`/sprints/${d.sprint.id}`} className="min-w-[14rem] rounded-2xl bg-muted/60 px-3 py-2 text-xs hover:bg-muted">
-                    <div className="flex justify-between gap-2"><b className="font-medium">{d.sprint.name}</b><span className="text-sub num">{L(`${fa(d.sprintSt.daysLeft)} روز مانده`, `${d.sprintSt.daysLeft}d left`)}</span></div>
+                    <div className="flex justify-between gap-2"><b dir={dirOf(d.sprint.name)} className="font-medium">{d.sprint.name}</b><span className="text-sub num">{L(`${fa(d.sprintSt.daysLeft)} روز مانده`, `${d.sprintSt.daysLeft}d left`)}</span></div>
                     <Progress value={d.sprintSt.pct} marker={d.sprintSt.elapsed} className="mt-1.5" />
                     <div className="mt-1 text-[0.6875rem] text-sub num">{L(`${fa(d.sprintSt.done)} از ${fa(d.sprintSt.total)} امتیاز`, `${d.sprintSt.done} of ${d.sprintSt.total} pts`)}{d.sprintSt.blocked.length > 0 && <span className="text-bad">{L(` · ${fa(d.sprintSt.blocked.length)} مسدود`, ` · ${d.sprintSt.blocked.length} blocked`)}</span>}</div>
                   </Link>
@@ -133,9 +134,9 @@ export default function Report() {
                 {risks.map((r) => (
                   <li key={r.id} className="flex items-center gap-3 py-2 text-sm">
                     <span className={cx('grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs font-bold num', riskScore(r) >= 15 ? 'bg-bad/10 text-bad' : riskScore(r) >= 8 ? 'bg-warn/15 text-warn' : 'bg-muted text-sub')}>{fa(riskScore(r))}</span>
-                    <span className="min-w-0 flex-1 truncate">{r.title}</span>
+                    <span dir={dirOf(r.title)} className="min-w-0 flex-1 truncate">{r.title}</span>
                     <span className="text-xs text-sub">{pname(r.project_id)}</span>
-                    <span className="text-xs text-sub">{r.owner}</span>
+                    <span dir={dirOf(r.owner)} className="text-xs text-sub">{r.owner}</span>
                   </li>
                 ))}
               </ul>

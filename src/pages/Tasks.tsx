@@ -1,4 +1,5 @@
 import { assigneesOf, isAssignee, joinNames, leadAssignee } from '../lib/assignees'
+import { dirOf } from '../lib/dir'
 import { useMemo, useState } from 'react'
 import { canPersonal } from '../lib/taskcfg'
 import { useSearchParams } from 'react-router-dom'
@@ -312,7 +313,7 @@ export default function Tasks() {
                             {canEdit ? <StatusPicker value={t.status} onChange={(s) => patch(t, { status: s })} label={false} /> : <StatusIcon s={t.status} />}
                           </td>
                           <td className="td">
-                            <div className={cx('font-medium', closed(t) && 'text-sub line-through')}>{t.title}</div>
+                            <div dir={dirOf(t.title)} className={cx('font-medium', closed(t) && 'text-sub line-through')}>{t.title}</div>
                             <div className="mt-1 flex flex-wrap items-center gap-2 text-[0.6875rem] text-sub">
                               <TaskSignals t={t} />
                               {t.requested_by && <span>{L('از', 'from')} {t.requested_by}</span>}
@@ -429,7 +430,7 @@ function AssignBoard({ tasks }: { tasks: Task[] }) {
                   className={cx('cursor-pointer rounded-2xl border border-line bg-surface p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-float', drag === t.id && 'opacity-40')}
                 >
                   {t.project_id && <div className="mb-1 truncate font-mono text-[0.625rem] uppercase tracking-wider text-sub">{db.Projects.find((p) => p.id === t.project_id)?.code || pname(t.project_id)}</div>}
-                  <div className="text-sm leading-6">{t.title}</div>
+                  <div dir={dirOf(t.title)} className="text-sm leading-6">{t.title}</div>
                   <div className="mt-2 flex items-center gap-2">
                     <StatusIcon s={t.status} size={13} />
                     <PriorityIcon p={t.priority} />

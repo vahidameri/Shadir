@@ -1,6 +1,7 @@
 // Visual pieces for teams: the status bar (tasks by category), the team card with its projects,
 // and small chart helpers shared with the overview dashboard.
-import { Link } from 'react-router-dom'
+import { dirOf } from '../lib/dir'
+import { Link, useNavigate } from 'react-router-dom'
 import { Ban, CalendarClock, Clock3, MoonStar, Plus } from 'lucide-react'
 import type { StatusCat } from '../lib/types'
 import { useStore } from '../lib/store'
@@ -9,7 +10,7 @@ import { AvatarStack, HealthDot, Progress, cx } from './ui'
 import { L, lbl, tr } from '../lib/i18n'
 import { fa, fmtDayMonth } from '../lib/jalali'
 import { STATUS_CAT } from '../lib/labels'
-import { TRACK } from '../lib/tracks'
+import { TRACK, TRACKS } from '../lib/tracks'
 import { projectMetrics } from '../lib/metrics'
 import { teamStats, type TeamStats } from '../lib/teams'
 import { closed } from '../lib/columns'
@@ -50,7 +51,7 @@ export function Bars({ rows, max, unit }: { rows: { label: string; value: number
         const inner = (
           <>
             <div className="flex items-baseline justify-between gap-2 text-xs">
-              <span className="truncate">{r.label}</span>
+              <span dir={dirOf(r.label)} className="truncate">{r.label}</span>
               <span className="shrink-0 font-medium num">
                 {fa(r.value)}
                 {unit}
@@ -89,6 +90,8 @@ export function TeamCard({ id, stats, compact }: { id: string; stats?: TeamStats
   const { db, canEdit } = useStore()
   const { open } = useEditor()
   const s = stats || teamStats(db, id)
+  const navigate = useNavigate()
+  const page = `/teams/${id || '-'}`
   const num = (icon: React.ReactNode, n: number, label: string, tone: string, to: string) => (
     <Link to={to} className={cx('flex items-center gap-1.5 rounded-xl px-2 py-1.5 text-xs transition hover:bg-muted', n ? tone : 'text-sub')}>
       {icon}
@@ -96,13 +99,14 @@ export function TeamCard({ id, stats, compact }: { id: string; stats?: TeamStats
     </Link>
   )
   return (
-    <div className="card overflow-hidden">
+    <div className="card cursor-pointer overflow-hidden transition hover:shadow-float" onClick={(e) => !(e.target as HTMLElement).closest('a, button, input, select') && navigate(page)}>
       <div className="p-5">
         <div className="flex items-start gap-3">
           <span className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-muted text-sm font-bold text-ink">{name(id).slice(0, 2)}</span>
           <div className="min-w-0 flex-1">
-            <Link to={`/tasks?track=${id}`} className="flex items-center gap-2 font-semibold hover:underline">
+            <Link to={`/teams/${id || '-'}`} className="flex items-center gap-2 font-semibold hover:underline">
               {name(id)} <HealthDot h={s.health} pulse />
+              {id && !TRACKS.includes(id) && <span className="rounded-full bg-warn/15 px-2 py-0.5 text-[0.625rem] font-normal text-warn">{L('تعریف‌نشده', 'Not defined')}</span>}
             </Link>
             <div className="mt-0.5 text-xs text-sub">
               {L(`${fa(s.projects.length)} محصول/پروژه · ${fa(s.open)} تسک باز · ${fa(s.doneRecent)} انجام‌شده در ۲ هفته`, `${s.projects.length} projects · ${s.open} open · ${s.doneRecent} done in 2 weeks`)}
@@ -115,10 +119,10 @@ export function TeamCard({ id, stats, compact }: { id: string; stats?: TeamStats
         <OkrLine id={id} tasks={s.tasks} />
 
         <div className="mt-3 grid grid-cols-2 gap-1 @md:grid-cols-4">
-          {num(<CalendarClock size={13} />, s.late, L('معوق', 'late'), 'text-bad', `/tasks?track=${id}&v=late`)}
-          {num(<Ban size={13} />, s.blocked, L('مسدود', 'blocked'), 'text-bad', `/tasks?track=${id}&v=blocked`)}
-          {num(<Clock3 size={13} />, s.byCat.waiting, L('در انتظار', 'waiting'), 'text-ink', `/tasks?track=${id}&v=waiting`)}
-          {num(<MoonStar size={13} />, s.stale, L('راکد', 'quiet'), 'text-sub', `/tasks?track=${id}&v=stale`)}
+          {num(<CalendarClock size={13} />, s.late, L('معوق', 'late'), 'text-bad', page)}
+          {num(<Ban size={13} />, s.blocked, L('مسدود', 'blocked'), 'text-bad', page)}
+          {num(<Clock3 size={13} />, s.byCat.waiting, L('در انتظار', 'waiting'), 'text-ink', page)}
+          {num(<MoonStar size={13} />, s.stale, L('راکد', 'quiet'), 'text-sub', page)}
         </div>
 
         {!compact && (
@@ -144,7 +148,7 @@ export function TeamCard({ id, stats, compact }: { id: string; stats?: TeamStats
                       <Link to={`/projects/${p.id}`} className="grid grid-cols-[auto_1fr_5rem_auto] items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-muted/60">
                         <HealthDot h={m.health} />
                         <span className="min-w-0">
-                          <span className="block truncate text-sm">{p.name}</span>
+                          <span dir={dirOf(p.name)} className="block truncate text-sm">{p.name}</span>
                           <span className="block text-[0.6875rem] text-sub">
                             {L(`${fa(openN)} باز`, `${openN} open`)}
                             {m.overdueTasks > 0 && <span className="text-bad"> · {L(`${fa(m.overdueTasks)} معوق`, `${m.overdueTasks} late`)}</span>}

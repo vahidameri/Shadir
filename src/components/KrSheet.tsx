@@ -1,6 +1,7 @@
 // A key result in full: its trend (every check-in against the target and the quarter's pace), the
 // check-in log, notes, documents, the Mizito link and the tasks that move it. Also the check-in
 // popover used on the OKR page.
+import { dirOf } from '../lib/dir'
 import { useState } from 'react'
 import { ExternalLink, Pencil, Plus, Send } from 'lucide-react'
 import { useStore } from '../lib/store'
@@ -48,7 +49,7 @@ export function CheckIn({ k }: { k: KeyResult }) {
     >
       {(close) => (
         <div className="space-y-3 p-3">
-          <div className="text-sm font-medium">{k.title}</div>
+          <div dir={dirOf(k.title)} className="text-sm font-medium">{k.title}</div>
           {k.kind === 'done' ? (
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Number(v) >= 1} onChange={(e) => setV(e.target.checked ? '1' : '0')} /> {L('انجام شد', 'Done')}</label>
           ) : (
@@ -172,8 +173,8 @@ export function KrSheet({ id, onClose }: { id: string; onClose: () => void }) {
       <div className="grid min-h-full @lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="min-w-0 space-y-6 px-6 py-6 @lg:border-e @lg:border-line">
           <div>
-            <div className="text-xs text-sub">{o.title}</div>
-            <h2 className="display mt-1 text-2xl leading-snug">{k.title}</h2>
+            <div dir={dirOf(o.title)} className="text-xs text-sub">{o.title}</div>
+            <h2 dir={dirOf(k.title)} className="display mt-1 text-2xl leading-snug">{k.title}</h2>
             <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
               <span className={cx('font-medium', CONF[c].tone)}>{tr(CONF[c].label)}{!k.confidence && <span className="font-normal text-sub"> {L('(خودکار)', '(auto)')}</span>}</span>
               <span className="text-sub">·</span>
@@ -207,7 +208,7 @@ export function KrSheet({ id, onClose }: { id: string; onClose: () => void }) {
                       {x.confidence && <span className={cx('ms-2 text-xs', CONF[x.confidence].tone)}>{tr(CONF[x.confidence].label)}</span>}
                       <span className="ms-2 text-xs text-sub">{x.by} · {fmtDate(x.at)} {x.at.slice(11, 16)}</span>
                     </div>
-                    {x.note && <div className="mt-1 whitespace-pre-wrap rounded-2xl rounded-ss-md bg-muted px-3 py-2 text-sm leading-7">{x.note}</div>}
+                    {x.note && <div dir={dirOf(x.note)} className="mt-1 whitespace-pre-wrap rounded-2xl rounded-ss-md bg-muted px-3 py-2 text-sm leading-7">{x.note}</div>}
                   </li>
                 ))}
               </ol>
@@ -248,7 +249,7 @@ export function KrSheet({ id, onClose }: { id: string; onClose: () => void }) {
                     <Avatar name={x.author} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline gap-2 text-sm"><span className="font-medium">{x.author}</span><span className="text-[0.6875rem] text-sub">{timeAgo(toDate(x.created_at))}</span></div>
-                      <div className="mt-0.5 whitespace-pre-wrap text-sm leading-7 text-ink/85">{x.body}</div>
+                      <div dir={dirOf(x.body)} className="mt-0.5 whitespace-pre-wrap text-sm leading-7 text-ink/85">{x.body}</div>
                     </div>
                   </div>
                 ))}
@@ -269,7 +270,7 @@ export function KrSheet({ id, onClose }: { id: string; onClose: () => void }) {
           {prop(L('هدف عددی', 'Target'), <span className="num">{fmtVal(k, k.target)}</span>)}
           {prop(L('محصول', 'Product'), product ? product.name : '—')}
           {prop(L('لینک میزیتو', 'Mizito link'), k.mizito_link ? <a href={k.mizito_link} target="_blank" rel="noreferrer" dir="ltr" className="block truncate text-brand hover:underline">{k.mizito_link}</a> : '—')}
-          {k.note && <div className="mt-3 rounded-2xl bg-surface p-3 text-xs leading-6 text-sub">{k.note}</div>}
+          {k.note && <div dir={dirOf(k.note)} className="mt-3 rounded-2xl bg-surface p-3 text-xs leading-6 text-sub">{k.note}</div>}
         </aside>
       </div>
     </Sheet>

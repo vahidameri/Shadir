@@ -1,4 +1,5 @@
 // Rich detail sheet for a task or follow-up: inline-editable properties, description, comments & activity.
+import { dirOf } from '../lib/dir'
 import { useMemo, useState } from 'react'
 import { CartableButton } from './CartableParts'
 import { copyFollowUp } from './shared'
@@ -160,7 +161,7 @@ export function ItemSheet({ sheet, id, onClose }: { sheet: 'Tasks' | 'FollowUps'
           {isTask && (
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-sub">
               <TaskSignals t={item as unknown as Task} />
-              {item.requested_by && <span>{L('درخواست از', 'Asked by')} <b className="font-medium text-ink">{item.requested_by}</b></span>}
+              {item.requested_by && <span>{L('درخواست از', 'Asked by')} <b dir={dirOf(item.requested_by)} className="font-medium text-ink">{item.requested_by}</b></span>}
             </div>
           )}
 
@@ -281,7 +282,7 @@ export function ItemSheet({ sheet, id, onClose }: { sheet: 'Tasks' | 'FollowUps'
                     <span className="font-medium">{c.author}</span>
                     <span className="text-[0.6875rem] text-sub">{timeAgo(stampToDate(c.created_at))}</span>
                   </div>
-                  <div className="mt-1 whitespace-pre-wrap rounded-2xl rounded-ss-md bg-muted px-4 py-2.5 text-sm leading-7">{renderMentions(c.body, people)}</div>
+                  <div dir={dirOf(c.body)} className="mt-1 whitespace-pre-wrap rounded-2xl rounded-ss-md bg-muted px-4 py-2.5 text-sm leading-7">{renderMentions(c.body, people)}</div>
                 </li>
               ))}
               {(item.completed_at || item.done_at) && (
@@ -752,7 +753,7 @@ function Dependencies({ task, onChange }: { task: Task; onChange: (ids: string[]
     return (
       <div className="group flex items-center gap-2.5 rounded-xl border border-line px-3 py-2">
         <StatusIcon s={t.status} size={14} />
-        <button onClick={() => open(t)} className={cx('min-w-0 flex-1 truncate text-start text-sm hover:underline', t.status === 'done' && 'text-sub line-through')}>
+        <button onClick={() => open(t)} dir={dirOf(t.title)} className={cx('min-w-0 flex-1 truncate text-start text-sm hover:underline', t.status === 'done' && 'text-sub line-through')}>
           {t.title}
         </button>
         <TrackBadge track={tr} />
@@ -798,7 +799,7 @@ function Dependencies({ task, onChange }: { task: Task; onChange: (ids: string[]
                     <div className="max-h-72 overflow-y-auto">
                       {candidates.map((t) => (
                         <MenuItem key={t.id} icon={<StatusIcon s={t.status} size={13} />} hint={trackOf(t, db) ? lbl(TRACK, trackOf(t, db) as Track) : undefined} onClick={() => { onChange([...ids, t.id]); close(); setQ('') }}>
-                          {t.title}
+                          <span dir={dirOf(t.title)}>{t.title}</span>
                         </MenuItem>
                       ))}
                       {!candidates.length && <div className="px-3 py-4 text-center text-xs text-sub">{L('موردی پیدا نشد', 'No matches')}</div>}
@@ -849,7 +850,7 @@ function Stages({ task }: { task: Task }) {
           const now = x.d === today
           return (
             <li key={x.label} className={cx('rounded-2xl border px-3 py-2.5', done || past ? 'border-line bg-muted/50' : now ? 'border-warn/40 bg-warn/[0.08]' : 'border-line bg-surface')}>
-              <div className="text-[0.6875rem] text-sub">{x.label}</div>
+              <div dir={dirOf(x.label)} className="text-[0.6875rem] text-sub">{x.label}</div>
               <div className={cx('mt-0.5 text-sm font-medium num', !done && past && 'text-bad')}>{fmtDate(x.d)}</div>
               <div className="text-[0.625rem] text-sub">{done ? L('انجام شد', 'Done') : now ? L('امروز', 'Today') : past ? L('گذشته', 'Passed') : relDays(x.d)}</div>
             </li>
@@ -886,7 +887,7 @@ function Checklist({ value, onChange, title }: { value: string; onChange: (v: st
         {items.map((it, i) => (
           <li key={i} className="group flex items-center gap-2 rounded-lg px-1 py-1 hover:bg-muted/50">
             <input type="checkbox" disabled={!canEdit} checked={it.done} onChange={() => onChange(serialize(items.map((x, j) => (j === i ? { ...x, done: !x.done } : x))))} />
-            <span className={cx('flex-1 text-sm', it.done && 'text-sub line-through')}>{it.text}</span>
+            <span dir={dirOf(it.text)} className={cx('flex-1 text-sm', it.done && 'text-sub line-through')}>{it.text}</span>
             {canEdit && (
               <button className="icon-btn h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => onChange(serialize(items.filter((_, j) => j !== i)))} aria-label={L('حذف', 'Remove')}>
                 <X size={12} />

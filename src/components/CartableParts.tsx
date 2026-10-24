@@ -1,5 +1,6 @@
 // Putting something in a cartable (from a Mizito item, a task, a follow-up or plain text), and one
 // item as it shows in a cartable, with what its owner can do: done, or back with a line of answer.
+import { dirOf } from '../lib/dir'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Check, CornerUpLeft, ExternalLink, Inbox, Pencil, Send, Trash2, Undo2 } from 'lucide-react'
@@ -157,17 +158,17 @@ export function CartableRow({ c, onEdit }: { c: CartableItem; onEdit?: () => voi
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             {c.entity === 'Mizito' ? (
-              <Link to={`/mizito?id=${c.entity_id}`} className={cx('font-medium hover:underline', c.status === 'done' && 'line-through')}>{c.title}</Link>
+              <Link dir={dirOf(c.title)} to={`/mizito?id=${c.entity_id}`} className={cx('font-medium hover:underline', c.status === 'done' && 'line-through')}>{c.title}</Link>
             ) : c.entity ? (
-              <button onClick={source} className={cx('text-start font-medium hover:underline', c.status === 'done' && 'line-through')}>{c.title}</button>
+              <button onClick={source} dir={dirOf(c.title)} className={cx('text-start font-medium hover:underline', c.status === 'done' && 'line-through')}>{c.title}</button>
             ) : (
-              <span className={cx('font-medium', c.status === 'done' && 'line-through')}>{c.title}</span>
+              <span dir={dirOf(c.title)} className={cx('font-medium', c.status === 'done' && 'line-through')}>{c.title}</span>
             )}
             {mz?.link && <a href={mz.link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full border border-line px-2 text-[0.6875rem] text-sub hover:text-brand"><ExternalLink size={11} /> {L('میزیتو', 'Mizito')}</a>}
             {c.status === 'draft' && <span className="rounded-full bg-muted px-2 text-[0.6875rem] text-sub">{L('پیش‌نویس', 'Draft')}</span>}
             {c.status === 'returned' && <span className="rounded-full bg-warn/15 px-2 text-[0.6875rem] text-warn">{L('برگشت خورد', 'Sent back')}</span>}
           </div>
-          {c.ask && <div className="mt-1 whitespace-pre-wrap text-sm leading-7 text-ink/85 [overflow-wrap:anywhere]">{c.ask}</div>}
+          {c.ask && <div dir={dirOf(c.ask)} className="mt-1 whitespace-pre-wrap text-sm leading-7 text-ink/85 [overflow-wrap:anywhere]">{c.ask}</div>}
           <div className="mt-1 flex flex-wrap gap-x-3 text-[0.6875rem] text-sub">
             {c.from !== c.owner && <span className="inline-flex items-center gap-1"><Avatar name={c.from} size="xs" /> {L(`از ${c.from}`, `from ${c.from}`)}</span>}
             {c.sent_at && <span>{timeAgo(toDate(c.sent_at))}</span>}

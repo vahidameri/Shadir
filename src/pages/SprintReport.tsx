@@ -1,6 +1,7 @@
 // One sprint, for the people who need to see it rather than run it (the CPTO): what was committed,
 // what got done, what changed after it started, the burndown, who did what, what is blocked or
 // carried over, and the retro. Printable.
+import { dirOf } from '../lib/dir'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowRight, Pencil, Printer } from 'lucide-react'
@@ -36,7 +37,7 @@ export default function SprintReport() {
             <button onClick={() => open('Tasks', t as never)} className="flex w-full items-center gap-2 px-1 py-2 text-start text-sm hover:bg-muted/50">
               <IssueBadge type={t.issue_type} />
               <KeyTag k={t.key} />
-              <span className="min-w-0 flex-1 truncate">{t.title}</span>
+              <span dir={dirOf(t.title)} className="min-w-0 flex-1 truncate">{t.title}</span>
               <span className="text-xs text-sub">{assigneesOf(t)[0] || '—'}</span>
               <span className="w-24 truncate text-end text-xs text-sub">{statusLabel(t.status)}</span>
               <span className="w-8 text-end text-xs font-medium num">{pts(t) ? fa(pts(t)) : '—'}</span>

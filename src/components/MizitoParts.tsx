@@ -1,6 +1,7 @@
 // Mizito pieces: the priority badge, the signal chips, the capture sheet ("a new mention"), the item
 // sheet (thread, status, outcome, reminder text) and the settings (statuses, categories, actions,
 // weights, thresholds, reminder template).
+import { dirOf } from '../lib/dir'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Attachments } from './Files'
 import { CartableButton } from './CartableParts'
@@ -15,7 +16,7 @@ import { L, locale } from '../lib/i18n'
 import { fa, fmtDate, fmtDayMonth, timeAgo, todayISO } from '../lib/jalali'
 import { uid } from '../lib/api'
 import { historyOf } from '../lib/history'
-import { mzClaudePrompt, parseMzImport } from '../lib/mzImport'
+import { mzClaudePrompt, mzTitleKey, parseMzImport } from '../lib/mzImport'
 import { historyText } from './TaskTracking'
 import {
   MZ_CUTOFF, MZ_KEYS, P_COLOR, P_HINT, isExecTier, markSeen, recentlyChanged, allPeople, askersOf, commentsOf, firstMzStatus, isMizitoLink, mentionsOf, mzCat, mzCfg, mzClosed, mzFlags, mzKeyOf, mzSignals, nowStampMz, optLabel, reminderText, statusById, tierOf,
@@ -251,7 +252,7 @@ export function CaptureSheet({ onClose, onOpen, initialLink = '' }: { onClose: (
             <div className="flex items-start gap-3">
               <PBadge p={mzSignals(db, existing).p} />
               <div className="min-w-0 flex-1">
-                <div className="font-medium">{existing.title}</div>
+                <div dir={dirOf(existing.title)} className="font-medium">{existing.title}</div>
                 <div className="mt-1 text-xs text-sub">
                   {L('این تسک قبلاً ثبت شده', 'Already logged')} · {existing.asked_by} · {fmtDate(existing.received_at)} · {L(`${fa(1 + mentionsOf(db, existing.id).length)} منشن`, `${1 + mentionsOf(db, existing.id).length} mentions`)}
                 </div>
@@ -351,7 +352,7 @@ function MzCommentLine({ c, m, all }: { c: MizitoComment; m: MizitoItem; all: Mi
         <b className="font-medium">{c.by}</b> <span className="text-sub">{fmtDate(c.at)} {String(c.at).slice(11, 16)} · {timeAgo(toDate(c.at))}</span>
       </div>
       {parent && <div className="mt-1 min-w-0 truncate border-s-2 border-line-strong ps-2 text-xs text-sub"><Reply size={11} className="inline" /> {parent.by}: {String(parent.body).slice(0, 120)}</div>}
-      <div className={cx('mt-1 whitespace-pre-wrap rounded-2xl rounded-ss-md px-4 py-2 text-sm leading-7 [overflow-wrap:anywhere]', mine ? 'bg-ink/[0.06]' : 'bg-muted')}>{String(c.body ?? '') ? <Linked text={String(c.body)} /> : <span className="text-sub">{L('(بدون متن)', '(no text)')}</span>}</div>
+      <div dir={dirOf(c.body)} className={cx('mt-1 whitespace-pre-wrap rounded-2xl rounded-ss-md px-4 py-2 text-sm leading-7 [overflow-wrap:anywhere]', mine ? 'bg-ink/[0.06]' : 'bg-muted')}>{String(c.body ?? '') ? <Linked text={String(c.body)} /> : <span className="text-sub">{L('(بدون متن)', '(no text)')}</span>}</div>
       {(tagged.length > 0 || files.length > 0) && (
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[0.6875rem] text-sub">
           {tagged.map((n) => <span key={n} className={cx('rounded-full px-1.5', ours.includes(n) ? 'bg-brand/10 font-medium text-brand' : 'bg-muted')}>@{n}</span>)}
@@ -580,7 +581,7 @@ export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }
                       <b className="font-medium">{t.x.by}</b> <span className="text-sub">{t.x.account ? L(`${t.x.account} را منشن کرد`, `mentioned ${t.x.account}`) : L('دوباره منشن کرد', 'mentioned again')} · {fmtDate(t.x.at)} {t.x.at.slice(11, 16)} · {timeAgo(toDate(t.x.at))}</span>
                       {t.x.status && <span className="ms-2"><MzStatusChip id={t.x.status} /></span>}
                     </div>
-                    {t.x.note && <div className="mt-1 whitespace-pre-wrap rounded-2xl rounded-ss-md bg-brand-soft/40 px-4 py-2 text-sm leading-7 [overflow-wrap:anywhere]"><Linked text={t.x.note} /></div>}
+                    {t.x.note && <div dir={dirOf(t.x.note)} className="mt-1 whitespace-pre-wrap rounded-2xl rounded-ss-md bg-brand-soft/40 px-4 py-2 text-sm leading-7 [overflow-wrap:anywhere]"><Linked text={t.x.note} /></div>}
                   </li>
                 ) : (
                   <li key={t.h.id} className="relative text-xs text-sub">
@@ -594,7 +595,7 @@ export function MizitoSheet({ id, onClose }: { id: string; onClose: () => void }
                   <li className="relative">
                     <span className="absolute -start-[37px] top-0"><Avatar name={m.asked_by || '?'} size="sm" ring /></span>
                     <div className="text-sm"><b className="font-medium">{m.asked_by || L('نامشخص', 'Unknown')}</b> <span className="text-sub">{L('مطرح کرد / منشن کرد', 'raised it')} · {fmtDate(m.received_at)} {m.received_at.slice(11, 16)}</span></div>
-                    {m.notes && <div className="mt-1 whitespace-pre-wrap rounded-2xl rounded-ss-md bg-muted px-4 py-2 text-sm leading-7 [overflow-wrap:anywhere]"><Linked text={m.notes} /></div>}
+                    {m.notes && <div dir={dirOf(m.notes)} className="mt-1 whitespace-pre-wrap rounded-2xl rounded-ss-md bg-muted px-4 py-2 text-sm leading-7 [overflow-wrap:anywhere]"><Linked text={m.notes} /></div>}
                   </li>
                 </>
               )}
@@ -741,7 +742,26 @@ export function MizitoImport({ admin }: { admin: boolean }) {
   const [showPrompt, setShowPrompt] = useState(false)
   const cutoff = setting(MZ_KEYS.cutoff) || MZ_CUTOFF
   const prompt = mzClaudePrompt(account || me, fmtDate(cutoff, 'long'))
-  const parsed = useMemo(() => (raw.trim() ? parseMzImport(raw, account, db.Mizito) : null), [raw, account, db.Mizito])
+  const people = useMemo(() => allPeople(db), [db])
+  const parsed = useMemo(() => (raw.trim() ? parseMzImport(raw, account, db.Mizito, people) : null), [raw, account, db.Mizito, people])
+  // the same Mizito task in more than one row (left by earlier imports)
+  const dupes = useMemo(() => {
+    const by = new Map<string, number>()
+    db.Mizito.forEach((m) => { const k = mzTitleKey(m.title); if (k) by.set(k, (by.get(k) || 0) + 1) })
+    return [...by.values()].filter((n) => n > 1).reduce((a, n) => a + n - 1, 0)
+  }, [db.Mizito])
+  const dedupe = async () => {
+    setBusy('dedupe')
+    try {
+      const r = (await action('mzDedupe', {})) as { groups?: number; rows?: number } | undefined
+      toast(L(`${fa(r?.rows || 0)} ردیف تکراری در ${fa(r?.groups || 0)} تسک یکی شد`, `${r?.rows || 0} duplicate rows merged`))
+      void refresh()
+    } catch (e) {
+      fail(e)
+    } finally {
+      setBusy('')
+    }
+  }
   const who = parsed?.account && leaders.some((x) => x.name === parsed.account) ? parsed.account : account
   const fail = (e: unknown) => toast(e instanceof Error ? e.message : String(e), 'err')
   const run = async () => {
@@ -758,7 +778,7 @@ export function MizitoImport({ admin }: { admin: boolean }) {
       }
       toast(L(`ایمپورت شد: ${fa(made)} تسک تازه، ${fa(updated)} به‌روز`, `Imported: ${made} new, ${updated} updated`))
       setRaw('')
-      void refresh()
+      await refresh()
     } catch (e) {
       fail(e)
     } finally {
@@ -813,9 +833,10 @@ export function MizitoImport({ admin }: { admin: boolean }) {
           <Paperclip size={13} /> {L('یا فایل JSON', 'or a JSON file')}
           <input type="file" accept=".json,.txt,application/json,text/plain" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void f.text().then(setRaw); e.target.value = '' }} />
         </label>
-        {stats && (
+        {stats && parsed && (
           <span className="num text-xs text-sub">
-            {L(`${fa(stats.tasks)} تسک · ${fa(stats.links)} با لینک · ${fa(stats.mentions)} منشن · ${fa(stats.comments)} کامنت · ${fa(stats.done)} انجام‌شده · به نام ${who}`, `${stats.tasks} tasks · ${stats.links} with link · ${stats.mentions} mentions · ${stats.comments} comments · for ${who}`)}
+            {L(`${fa(stats.tasks)} تسک یکتا${parsed.listed > stats.tasks ? ` (از ${fa(parsed.listed)} ردیف؛ تکراری‌ها یکی شد)` : ''} · ${fa(stats.links)} با لینک · ${fa(stats.mentions)} منشن · ${fa(stats.comments)} کامنت · ${fa(stats.done)} انجام‌شده · ${fa(parsed.parts)} بخش · به نام ${who}`, `${stats.tasks} tasks · ${stats.links} with link · ${stats.mentions} mentions · ${stats.comments} comments · for ${who}`)}
+            {parsed.broken > 0 && <b className="ms-2 text-bad">{L(`${fa(parsed.broken)} بخش خوانده نشد`, `${parsed.broken} parts unreadable`)}</b>}
           </span>
         )}
         <span className="flex-1" />
@@ -826,6 +847,15 @@ export function MizitoImport({ admin }: { admin: boolean }) {
           <summary className="cursor-pointer">{L(`${fa(parsed.problems.length)} نکته`, `${parsed.problems.length} notes`)}</summary>
           <ul className="mt-1 list-disc space-y-0.5 ps-5 text-sub">{parsed.problems.slice(0, 50).map((p, i) => <li key={i}>{p}</li>)}</ul>
         </details>
+      )}
+      {dupes > 0 && (
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-warn/40 bg-warn/5 p-3">
+          <div className="min-w-0 flex-1 text-xs leading-6">
+            <div className="font-medium">{L(`${fa(dupes)} ردیف تکراری در میزیتوی مدار`, `${dupes} duplicate rows`)}</div>
+            <div className="text-sub">{L('تسک‌هایی که چند بار آمده‌اند (هم‌عنوان، بدون دو لینک متفاوت) در یک ردیف یکی می‌شوند؛ منشن‌ها، کامنت‌ها، یادداشت‌ها و کارتابلشان روی همان ردیف می‌ماند.', 'Rows of the same task become one; mentions, comments, notes and cartable items move to it.')}</div>
+          </div>
+          <button className="btn-outline btn-sm" disabled={!!busy} onClick={dedupe}>{busy === 'dedupe' ? L('در حال یکی کردن…', 'Merging…') : L('یکی کردن تکراری‌ها', 'Merge duplicates')}</button>
+        </div>
       )}
       {admin && (
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-bad/30 p-3">

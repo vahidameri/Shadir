@@ -1,5 +1,6 @@
 // Two desk cards: the cartable at a glance (what waits for me; for the PgM, the CPTO's too), and a
 // person's own to-do notes for the day — write, tick, and clear at the end of the day.
+import { dirOf } from '../lib/dir'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Eraser, Inbox, ListTodo, Plus, X } from 'lucide-react'
@@ -25,7 +26,7 @@ export function CartableCard() {
             <li key={c.id}>
               <Link to="/cartable" className="flex items-center gap-2 text-sm hover:underline">
                 <span className={cx('shrink-0 rounded-md px-1.5 text-[0.625rem] font-semibold', c.priority === 'high' ? 'bg-bad/10 text-bad' : 'bg-muted')}>{tr(CART_KIND[c.kind] || CART_KIND.info)}</span>
-                <span className="min-w-0 flex-1 truncate">{c.title}</span>
+                <span dir={dirOf(c.title)} className="min-w-0 flex-1 truncate">{c.title}</span>
                 {c.due_date && <span className={cx('shrink-0 text-[0.6875rem] num', c.due_date < today ? 'text-bad' : 'text-sub')}>{fmtDayMonth(c.due_date)}</span>}
               </Link>
             </li>
@@ -90,7 +91,7 @@ export function TodoCard() {
           {items.map((t) => (
             <li key={t.id} className="group flex items-start gap-2 rounded-lg px-1 py-1 hover:bg-muted/50">
               <input type="checkbox" className="mt-1.5" checked={t.done === '1'} onChange={() => upsert('Todos', { ...t, done: t.done === '1' ? '' : '1' })} aria-label={L('انجام شد', 'Done')} />
-              <span className={cx('min-w-0 flex-1 text-sm leading-7 [overflow-wrap:anywhere]', t.done === '1' && 'text-sub line-through')}>{t.text}</span>
+              <span dir={dirOf(t.text)} className={cx('min-w-0 flex-1 text-sm leading-7 [overflow-wrap:anywhere]', t.done === '1' && 'text-sub line-through')}>{t.text}</span>
               {t.day && t.day < today && <span className="mt-1 shrink-0 text-[0.6875rem] text-warn num">{fmtDayMonth(t.day)}</span>}
               <button className="icon-btn h-7 w-7 opacity-0 group-hover:opacity-100" onClick={() => remove('Todos', t.id)} aria-label={L('حذف', 'Remove')}><X size={13} /></button>
             </li>

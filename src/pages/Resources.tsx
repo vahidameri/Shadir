@@ -1,6 +1,7 @@
 // Resource allocation: for one quarter, what share of each person's time goes to each product.
 // Rows are people, columns are products (grouped by team). A row over 100% of the person's
 // capacity is over-allocated; the small number in a cell is their open tasks there (plan vs reality).
+import { dirOf } from '../lib/dir'
 import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Copy, Plus } from 'lucide-react'
 import { useStore } from '../lib/store'
@@ -92,7 +93,7 @@ export default function Resources() {
                   {products.map((p) => (
                     <th key={p.id} className="th min-w-[6.5rem] text-center align-bottom">
                       <div className="text-[0.625rem] font-normal text-sub">{teamName(p.team || '')}</div>
-                      <div className="truncate">{p.name}</div>
+                      <div dir={dirOf(p.name)} className="truncate">{p.name}</div>
                     </th>
                   ))}
                   <th className="th text-center">{L('جمع', 'Total')}</th>
@@ -105,7 +106,7 @@ export default function Resources() {
                   return (
                     <tr key={m.id} className="border-b border-line last:border-0">
                       <td className="td sticky start-0 z-10 bg-surface">
-                        <div className="font-medium">{m.name}</div>
+                        <div dir={dirOf(m.name)} className="font-medium">{m.name}</div>
                         <div className="text-[0.6875rem] text-sub">{teamName(m.track || '')}</div>
                       </td>
                       {products.map((p) => {

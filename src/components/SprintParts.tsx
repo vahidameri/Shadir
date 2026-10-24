@@ -1,5 +1,6 @@
 // Pieces of the sprint pages: issue badge, burndown and velocity charts (plain SVG), a backlog row,
 // and the "complete sprint" dialog that moves unfinished work on.
+import { dirOf } from '../lib/dir'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Bug, BookOpen, CheckSquare, FlaskConical } from 'lucide-react'
@@ -79,7 +80,7 @@ export function Velocity({ rows }: { rows: { s: Sprint; committed: number; compl
         ))}
       </div>
       <div className="mt-1 flex gap-4 px-2">
-        {rows.map((r) => <span key={r.s.id} className="min-w-0 flex-1 truncate text-center text-[0.625rem] text-sub">{r.s.name}</span>)}
+        {rows.map((r) => <span dir={dirOf(r.s.name)} key={r.s.id} className="min-w-0 flex-1 truncate text-center text-[0.625rem] text-sub">{r.s.name}</span>)}
       </div>
       <div className="mt-2 flex gap-4 text-[0.6875rem] text-sub">
         <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-ink/15" /> {L('تعهد', 'Committed')}</span>
@@ -102,7 +103,7 @@ export function WorkRow({ t, sprints, onMove }: { t: Task; sprints: Sprint[]; on
       </span>
       <button className="flex min-w-0 items-center gap-2 text-start" onClick={() => open('Tasks', t as never)}>
         <KeyTag k={t.key} />
-        <span className="truncate hover:underline">{t.title}</span>
+        <span dir={dirOf(t.title)} className="truncate hover:underline">{t.title}</span>
       </button>
       <span className="flex -space-x-1.5 rtl:space-x-reverse">{people.slice(0, 2).map((p) => <Avatar key={p} name={p} />)}</span>
       <input

@@ -1,4 +1,5 @@
 import { isAssignee } from '../lib/assignees'
+import { dirOf } from '../lib/dir'
 import { closed } from '../lib/columns'
 import { Link, useParams } from 'react-router-dom'
 import { JOB_TITLE, TEAM_NAMES, teamCodes } from '../lib/labels'
@@ -137,7 +138,7 @@ export default function Profile() {
                   <li key={x.id}>
                     <Link to="/meetings" className="flex items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-muted">
                       <CalendarDays size={15} className="text-sub" />
-                      <span className="min-w-0 flex-1 truncate text-sm">{x.title}</span>
+                      <span dir={dirOf(x.title)} className="min-w-0 flex-1 truncate text-sm">{x.title}</span>
                       <span className="text-xs text-sub num">
                         {x.date === today ? L('امروز', 'Today') : fmtWeekday(x.date)} {fa(x.time)}
                       </span>

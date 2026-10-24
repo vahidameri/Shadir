@@ -1,5 +1,6 @@
 // Mizito queue: what the CPTO and the PgM were mentioned on, one row per Mizito task, sorted by
 // priority (P0 first, then SLA, then deadline). Re-mentions thread into the same row.
+import { dirOf } from '../lib/dir'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { AtSign, Bot, Check, Copy, Plus, Rows3, Settings2, X } from 'lucide-react'
@@ -267,7 +268,7 @@ export default function MizitoPage() {
                           <div className="flex flex-wrap items-center gap-2">
                             <MzBadges m={m} />
                             {mzFlags(m).fresh && <span className="rounded-full bg-brand px-1.5 text-[0.625rem] font-medium leading-5 text-white">{L('تازه', 'New')}</span>}
-                            <span className="font-medium">{m.title}</span>
+                            <span dir={dirOf(m.title)} className="font-medium">{m.title}</span>
                             {canEdit ? (
                               <select
                                 value={m.status}
@@ -286,7 +287,7 @@ export default function MizitoPage() {
                             {m.asked_by && (
                               <span className="inline-flex items-center gap-1">
                                 {s.tier && <span className="h-2 w-2 rounded-full" style={{ background: s.tier.color }} title={optLabel(s.tier)} />}
-                                <b className="font-medium text-ink">{m.asked_by}</b>
+                                <b dir={dirOf(m.asked_by)} className="font-medium text-ink">{m.asked_by}</b>
                                 {s.tier && <span>({optLabel(s.tier)})</span>}
                               </span>
                             )}
@@ -302,11 +303,11 @@ export default function MizitoPage() {
                             <div className={cx('mt-1.5 flex items-center gap-1.5 text-xs', changeUnseen(m) ? 'font-medium text-ink' : 'text-sub')}>
                               {changeUnseen(m) && <span className="h-2 w-2 shrink-0 rounded-full bg-brand" title={L('تغییر تازه‌ای که هنوز ندیده‌اید', 'A change you have not seen')} />}
                               <Bot size={12} className="shrink-0 text-sub" />
-                              <span className="min-w-0 truncate">{m.mz_change}</span>
+                              <span dir={dirOf(m.mz_change)} className="min-w-0 truncate">{m.mz_change}</span>
                               <span className="shrink-0 text-sub">· {timeAgo(new Date(String(m.mz_changed_at).replace(' ', 'T')))}</span>
                             </div>
                           )}
-                          {m.outcome && <div className="mt-1 truncate text-xs text-sub">↳ {m.outcome}</div>}
+                          {m.outcome && <div dir={dirOf(m.outcome)} className="mt-1 truncate text-xs text-sub">↳ {m.outcome}</div>}
                         </div>
                         <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
                           {canEdit && mzFlags(m).fresh && (

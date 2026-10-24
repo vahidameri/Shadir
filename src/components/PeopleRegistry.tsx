@@ -1,6 +1,7 @@
 // People & tiers (back office): everyone who asks, mentions or is chased — inside or outside the
 // department — with the tier that sets their SLA and the weight of what they ask in Mizito.
 // Tiers are a setting (mz.tiers); people can be added one by one or pasted from a spreadsheet.
+import { dirOf } from '../lib/dir'
 import { useMemo, useState } from 'react'
 import { ClipboardPaste, Pencil, Plus, Trash2, Users } from 'lucide-react'
 import { useStore } from '../lib/store'
@@ -181,7 +182,7 @@ function ContactSheet({ name, onClose }: { name: string; onClose: () => void }) 
                 return (
                   <li key={m.id} className="flex items-center gap-3 px-3 py-2 text-sm">
                     <span className="rounded-md px-1.5 font-mono text-[0.6875rem] font-semibold text-white" style={{ background: ['#c4314b', '#e8650a', '#2f6f9f', '#7a8a90'][s.p] }}>P{s.p}</span>
-                    <span className={cx('min-w-0 flex-1 truncate', mzClosed(m) && 'text-sub line-through')}>{m.title}</span>
+                    <span dir={dirOf(m.title)} className={cx('min-w-0 flex-1 truncate', mzClosed(m) && 'text-sub line-through')}>{m.title}</span>
                     <span className="text-[0.6875rem] text-sub">{fmtDate(m.received_at || m.created_at)}</span>
                   </li>
                 )
@@ -197,11 +198,11 @@ function ContactSheet({ name, onClose }: { name: string; onClose: () => void }) 
             </div>
             <div>
               <div className="eyebrow mb-2">{L('تسک‌هایی که درخواست داده', 'Tasks they requested')}</div>
-              <ul className="space-y-1 text-sm">{asked.map((t) => <li key={t.id} className="truncate">• {t.title}</li>)}</ul>
+              <ul className="space-y-1 text-sm">{asked.map((t) => <li key={t.id} dir={dirOf(t.title)} className="truncate">• {t.title}</li>)}</ul>
             </div>
           </section>
         )}
-        {c?.notes && <p className="whitespace-pre-wrap rounded-2xl bg-muted p-3 text-sm leading-7">{c.notes}</p>}
+        {c?.notes && <p dir={dirOf(c.notes)} className="whitespace-pre-wrap rounded-2xl bg-muted p-3 text-sm leading-7">{c.notes}</p>}
       </div>
     </Sheet>
   )
@@ -266,7 +267,7 @@ export function PeopleRegistry({ admin }: { admin: boolean }) {
                       <span className="flex items-center gap-2">
                         <Avatar name={c.name} size="sm" />
                         <span>
-                          <span className="font-medium">{c.name}</span>
+                          <span dir={dirOf(c.name)} className="font-medium">{c.name}</span>
                           {c.name_en && c.name_en !== c.name && <span className="block text-[0.6875rem] text-sub" dir="ltr">{c.name_en}</span>}
                         </span>
                       </span>

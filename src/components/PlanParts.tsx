@@ -1,5 +1,6 @@
 // A roadmap item in full: dates and slippage, progress against its window, the weekly status line
 // (each one kept as a note), the tasks under it, documents and links.
+import { dirOf } from '../lib/dir'
 import { useState } from 'react'
 import { ExternalLink, Pencil, Plus, Send } from 'lucide-react'
 import { useStore } from '../lib/store'
@@ -80,7 +81,7 @@ export function PlanSheet({ id, onClose }: { id: string; onClose: () => void }) 
               <PlanStatusChip p={p} />
               <span className={cx('font-medium', CONF[h].tone)}>{tr(CONF[h].label)}{!p.confidence && <span className="font-normal text-sub"> {L('(خودکار)', '(auto)')}</span>}</span>
             </div>
-            <h2 className="display mt-2 text-2xl leading-snug">{p.title}</h2>
+            <h2 dir={dirOf(p.title)} className="display mt-2 text-2xl leading-snug">{p.title}</h2>
             <div className="mt-3 flex items-center gap-3">
               <Progress value={prog} marker={planElapsed(p)} h={h === 'on_track' ? 'green' : h === 'at_risk' ? 'amber' : 'red'} className="h-2" />
               <span className="text-sm font-semibold num">{fa(prog)}٪</span>
@@ -94,7 +95,7 @@ export function PlanSheet({ id, onClose }: { id: string; onClose: () => void }) 
 
           <section>
             <div className="eyebrow mb-2">{L('وضعیت این هفته (برای گزارش CPTO)', 'This week’s status (for the CPTO report)')}</div>
-            {p.note && <div className="mb-3 whitespace-pre-wrap rounded-2xl bg-muted px-4 py-3 text-sm leading-7">{p.note}</div>}
+            {p.note && <div dir={dirOf(p.note)} className="mb-3 whitespace-pre-wrap rounded-2xl bg-muted px-4 py-3 text-sm leading-7">{p.note}</div>}
             {canEdit && (
               <div className="flex items-end gap-2 rounded-2xl border border-line p-2 focus-within:border-ink/30">
                 <textarea value={note} onChange={(e) => setNote(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && post()} rows={2} placeholder={L('چه شد، چه مانده، به چه چیزی نیاز است؟ (Ctrl+Enter)', 'What happened, what is left, what is needed? (Ctrl+Enter)')} className="flex-1 resize-none bg-transparent px-1 text-sm outline-none" />
@@ -129,7 +130,7 @@ export function PlanSheet({ id, onClose }: { id: string; onClose: () => void }) 
                     <Avatar name={x.author} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline gap-2 text-sm"><span className="font-medium">{x.author}</span><span className="text-[0.6875rem] text-sub">{fmtDate(x.created_at)} · {timeAgo(toDate(x.created_at))}</span></div>
-                      <div className="mt-0.5 whitespace-pre-wrap text-sm leading-7 text-ink/85">{x.body}</div>
+                      <div dir={dirOf(x.body)} className="mt-0.5 whitespace-pre-wrap text-sm leading-7 text-ink/85">{x.body}</div>
                     </div>
                   </div>
                 ))}

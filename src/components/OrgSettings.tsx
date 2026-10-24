@@ -1,4 +1,5 @@
 // The organisation in the back office: job titles, teams and sides are lists the program manager edits.
+import { TeamMove } from './TeamMove'
 import { useState } from 'react'
 import { ArrowDown, ArrowUp, BookA, Building2, Plus, Trash2 } from 'lucide-react'
 import { useStore } from '../lib/store'
@@ -27,7 +28,7 @@ function OrgList({ kind, admin: canEdit, bare }: { kind: OrgKind; admin: boolean
   const [draft, setDraft] = useState<OrgItem>({ id: '', fa: '', en: '' })
   const save = (next: OrgItem[]) => setSetting(ORG_KEYS[kind], JSON.stringify(next))
   const used = (id: string) =>
-    kind === 'links' ? db.Projects.filter((p) => String(p.links || '').includes(`"${id}"`)).length : kind === 'access' ? db.Team.filter((m) => m.access === id).length : kind === 'series' ? db.Meetings.filter((m) => m.series === id).length : kind === 'plans' ? db.Meetings.filter((m) => m.purpose === id).length : kind === 'titles' ? db.Team.filter((m) => m.role === id).length : kind === 'teams' ? db.Team.filter((m) => teamCodes(m.team, m.role, m.track).includes(id)).length : db.Team.filter((m) => m.track === id).length + db.Tasks.filter((t) => t.track === id).length
+    kind === 'links' ? db.Projects.filter((p) => String(p.links || '').includes(`"${id}"`)).length : kind === 'access' ? db.Team.filter((m) => m.access === id).length : kind === 'series' ? db.Meetings.filter((m) => m.series === id).length : kind === 'plans' ? db.Meetings.filter((m) => m.purpose === id).length : kind === 'titles' ? db.Team.filter((m) => m.role === id).length : kind === 'teams' ? db.Team.filter((m) => teamCodes(m.team, m.role, m.track).includes(id)).length : db.Team.filter((m) => m.track === id).length + db.Tasks.filter((t) => t.track === id).length + db.Projects.filter((p) => p.team === id).length
   const edit = (i: number, k: keyof OrgItem, v: string) => {
     if ((list[i][k] || '') === v) return
     save(list.map((x, j) => (j === i ? { ...x, [k]: v } : x)))
@@ -39,9 +40,12 @@ function OrgList({ kind, admin: canEdit, bare }: { kind: OrgKind; admin: boolean
     ;[next[i], next[j]] = [next[j], next[i]]
     save(next)
   }
+  const [moving, setMoving] = useState('')
   const remove = (i: number) => {
     const n = used(list[i].id)
     if (list.length <= 1) return
+    // a team with work: its tasks, projects and people go to another team first
+    if (kind === 'sides' && n) return setMoving(list[i].id)
     save(list.filter((_, j) => j !== i))
     if (n) toast(L(`${n} مورد هنوز «${list[i].fa}» را دارند؛ آن‌ها را ویرایش کنید.`, `${n} item(s) still use “${list[i].en}”; edit them.`), 'err')
   }
@@ -82,6 +86,12 @@ function OrgList({ kind, admin: canEdit, bare }: { kind: OrgKind; admin: boolean
           </li>
         ))}
       </ul>
+      {moving && (
+        <div className="mt-2">
+          <TeamMove from={moving} onDone={() => { save(list.filter((x) => x.id !== moving)); setMoving('') }} />
+          <button className="mt-1 text-[0.6875rem] text-sub hover:underline" onClick={() => setMoving('')}>{L('انصراف', 'Cancel')}</button>
+        </div>
+      )}
       {admin && !fixed && (
         <form className="mt-2 flex flex-wrap gap-1.5" onSubmit={(e) => (e.preventDefault(), add())}>
           <input dir="ltr" className="input h-9 w-20 text-xs" placeholder={kind === 'titles' ? 'APM' : L('کد', 'Code')} value={draft.id} onChange={(e) => setDraft({ ...draft, id: e.target.value })} />

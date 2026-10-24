@@ -1,6 +1,7 @@
 // Sprints (Jira-style) for the teams that work in them: the running sprint's board, the backlog with
 // planned sprints (plan, start), and reports (velocity, past sprints). Each sprint has its own report
 // page (SprintReport) that doubles as the CPTO's view.
+import { dirOf } from '../lib/dir'
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { BarChart3, Pencil, Play, Plus, Settings2, Zap } from 'lucide-react'
@@ -163,7 +164,7 @@ export default function Sprints() {
                   <section key={s.id} className="card overflow-hidden">
                     <header className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3">
                       <span className={cx('rounded-full px-2 py-0.5 text-[0.6875rem]', s.status === 'active' ? 'bg-ink text-surface' : 'bg-muted text-sub')}>{L(SPRINT_LABEL[s.status][0], SPRINT_LABEL[s.status][1])}</span>
-                      <Link to={`/sprints/${s.id}`} className="font-semibold hover:underline">{s.name}</Link>
+                      <Link dir={dirOf(s.name)} to={`/sprints/${s.id}`} className="font-semibold hover:underline">{s.name}</Link>
                       <span className="text-xs text-sub num">{fmtDayMonth(s.start_date)} → {fmtDayMonth(s.end_date)}</span>
                       {s.goal && <span className="truncate text-xs text-sub">· {s.goal}</span>}
                       <span className={cx('ms-auto text-xs num', over ? 'text-warn' : 'text-sub')}>
@@ -206,7 +207,7 @@ export default function Sprints() {
                     return (
                       <li key={s.id}>
                         <Link to={`/sprints/${s.id}`} className="flex items-center gap-3 px-5 py-3 text-sm hover:bg-muted/50">
-                          <span className="font-medium">{s.name}</span>
+                          <span dir={dirOf(s.name)} className="font-medium">{s.name}</span>
                           <span className="text-xs text-sub num">{fmtDayMonth(s.start_date)} → {fmtDayMonth(s.end_date)}</span>
                           <span className="ms-auto text-xs num">{fa(d)}/{fa(c)}</span>
                           <span className={cx('w-12 text-end text-xs font-medium num', c && d / c < 0.7 ? 'text-warn' : 'text-good')}>{c ? `${fa(Math.round((d / c) * 100))}٪` : '—'}</span>

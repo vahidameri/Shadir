@@ -1,4 +1,5 @@
 import { assigneesOf } from '../lib/assignees'
+import { dirOf } from '../lib/dir'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, BellRing, CalendarRange, MessageSquareText } from 'lucide-react'
@@ -243,6 +244,7 @@ function Pill({ tone, icon, text, onClick, done }: { tone: keyof typeof pillTone
         onClick()
       }}
       title={text}
+      dir={dirOf(text)}
       className={cx('flex w-full items-center gap-1 rounded-md px-1.5 py-0.5 text-start text-[0.6875rem] leading-4 transition hover:brightness-95', pillTone[tone])}
     >
       <span className="shrink-0">{icon}</span>

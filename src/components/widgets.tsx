@@ -1,4 +1,5 @@
 import { assigneesOf } from '../lib/assignees'
+import { dirOf } from '../lib/dir'
 import { useState } from 'react'
 import { Plus, MessageSquare, CheckCircle2, FileText, Flag, BellRing, Link2 } from 'lucide-react'
 import { trackOf, sideDot, waitingOn, TRACK } from '../lib/tracks'
@@ -86,7 +87,7 @@ export function Kanban({ tasks, defaults, showProject = true }: { tasks: Task[];
                     {(t.key || t.issue_type) && <div className="mb-1 flex items-center gap-1.5"><IssueBadge type={t.issue_type} /><KeyTag k={t.key} /></div>}
                     <div className={cx('flex items-start gap-1.5 text-sm leading-6', isClosed(s) && 'text-sub line-through')}>
                       {t.flag && <span className="mt-1"><FlagMark id={t.flag} size={12} /></span>}
-                      <span className="min-w-0 flex-1">{t.title}</span>
+                      <span dir={dirOf(t.title)} className="min-w-0 flex-1">{t.title}</span>
                     </div>
                     {catOf(t.status) === 'blocked' && t.blocked_reason && <div className="mt-2 rounded-lg bg-bad/[0.07] px-2 py-1 text-[0.6875rem] leading-5 text-bad">{t.blocked_reason}</div>}
                     <TaskSignals t={{ ...t, flag: '' }} assign={false} className="mt-2" />
@@ -218,8 +219,8 @@ export function RiskMatrix({ risks, onPick, cell: active, onCell }: { risks: Ris
             <li key={r.id}>
               <button onClick={() => onPick?.(r)} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-start text-xs transition hover:bg-muted">
                 <span className={cx('h-1.5 w-1.5 shrink-0 rounded-full', BAND[riskLevel(riskScore(r))].dot)} />
-                <span className="flex-1 truncate">{r.title}</span>
-                <span className="shrink-0 text-sub">{r.owner}</span>
+                <span dir={dirOf(r.title)} className="flex-1 truncate">{r.title}</span>
+                <span dir={dirOf(r.owner)} className="shrink-0 text-sub">{r.owner}</span>
               </button>
             </li>
           ))}
@@ -248,7 +249,7 @@ export function UpdateCard({ u, showProject }: { u: Update; showProject?: boolea
         </div>
         <HealthBadge h={u.health} />
       </div>
-      <p className="mt-4 text-[0.9375rem] leading-8">{u.summary}</p>
+      <p dir={dirOf(u.summary)} className="mt-4 text-[0.9375rem] leading-8">{u.summary}</p>
       <div className="mt-5 grid gap-4 border-t border-line pt-4 @sm:grid-cols-3">
         {[
           [L('انجام‌شده', 'Done'), u.done, 'bg-good'],

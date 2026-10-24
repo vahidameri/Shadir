@@ -1,6 +1,7 @@
 // The cartable: one page per person (the CPTO's, the PgM's), daily or for the end of the week.
 // The PgM fills the CPTO's from Mizito, tasks and follow-ups (or plain text), and sends it in one go;
 // the CPTO works down it: done, or back with a line. What isn't done carries over.
+import { dirOf } from '../lib/dir'
 import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Inbox, Plus, Search, Send } from 'lucide-react'
 import { useStore } from '../lib/store'
@@ -118,7 +119,7 @@ export default function CartablePage() {
                 <li key={`${p.entity}${p.entity_id}`}>
                   <button className="flex w-full items-center gap-3 px-3 py-2 text-start text-sm hover:bg-muted/50" onClick={() => (setAdding(p), setQ(''))}>
                     <span className="w-16 shrink-0 text-[0.6875rem] text-sub">{p.where}</span>
-                    <span className="min-w-0 flex-1 truncate">{p.title}</span>
+                    <span dir={dirOf(p.title)} className="min-w-0 flex-1 truncate">{p.title}</span>
                     <Plus size={14} className="text-sub" />
                   </button>
                 </li>

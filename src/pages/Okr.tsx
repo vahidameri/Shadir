@@ -1,6 +1,7 @@
 // OKRs: each team's objectives and key results for a quarter. A team card shows the quarter at a
 // glance and opens to the full tree. Key results carry a weight (a team's add up to 100), a Mizito
 // link, check-ins (the trend), documents and notes; their detail opens in a side panel.
+import { dirOf } from '../lib/dir'
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Pencil, Plus, Target } from 'lucide-react'
@@ -130,7 +131,7 @@ export default function OkrPage() {
                         <span className="mt-2 flex flex-wrap gap-1.5">
                           {okr.objectives.map((o) => (
                             <span key={o.id} className="inline-flex max-w-[16rem] items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-[0.6875rem]">
-                              <span className="truncate">{o.title}</span>
+                              <span dir={dirOf(o.title)} className="truncate">{o.title}</span>
                               <b className="font-medium num">{fa(objectiveProgress(db, o))}٪</b>
                             </span>
                           ))}
@@ -171,12 +172,12 @@ export default function OkrPage() {
                               <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-muted text-xs font-semibold num">{fa(i + 1)}</span>
                               <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <span className="font-medium">{o.title}</span>
+                                  <span dir={dirOf(o.title)} className="font-medium">{o.title}</span>
                                   {o.owner && <span className="text-xs text-sub">· {o.owner}</span>}
                                   {w > 0 && <span className="text-xs text-sub">· {L(`وزن ${fa(w)}`, `weight ${w}`)}</span>}
                                   {canEdit && <button className="icon-btn h-7 w-7 text-sub" onClick={() => open('Objectives', o as never)} aria-label={L('ویرایش هدف', 'Edit objective')}><Pencil size={13} /></button>}
                                 </div>
-                                {o.description && <div className="mt-0.5 text-xs text-sub">{o.description}</div>}
+                                {o.description && <div dir={dirOf(o.description)} className="mt-0.5 text-xs text-sub">{o.description}</div>}
                                 <div className="mt-2 flex items-center gap-3">
                                   <Progress value={p} marker={el} className="max-w-md" />
                                   <span className="text-xs font-medium num">{fa(p)}٪</span>
@@ -223,12 +224,12 @@ function KrRow({ k, quarter, onOpen }: { k: KeyResult; quarter: string; onOpen: 
       <div className="min-w-0">
         <button onClick={onOpen} className="flex max-w-full items-center gap-1.5 text-start text-sm hover:underline">
           <HealthDot h={c === 'on_track' ? 'green' : c === 'at_risk' ? 'amber' : 'red'} />
-          <span className="truncate">{k.title}</span>
+          <span dir={dirOf(k.title)} className="truncate">{k.title}</span>
         </button>
         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[0.6875rem] text-sub">
           <span className="rounded-full bg-muted px-1.5 font-medium text-ink num">{L(`وزن ${fa(Number(k.weight) || 0)}`, `w ${Number(k.weight) || 0}`)}</span>
-          {k.owner && <span>{k.owner}</span>}
-          {product && <Link to={`/projects/${product.id}`} className="hover:text-ink">{product.name}</Link>}
+          {k.owner && <span dir={dirOf(k.owner)}>{k.owner}</span>}
+          {product && <Link dir={dirOf(product.name)} to={`/projects/${product.id}`} className="hover:text-ink">{product.name}</Link>}
           {k.mizito_link && (
             <a href={k.mizito_link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 hover:text-ink">
               <ExternalLink size={11} /> {L('میزیتو', 'Mizito')}

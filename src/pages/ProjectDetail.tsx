@@ -1,4 +1,5 @@
 import { isAssignee } from '../lib/assignees'
+import { dirOf } from '../lib/dir'
 import { closed } from '../lib/columns'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
@@ -97,7 +98,7 @@ export default function ProjectDetail() {
                 {p.pause_reason && ` — ${p.pause_reason}`}
               </span>
             )}
-            {p.description}
+            <span dir={dirOf(p.description)}>{p.description}</span>
             {p.objective && (
               <span className="mt-3 flex items-center gap-2 text-white/80">
                 <Target size={14} /> {p.objective}
@@ -245,7 +246,7 @@ export default function ProjectDetail() {
                           <span className="font-medium">{c.author}</span>
                           <span className="text-[0.6875rem] text-sub">{timeAgo(stampToDate(c.created_at))}</span>
                         </div>
-                        <div className="mt-0.5 text-sm leading-7 text-ink/85">{renderMentions(c.body, db.Team.map((t) => t.name))}</div>
+                        <div dir={dirOf(c.body)} className="mt-0.5 text-sm leading-7 text-ink/85">{renderMentions(c.body, db.Team.map((t) => t.name))}</div>
                       </div>
                     </div>
                   ))}
@@ -378,7 +379,7 @@ export default function ProjectDetail() {
                     <button key={a.id} onClick={() => open('Allocations', a as never)} className="flex items-center gap-3 rounded-2xl border border-line p-4 text-start transition hover:border-line-strong">
                       <Avatar name={mem.name} size="lg" />
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium">{mem.name}</div>
+                        <div dir={dirOf(mem.name)} className="text-sm font-medium">{mem.name}</div>
                         <div className="text-xs text-sub">
                           {lbl(JOB_TITLE, mem.role)} · {L(`${fa(memTasks)} تسک باز`, `${memTasks} open tasks`)}
                         </div>
@@ -464,7 +465,7 @@ function KrMini({ id }: { id: string }) {
   return (
     <div>
       <div className="flex items-center justify-between gap-2 text-sm">
-        <span className="truncate">{k.title}</span>
+        <span dir={dirOf(k.title)} className="truncate">{k.title}</span>
         <span className={cx('shrink-0 text-xs', CONF[c].tone)}>{tr(CONF[c].label)}</span>
       </div>
       <Progress value={krProgress(k)} marker={elapsed(o.quarter)} h={c === 'on_track' ? 'green' : c === 'at_risk' ? 'amber' : 'red'} className="mt-1.5" />

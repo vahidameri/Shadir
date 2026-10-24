@@ -1,4 +1,5 @@
 import { DAYS as CADENCE_DAYS, DELIVERY_KEYS, deliveryCfg } from '../lib/cadence'
+import { dirOf } from '../lib/dir'
 import { MizitoSettings } from '../components/MizitoParts'
 import { useState } from 'react'
 import { CalendarClock, CheckCircle2, Link2, Loader2, RotateCcw, Unplug, XCircle, Zap } from 'lucide-react'
@@ -66,7 +67,7 @@ export default function Settings({ embedded }: { embedded?: boolean }) {
               <ul className="space-y-1 text-xs">
                 {auto.log.slice(0, 6).map((l, i) => (
                   <li key={i} className="flex justify-between gap-3">
-                    <span>{l.text}</span>
+                    <span dir={dirOf(l.text)}>{l.text}</span>
                     <span className="shrink-0 text-sub">{timeAgo(l.at)}</span>
                   </li>
                 ))}

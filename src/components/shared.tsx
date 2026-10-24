@@ -1,4 +1,5 @@
 import { DeliveredButton, DeliveryBadge, DeliveryHistory } from './DeliveryDay'
+import { dirOf } from '../lib/dir'
 import { reminderText } from '../lib/mizito'
 import { taskCfg } from '../lib/taskcfg'
 import { Copy, ExternalLink, Send } from 'lucide-react'
@@ -65,7 +66,7 @@ export function TaskRow({ t, showProject = true, dense }: { t: Task; showProject
       <div className="min-w-0 flex-1">
         <div className={cx('flex items-center gap-1.5 truncate text-sm', done && 'text-sub line-through')}>
           {isPrivateTask(t, db) && <Lock size={12} className="shrink-0 text-sub" aria-label={L('خصوصی', 'Private')} />}
-          <span className="truncate">{t.title}</span>
+          <span dir={dirOf(t.title)} className="truncate">{t.title}</span>
         </div>
         {(showProject && t.project_id) || nComments || loud ? (
           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[0.6875rem] text-sub">
@@ -137,7 +138,7 @@ export function FollowUpRow({ f, compact }: { f: FollowUp; compact?: boolean }) 
         <Icon size={15} />
       </div>
       <div className="min-w-0 flex-1">
-        <div className={cx('text-sm font-medium', f.status === 'done' && 'text-sub line-through')}>{f.subject}</div>
+        <div dir={dirOf(f.subject)} className={cx('text-sm font-medium', f.status === 'done' && 'text-sub line-through')}>{f.subject}</div>
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-sub">
           <span className="inline-flex items-center gap-1.5">
             <Avatar name={f.person} size="xs" /> {f.person}
@@ -153,7 +154,7 @@ export function FollowUpRow({ f, compact }: { f: FollowUp; compact?: boolean }) 
           )}
         </div>
         {f.waiting_for && <div className="mt-1 text-xs"><span className="text-sub">{L('منتظر:', 'Waiting for:')}</span> {f.waiting_for}</div>}
-        {!compact && f.notes && <div className="mt-1.5 line-clamp-2 text-xs leading-5 text-sub/90">{f.notes}</div>}
+        {!compact && f.notes && <div dir={dirOf(f.notes)} className="mt-1.5 line-clamp-2 text-xs leading-5 text-sub/90">{f.notes}</div>}
       </div>
       <div className="flex flex-col items-end gap-1.5">
         <Due iso={f.due_date} done={f.status === 'done'} />
@@ -237,8 +238,8 @@ export function ProjectCard({ p }: { p: Project }) {
           {p.pause_reason && ` — ${p.pause_reason}`}
         </div>
       )}
-      <h3 className="mt-3 text-[1.0625rem] font-semibold leading-snug tracking-tight" dir="auto">{p.name}</h3>
-      {p.description && <p className="mt-1 line-clamp-1 text-xs leading-5 text-sub">{p.description}</p>}
+      <h3 className="mt-3 text-[1.0625rem] font-semibold leading-snug tracking-tight" dir={dirOf(p.name)}>{p.name}</h3>
+      {p.description && <p dir={dirOf(p.description)} className="mt-1 line-clamp-1 text-xs leading-5 text-sub">{p.description}</p>}
       {hasDeliveryDay(p) && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <DeliveryBadge p={p} />
@@ -302,11 +303,11 @@ export function ProjectCard({ p }: { p: Project }) {
       {issue && p.status === 'active' ? (
         <div className={cx('mt-4 flex items-start gap-2 rounded-xl px-3 py-2 text-[0.6875rem] leading-5', m.health === 'red' ? 'bg-bad/[0.07] text-bad' : 'bg-warn/[0.09] text-warn')}>
           <AlertTriangle size={13} className="mt-0.5 shrink-0" />
-          <span className="line-clamp-2">{issue.text}</span>
+          <span dir={dirOf(issue.text)} className="line-clamp-2">{issue.text}</span>
         </div>
       ) : m.nextMilestone ? (
         <div className="mt-4 rounded-xl bg-muted/70 px-3 py-2 text-[0.6875rem] text-sub">
-          {L('مایلستون بعدی', 'Next milestone')}: <span className="text-ink">{m.nextMilestone.title}</span> · {fmtDayMonth(m.nextMilestone.planned_date)}
+          {L('مایلستون بعدی', 'Next milestone')}: <span dir={dirOf(m.nextMilestone.title)} className="text-ink">{m.nextMilestone.title}</span> · {fmtDayMonth(m.nextMilestone.planned_date)}
         </div>
       ) : (
         <div className="mt-4" />

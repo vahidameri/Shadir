@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { dirOf } from '../lib/dir'
 import { closed } from '../lib/columns'
 import { NavLink, useLocation, useNavigate, Link } from 'react-router-dom'
 import {
@@ -163,7 +164,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
         {groups.map((g) => (
           <div key={g.label}>
-            {wide && <div className="mb-1.5 px-3 font-mono text-[0.625rem] uppercase tracking-[0.18em] text-band-sub/80">{g.label}</div>}
+            {wide && <div dir={dirOf(g.label)} className="mb-1.5 px-3 font-mono text-[0.625rem] uppercase tracking-[0.18em] text-band-sub/80">{g.label}</div>}
             <div className="space-y-0.5">
               {g.links.map((l) => (
                 <NavLink
@@ -186,7 +187,7 @@ export function Layout({ children }: { children: ReactNode }) {
                     <>
                       {isActive && <span className="absolute inset-y-2 start-0 w-[3px] rounded-full bg-brand-soft" />}
                       <l.icon size={18} strokeWidth={1.7} />
-                      {wide && <span className="flex-1 truncate">{l.label}</span>}
+                      {wide && <span dir={dirOf(l.label)} className="flex-1 truncate">{l.label}</span>}
                       {wide && !l.badge && !!l.count && <span className="font-mono text-[0.6875rem] text-white/35 num">{fa(l.count)}</span>}
                       {!!l.badge && (
                         <span className={cx('rounded-full bg-[#c4314b] text-[0.625rem] font-semibold text-white num leading-[18px]', wide ? 'px-1.5' : 'absolute end-2 top-1.5 h-2 w-2 overflow-hidden text-transparent')}>{fa(l.badge)}</span>
@@ -212,7 +213,7 @@ export function Layout({ children }: { children: ReactNode }) {
                   className={({ isActive }) => cx('flex h-9 items-center gap-3 rounded-xl px-3 text-[0.8125rem] transition', isActive ? 'bg-white/[0.09] text-white' : 'text-white/60 hover:bg-white/[0.05] hover:text-white')}
                 >
                   <HealthDot h={projectMetrics(p, db).health} />
-                  <span className="truncate">{p.name}</span>
+                  <span dir={dirOf(p.name)} className="truncate">{p.name}</span>
                 </NavLink>
               ))}
             </div>
@@ -401,7 +402,7 @@ export function Layout({ children }: { children: ReactNode }) {
         {toasts.map((t) => (
           <div key={t.id} className={cx('pointer-events-auto flex items-center gap-3 rounded-2xl px-4 py-3 text-sm shadow-pop rise', t.kind === 'err' ? 'bg-bad text-white' : 'bg-[#111214] text-white')}>
             {t.kind === 'err' ? <AlertCircle size={16} /> : <CheckCircle2 size={16} className="text-[#7fe0b0]" />}
-            <span>{t.text}</span>
+            <span dir={dirOf(t.text)}>{t.text}</span>
             {t.action && (
               <button
                 className="ms-2 font-semibold text-brand-soft hover:underline dark:text-[#C1D6DE]"
@@ -490,7 +491,7 @@ function InboxButton({ items }: { items: InboxItem[] }) {
                     <Icon size={14} />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className={cx('block truncate text-sm', isUnread && 'font-semibold')}>{i.title}</span>
+                    <span dir={dirOf(i.title)} className={cx('block truncate text-sm', isUnread && 'font-semibold')}>{i.title}</span>
                     <span className="block truncate text-xs text-sub">{i.sub}</span>
                   </span>
                   <span className="flex flex-col items-end gap-1.5">
