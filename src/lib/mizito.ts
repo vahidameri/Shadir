@@ -322,8 +322,8 @@ export const P_HINT: T2[] = [
   ['خوب است انجام شود', 'Good to do'],
 ]
 
-export type MzView = 'queue' | 'inbox' | 'changed' | 'p0' | 'exec' | 'breached' | 'waiting' | 'stale' | 'mine_cpto' | 'mine_pgm' | 'closed' | 'all'
-export const MZ_VIEWS: MzView[] = ['queue', 'inbox', 'changed', 'p0', 'exec', 'breached', 'waiting', 'stale', 'closed', 'all']
+export type MzView = 'queue' | 'inbox' | 'changed' | 'again' | 'p0' | 'exec' | 'breached' | 'waiting' | 'stale' | 'mine_cpto' | 'mine_pgm' | 'closed' | 'all'
+export const MZ_VIEWS: MzView[] = ['queue', 'inbox', 'changed', 'again', 'p0', 'exec', 'breached', 'waiting', 'stale', 'closed', 'all']
 
 /** The two highest tiers count as "exec asks". */
 export const isExecTier = (t?: Tier) => !!t && [...cfg.tiers].sort((a, b) => b.weight - a.weight).slice(0, 2).some((x) => x.id === t.id)
@@ -341,6 +341,9 @@ export function inMzView(db: DB, m: MizitoItem, v: MzView, s = mzSignals(db, m))
       return m.review === 'new' && !mzClosed(m)
     case 'changed':
       return recentlyChanged(m) && m.review !== 'ignored'
+    case 'again':
+      // asked about again (a later mention on the same task) and still open
+      return !!m.mz_again && !mzClosed(m)
     case 'p0':
       return !mzClosed(m) && s.p === 0
     case 'exec':

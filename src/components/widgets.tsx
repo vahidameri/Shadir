@@ -1,6 +1,6 @@
 import { assigneesOf } from '../lib/assignees'
 import { dirOf } from '../lib/dir'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Plus, MessageSquare, CheckCircle2, FileText, Flag, BellRing, Link2 } from 'lucide-react'
 import { trackOf, sideDot, waitingOn, TRACK } from '../lib/tracks'
 import type { Track } from '../lib/types'
@@ -33,6 +33,14 @@ export function Kanban({ tasks, defaults, showProject = true }: { tasks: Task[];
   const admin = canEdit && can.backoffice(access)
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
+  // a long column is drawn in pages (done columns grow without end)
+  const [shownPer, setShownPer] = useState<Record<string, number>>({})
+  const COL = 30
+  const nComments = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const c of db.Comments) if (c.entity === 'Tasks') m.set(c.entity_id, (m.get(c.entity_id) || 0) + 1)
+    return m
+  }, [db.Comments])
   const addColumn = async () => {
     const n = name.trim()
     setAdding(false)
@@ -73,8 +81,8 @@ export function Kanban({ tasks, defaults, showProject = true }: { tasks: Task[];
               {pts > 0 && <span className="ms-auto font-mono text-[0.625rem] text-sub">{fa(pts)} {L('امتیاز', 'pts')}</span>}
             </div>
             <div className="mt-1 flex flex-col gap-2">
-              {col.map((t) => {
-                const nC = db.Comments.filter((c) => c.entity === 'Tasks' && c.entity_id === t.id).length
+              {col.slice(0, shownPer[s] || COL).map((t) => {
+                const nC = nComments.get(t.id) || 0
                 return (
                   <div
                     key={t.id}
@@ -109,6 +117,11 @@ export function Kanban({ tasks, defaults, showProject = true }: { tasks: Task[];
                   </div>
                 )
               })}
+              {col.length > (shownPer[s] || COL) && (
+                <button onClick={() => setShownPer((x) => ({ ...x, [s]: (x[s] || COL) + COL * 2 }))} className="rounded-2xl px-3 py-2 text-xs text-brand transition hover:bg-surface">
+                  {L(`${fa(col.length - (shownPer[s] || COL))} کارت دیگر`, `${col.length - (shownPer[s] || COL)} more`)}
+                </button>
+              )}
               {canEdit && (
                 <button onClick={() => open('Tasks', { ...defaults, status: s })} className="flex items-center gap-1.5 rounded-2xl px-3 py-2.5 text-xs text-sub transition hover:bg-surface hover:text-ink">
                   <Plus size={14} /> {L('افزودن', 'Add')}

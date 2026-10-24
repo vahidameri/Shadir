@@ -26,5 +26,19 @@ export function diffRows(sheet: SheetName, prev: Record<string, unknown> | undef
 }
 
 /** A row's log, newest first. */
-export const historyOf = (db: DB, entity: HistoryRow['entity'], id: string) =>
-  db.History.filter((h) => h.entity === entity && h.entity_id === id).sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
+// one index per version of the History tab (it holds every change ever made: tens of thousands of rows)
+const histIndex = new WeakMap<HistoryRow[], Map<string, HistoryRow[]>>()
+export const historyOf = (db: DB, entity: HistoryRow['entity'], id: string) => {
+  let ix = histIndex.get(db.History)
+  if (!ix) {
+    ix = new Map()
+    for (const h of db.History) {
+      const k = `${h.entity}|${h.entity_id}`
+      const l = ix.get(k)
+      if (l) l.push(h)
+      else ix.set(k, [h])
+    }
+    histIndex.set(db.History, ix)
+  }
+  return [...(ix.get(`${entity}|${id}`) || [])].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
+}

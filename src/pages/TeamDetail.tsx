@@ -1,5 +1,6 @@
 // One team: its health and numbers, its people (with what each has open), its products and projects,
 // this quarter's OKRs, and its tasks by what needs attention first.
+import { MoreButton, usePaged } from '../components/Paged'
 import { dirOf } from '../lib/dir'
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
@@ -34,7 +35,6 @@ export default function TeamDetail() {
   const q = quarterOf()
   const okr = useMemo(() => teamOkr(db, team, q, s.tasks), [db, team, q, s.tasks])
   const defined = !team || TRACKS.includes(team)
-  if (team && !defined && !s.tasks.length && !s.projects.length && !db.Team.some((m) => m.track === team)) return <Empty text={L('این تیم پیدا نشد', 'Team not found')} />
 
   const openTasks = s.tasks.filter((t) => !closed(t))
   const sig = new Map(openTasks.map((t) => [t.id, signals(t)]))
@@ -49,6 +49,9 @@ export default function TeamDetail() {
       : view === 'open'
         ? [...openTasks].sort(byDue)
         : s.tasks.filter((t) => catOf(t.status) === 'done').sort((a, b) => String(b.completed_at || '') < String(a.completed_at || '') ? -1 : 1).slice(0, 40)
+
+  const paged = usePaged([{ rows: list }], 60, [view, team])
+  if (team && !defined && !s.tasks.length && !s.projects.length && !db.Team.some((m) => m.track === team)) return <Empty text={L('این تیم پیدا نشد', 'Team not found')} />
 
   const members = db.Team.filter((m) => m.track === team && String(m.active) !== 'false').map((m) => {
     const mine = openTasks.filter((t) => assigneesOf(t).includes(m.name))
@@ -115,10 +118,11 @@ export default function TeamDetail() {
               }
             >
               {list.length ? (
-                <div className="divide-y divide-line">{list.map((t) => <TaskRow key={t.id} t={t} />)}</div>
+                <div className="divide-y divide-line">{paged.groups[0].shown.map((t) => <TaskRow key={t.id} t={t} />)}</div>
               ) : (
                 <Empty text={view === 'attention' ? L('چیزی معوق، مسدود یا راکد نیست', 'Nothing late, blocked or quiet') : L('تسکی نیست', 'No tasks')} />
               )}
+              <MoreButton hidden={paged.hidden} step={paged.step} onMore={paged.more} noun={['تسک', 'tasks']} />
               <Link to={`/tasks?track=${team}`} className="mt-3 inline-block text-xs text-brand hover:underline">{L('همه در صفحه‌ی تسک‌ها ←', 'All on the Tasks page →')}</Link>
             </Card>
           </div>

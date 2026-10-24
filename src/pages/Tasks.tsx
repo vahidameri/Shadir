@@ -1,6 +1,6 @@
 import { assigneesOf, isAssignee, joinNames, leadAssignee } from '../lib/assignees'
 import { dirOf } from '../lib/dir'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { canPersonal } from '../lib/taskcfg'
 import { useSearchParams } from 'react-router-dom'
 import { Plus, ArrowUpDown, MessageSquare, Link2, Settings2, UserX, Check, XCircle, Rows3, Target, X } from 'lucide-react'
@@ -35,6 +35,9 @@ const VIEW_LABEL: Record<View, [string, string]> = {
   stale: ['راکد', 'Quiet'], waiting: ['در انتظار', 'Waiting'], intake: ['ورودی', 'Intake'], closed: ['بسته‌شده', 'Closed'], all: ['همه', 'All'],
 }
 const VIEW_TONE: Partial<Record<View, string>> = { blocked: 'text-bad', late: 'text-bad', flagged: 'text-warn', intake: 'text-sky-600', stale: 'text-sub' }
+
+/** rows drawn at once in the list (the rest with «نمایش بیشتر») */
+const PAGE = 120
 
 export default function Tasks() {
   const { db, me, canEdit, upsert, access, toast } = useStore()
@@ -103,6 +106,12 @@ export default function Tasks() {
     return out.sort(cmp[sort])
   }, [db, project, assignee, status, prio, due, q, sort, today, track, whose, area, kr, me, sv, view])
   const counts = useMemo(() => viewCounts(db.Tasks, me), [db.Tasks, me])
+  // comments per task, counted once (not once per row)
+  const nComments = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const c of db.Comments) if (c.entity === 'Tasks') m.set(c.entity_id, (m.get(c.entity_id) || 0) + 1)
+    return m
+  }, [db.Comments])
   // grouped list: one section per unit / person / status / flag / project
   const groups = useMemo(() => {
     if (!group) return [{ key: '', label: '', rows: list }]
@@ -117,6 +126,18 @@ export default function Tasks() {
     return keys.map((k) => ({ key: k, label: label(k), rows: map.get(k)! }))
   }, [list, group, db, pname])
 
+  // a long list is drawn in pages: the first rows at once, the rest on request
+  const [limit, setLimit] = useState(PAGE)
+  useEffect(() => setLimit(PAGE), [project, assignee, status, prio, due, q, sort, track, whose, area, kr, sv, group])
+  const shownGroups = useMemo(() => {
+    let left = limit
+    return groups.map((g) => {
+      const rows = g.rows.slice(0, Math.max(0, left))
+      left -= rows.length
+      return { ...g, shown: rows }
+    })
+  }, [groups, limit])
+  const hidden = list.length - Math.min(list.length, limit)
   const togglePick = (id: string) =>
     setPicked((s) => {
       const n = new Set(s)
@@ -285,7 +306,7 @@ export default function Tasks() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line">
-                    {groups.map((g) => [
+                    {shownGroups.map((g) => [
                       g.key !== '' || group ? (
                         <tr key={`g-${g.key}`} className="bg-muted/50">
                           <td colSpan={20} className="px-4 py-2 text-xs font-semibold">
@@ -300,8 +321,8 @@ export default function Tasks() {
                           </td>
                         </tr>
                       ) : null,
-                      ...g.rows.map((t) => {
-                      const nC = db.Comments.filter((c) => c.entity === 'Tasks' && c.entity_id === t.id).length
+                      ...g.shown.map((t) => {
+                      const nC = nComments.get(t.id) || 0
                       return (
                         <tr key={t.id} className={cx('group cursor-pointer transition hover:bg-muted/40', isTaskOverdue(t) && 'bg-bad/[0.025]', signals(t).blockedLong && 'bg-bad/[0.04]')} onClick={() => open('Tasks', t as never)}>
                           {leader && (
@@ -371,6 +392,13 @@ export default function Tasks() {
                     ])}
                   </tbody>
                 </table>
+                {hidden > 0 && (
+                  <div className="border-t border-line p-3 text-center">
+                    <button className="btn-outline btn-sm" onClick={() => setLimit((n) => n + PAGE * 2)}>
+                      {L(`نمایش ${fa(Math.min(hidden, PAGE * 2))} تسک دیگر (${fa(hidden)} باقی‌مانده)`, `Show ${Math.min(hidden, PAGE * 2)} more (${hidden} left)`)}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </Card>

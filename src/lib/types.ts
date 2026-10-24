@@ -437,6 +437,8 @@ export interface MizitoItem {
   mz_first?: string
   /** the task's conversation in Mizito (#/ws/im/<dialog>/) */
   mz_chat?: string
+  /** when the task was last mentioned again (after the first ask); set by the server */
+  mz_again?: string
   mz_link_ok?: string
 }
 

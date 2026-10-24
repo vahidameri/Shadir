@@ -70,14 +70,17 @@ async function readJson(res: Response) {
   return JSON.parse(text)
 }
 
-/** The whole data; with `since` (the data version last received) the server only says "same" when nothing changed. */
-export async function fetchAll(c: Config, since = ''): Promise<{ data: DB | null; user: RemoteUser; version: string; ver: string }> {
-  const q = new URLSearchParams({ action: 'all', ...auth(c), ...(since ? { v: since } : {}) }).toString()
+/**
+ * The data. With `since` (the data version last received) the server says "same" when nothing
+ * changed; with `held` (part → fingerprint, see lib/delta) it sends only the parts that differ.
+ */
+export async function fetchAll(c: Config, since = '', held: Record<string, string> = {}): Promise<{ data: DB | null; user: RemoteUser; version: string; ver: string; h?: Record<string, string> }> {
+  const q = new URLSearchParams({ action: 'all', d: '1', h: JSON.stringify(held), ...auth(c), ...(since ? { v: since } : {}) }).toString()
   const url = `${c.apiUrl}${c.apiUrl.includes('?') ? '&' : '?'}${q}`
   const res = await fetch(url, { method: 'GET', redirect: 'follow' })
-  const json = (await readJson(res)) as AllResponse & { same?: boolean; ver?: string; version?: string }
+  const json = (await readJson(res)) as AllResponse & { same?: boolean; ver?: string; version?: string; delta?: boolean; h?: Record<string, string> }
   if (!json.ok) throw new Error(json.error || 'خطای ناشناخته از سرور')
-  return { data: json.same ? null : json.data, user: json.user, version: String(json.version || ''), ver: String(json.ver || '') }
+  return { data: json.same ? null : json.data, user: json.user, version: String(json.version || ''), ver: String(json.ver || ''), h: json.delta ? json.h : undefined }
 }
 
 // text/plain avoids a CORS preflight, which Apps Script doesn't answer.

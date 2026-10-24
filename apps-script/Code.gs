@@ -18,7 +18,7 @@
  *   viewer — read only (leadership)
  */
 
-var MADAR_VERSION = '2.2.0'; // shown on the login page and by diagnose()
+var MADAR_VERSION = '2.3.0'; // shown on the login page and by diagnose()
 
 var SCHEMA = {
   Projects: ['id', 'code', 'name', 'description', 'category', 'owner', 'client', 'liaison', 'liaison_contact', 'status', 'priority', 'phase', 'start_date', 'end_date', 'progress', 'health_override', 'objective', 'paused_at', 'pause_reason', 'delivery_day', 'last_delivery', 'archived', 'archived_at', 'links', 'team', 'kind', 'batch'],
@@ -65,7 +65,7 @@ var SCHEMA = {
   // source = agent when the Mizito agent brought it; review = new (waiting for a look) | ignored.
   // mz_* columns mirror the task in Mizito and are written by the agent only.
   Mizito: ['id', 'mz_key', 'link', 'title', 'description', 'docs', 'asked_by', 'mentioned', 'category', 'action', 'status', 'priority_override', 'override_reason', 'urgent', 'assigned_to', 'due_date', 'received_at', 'last_mention_at', 'last_mention_by', 'outcome', 'notes', 'created_at', 'updated_at', 'closed_at', 'ext_id', 'batch',
-    'source', 'review', 'mz_state', 'mz_done_at', 'mz_done_by', 'mz_progress', 'mz_project', 'mz_owner', 'mz_assignees', 'mz_labels', 'mz_checklist', 'mz_deadline', 'mz_last_by', 'mz_last_at', 'mz_sig', 'synced_at', 'mz_change', 'mz_changed_at', 'mz_first', 'mz_link_ok', 'mz_chat'],
+    'source', 'review', 'mz_state', 'mz_done_at', 'mz_done_by', 'mz_progress', 'mz_project', 'mz_owner', 'mz_assignees', 'mz_labels', 'mz_checklist', 'mz_deadline', 'mz_last_by', 'mz_last_at', 'mz_sig', 'synced_at', 'mz_change', 'mz_changed_at', 'mz_first', 'mz_link_ok', 'mz_chat', 'mz_again'],
   // account = whose Mizito the agent read it in; mz_id = the mention's id there, mz_comment = the comment that mentioned
   MizitoMentions: ['id', 'item_id', 'by', 'at', 'note', 'status', 'batch', 'mz_id', 'account', 'mz_comment'],
   // the conversation on a Mizito task, as the agent read it (one row per Mizito comment)
@@ -112,6 +112,13 @@ function doGet(e) {
       // nothing written since this person's last read: say so instead of sending everything again
       var ver = cacheVer_();
       if (e.parameter.v && e.parameter.v === ver) return json_({ ok: true, user: me, same: true, ver: ver, version: MADAR_VERSION });
+      // d=1: only the parts this person does not have yet (h = what they have, part → fingerprint)
+      if (e.parameter.d) {
+        var have = {};
+        try { have = JSON.parse(e.parameter.h || '{}') || {}; } catch (eh) {}
+        var delta = deltaOut_(readAll_(user), have);
+        return json_({ ok: true, user: me, delta: true, data: delta.data, h: delta.h, ver: ver, version: MADAR_VERSION });
+      }
       return json_({ ok: true, user: me, data: readAll_(user), ver: ver, version: MADAR_VERSION });
     }
     if (action === 'ping') return json_({ ok: true, user: me, version: MADAR_VERSION });
@@ -512,6 +519,40 @@ function rawAll_() {
   }
   RAW_ = out;
   return RAW_;
+}
+
+// --------------------------------------------------------------------------
+// Sending only what changed. What a person sees is cut into parts: one per tab, and the tabs that
+// only grow (the change log, comments, Mizito's conversation) one part per month. Each part has a
+// fingerprint of exactly what this person receives; the app says which fingerprints it holds and
+// gets back only the parts that differ — after a save, usually one tab and this month's log.
+// The same rule is in src/lib/delta.ts.
+// --------------------------------------------------------------------------
+var PARTS_ = { History: 'at', Comments: 'created_at', MizitoComments: 'at', MizitoMentions: 'at' };
+
+function partsOf_(data) {
+  var parts = {};
+  Object.keys(data).forEach(function (name) {
+    var rows = data[name] || [];
+    var field = PARTS_[name];
+    if (!field) { parts[name] = rows; return; }
+    rows.forEach(function (r) { var k = name + '|' + String(r[field] || '').slice(0, 7); (parts[k] = parts[k] || []).push(r); });
+  });
+  return parts;
+}
+
+function fingerprint_(s) {
+  return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, s, Utilities.Charset.UTF_8)).slice(0, 12);
+}
+
+function deltaOut_(data, have) {
+  var parts = partsOf_(data), out = {}, h = {};
+  Object.keys(parts).forEach(function (k) {
+    var f = fingerprint_(JSON.stringify(parts[k]));
+    h[k] = f;
+    if (have[k] !== f) out[k] = parts[k];
+  });
+  return { data: out, h: h };
 }
 
 /** Simple trigger: a manual edit in the Sheet invalidates that tab's cache. */
@@ -1819,7 +1860,7 @@ function mzIngest_(body, agent) {
       m = {
         id: 'MZ-' + key, mz_key: key, link: t.link || '', title: long(t.title, 300), description: long(t.notes), docs: '',
         asked_by: first && first.by ? first.by : t.owner || '', mentioned: agent.name, category: '', action: '',
-        status: t.completed ? firstOf('done') : mzAnsweredLast_(t, ments, agent.name, ts) ? firstOf('waiting') : firstOf('open'),
+        status: t.completed && !mzAskedAfter_(t, ments, ts) ? firstOf('done') : mzAnsweredLast_(t, ments, agent.name, ts) ? firstOf('waiting') : firstOf('open'),
         priority_override: '', override_reason: '', urgent: '', assigned_to: '', due_date: ts(t.deadline).slice(0, 10),
         received_at: first ? ts(first.at) : ts(t.first_at) || ts(t.created_at) || now, last_mention_at: '', last_mention_by: '',
         outcome: '', notes: '', created_at: now.slice(0, 10), updated_at: now, closed_at: '', ext_id: first ? String(first.id) : '',
@@ -1827,12 +1868,13 @@ function mzIngest_(body, agent) {
       };
       m.last_mention_at = m.received_at;
       m.last_mention_by = m.asked_by;
-      if (t.completed) m.closed_at = ts(t.completed_at) || now;
+      if (catOf(m.status) === 'done') m.closed_at = ts(t.completed_at) || now;
+      if (t.completed && catOf(m.status) !== 'done') { m.mz_again = ments[ments.length - 1] ? ts(ments[ments.length - 1].at) : ''; m.review = 'new'; }
       hist.push({ entity: 'Mizito', entity_id: m.id, field: '_created', from: '', to: m.status });
       made++;
     }
     if (!listed(m.mentioned, agent.name)) m.mentioned = names_(m.mentioned).concat([agent.name]).join(', ');
-    var newComments = [], freshMentions = [], changes = [], actor = '';
+    var newComments = [], changes = [], actor = '';
 
     if (t.title) {
       // the snapshot: Mizito's own facts about the task
@@ -1905,7 +1947,9 @@ function mzIngest_(body, agent) {
       // Mizito decides whether it is open or done (an item set aside in Madar stays aside)
       var cat = catOf(m.status);
       if (cur && m.review !== 'ignored') {
-        if (t.completed && cat !== 'done' && cat !== 'cancelled') {
+        var doneAt = ts(t.completed_at);
+        var askedAfter = doneAt && String(m.last_mention_at || '') > doneAt;
+        if (t.completed && cat !== 'done' && cat !== 'cancelled' && !askedAfter) {
           log(m, 'status', m.status, firstOf('done'));
           m.status = firstOf('done');
           m.closed_at = m.mz_done_at || now;
@@ -1927,14 +1971,16 @@ function mzIngest_(body, agent) {
         m.asked_by = ments[0].by;
       }
     }
+    var fresh = [];
+    var prevAsk = String(cur ? cur.last_mention_at || cur.received_at || '' : '');
     ments.forEach(function (x) {
       var id = String(x.id);
       if (mentionIds[id] || id === String(m.ext_id || '')) return;
       mentionIds[id] = 1;
       var at = ts(x.at);
-      // a change only when it happened after the last read and this person already had the task
-      // (a second person's agent bringing old mentions, or a first comment read, is not news)
-      if (cur && cur.mz_state && listed(cur.mentioned, agent.name) && at > String(cur.synced_at || '') && freshMentions.indexOf(x.by) === -1) freshMentions.push(x.by || '');
+      // asked again: a mention Madar did not have, made after the latest ask it knew of (an older
+      // mention read late, or one from a second person's first read, is history, not a new ask)
+      if (cur && listed(cur.mentioned, agent.name) && at > prevAsk) fresh.push({ by: x.by || '', at: at });
       mentions.push({ id: 'MM-' + id, item_id: m.id, by: x.by || '', at: at, note: '', status: '', mz_id: id, account: agent.name, mz_comment: x.comment || '' });
       if (at > String(m.last_mention_at || '')) { m.last_mention_at = at; m.last_mention_by = x.by || ''; }
       if (m.source !== 'agent' && at < String(m.received_at || '9999')) m.received_at = at;
@@ -1945,7 +1991,7 @@ function mzIngest_(body, agent) {
       var row = { id: 'MC-' + c.id, item_id: m.id, by: c.by || '', at: ts(c.at), body: long(c.body), mentions: (c.mentions || []).join(', '), reply_to: c.reply_to ? 'MC-' + c.reply_to : '', files: long((c.files || []).join('\n'), 1000) };
       var old = comments[row.id];
       if (old && String(old.body) === row.body && String(old.files || '') === row.files && String(old.mentions || '') === row.mentions) return;
-      if (!old && cur && cur.mz_state && row.at > String(cur.synced_at || '')) newComments.push(row);
+      if (!old && cur && cur.mz_state && row.at > String(cur.mz_last_at || cur.received_at || '')) newComments.push(row);
       comments[row.id] = row;
       notes.push(row);
     });
@@ -1955,7 +2001,26 @@ function mzIngest_(body, agent) {
       newComments.forEach(function (c) { if (who.indexOf(c.by) === -1) who.push(c.by); });
       changes.push(who.join('، ') + (newComments.length > 1 ? ' ' + newComments.length + ' کامنت گذاشتند' : ' کامنت گذاشت'));
     }
-    if (freshMentions.length) changes.push(freshMentions.join('، ') + ' منشن کرد');
+    // the same task asked about again: back on the person's desk, its SLA counting from the new ask
+    if (fresh.length) {
+      var again = fresh.reduce(function (a, x) { return x.at > a ? x.at : a; }, '');
+      var askers = [];
+      fresh.forEach(function (x) { if (x.by && askers.indexOf(x.by) === -1) askers.push(x.by); });
+      m.mz_again = again;
+      var cat2 = catOf(m.status);
+      if ((cat2 === 'done' || cat2 === 'cancelled') && again > String(m.closed_at || '')) {
+        log(m, 'status', m.status, firstOf('open'));
+        m.status = firstOf('open');
+        m.closed_at = '';
+        changes.push('بعد از بسته شدن دوباره منشن شد');
+      } else if (cat2 === 'waiting') {
+        log(m, 'status', m.status, firstOf('open'));
+        m.status = firstOf('open');
+      }
+      // set aside in Madar, but asked again: it comes back for a look
+      if (m.review === 'ignored') m.review = 'new';
+      changes.push((askers.join('، ') || 'کسی') + ' دوباره منشن کرد' + (fresh.length > 1 ? ' (' + fresh.length + ' بار)' : ''));
+    }
     if (changes.length) {
       var last = newComments.reduce(function (a, c) { return c.at > a ? c.at : a; }, '');
       m.mz_change = long(changes.join(' · '), 300);
@@ -2035,7 +2100,7 @@ function mzIngest_(body, agent) {
   return { made: made, updated: updated, mentions: mentions.length, comments: notes.length, gone: gone, removed: removed.length };
 }
 
-var MZ_AGENT_FIELDS = ['mz_state', 'mz_done_at', 'mz_done_by', 'mz_progress', 'mz_project', 'mz_owner', 'mz_assignees', 'mz_labels', 'mz_checklist', 'mz_deadline', 'mz_last_by', 'mz_last_at', 'synced_at', 'mz_change', 'mz_changed_at', 'mz_first', 'mz_link_ok', 'mz_chat', 'last_mention_at', 'last_mention_by', 'received_at', 'mentioned'];
+var MZ_AGENT_FIELDS = ['mz_again', 'mz_state', 'mz_done_at', 'mz_done_by', 'mz_progress', 'mz_project', 'mz_owner', 'mz_assignees', 'mz_labels', 'mz_checklist', 'mz_deadline', 'mz_last_by', 'mz_last_at', 'synced_at', 'mz_change', 'mz_changed_at', 'mz_first', 'mz_link_ok', 'mz_chat', 'last_mention_at', 'last_mention_by', 'received_at', 'mentioned'];
 /**
  * A save from a page that loaded before the agent's last read must not take the agent's newer facts
  * back: those fields keep the sheet's values, and the task is read in full again (sig cleared) so
@@ -2182,6 +2247,13 @@ function mzAnsweredLast_(t, ments, me, ts) {
   return ts(t.last_at) >= lastAsk;
 }
 
+/** Done in Mizito, but someone asked about it after that: still an open ask. */
+function mzAskedAfter_(t, ments, ts) {
+  var doneAt = ts(t.completed_at);
+  if (!doneAt) return false;
+  return ments.some(function (x) { return ts(x.at) > doneAt; });
+}
+
 /** Same compare key as src/lib/mzImport.ts mzTitleKey: no spaces, half-spaces, punctuation or letter-form differences. */
 function mzTitleKey_(s) {
   return String(s || '')
@@ -2242,7 +2314,7 @@ function mzDedupe_(dry) {
 
   var keepRows = [], gone = {}, moveTo = {};
   var madar = ['category', 'action', 'priority_override', 'override_reason', 'urgent', 'assigned_to', 'outcome', 'notes', 'docs', 'link', 'description'];
-  var mzFacts = ['mz_project', 'mz_owner', 'mz_assignees', 'mz_labels', 'mz_checklist', 'mz_deadline', 'mz_progress', 'mz_last_by', 'mz_last_at', 'mz_chat'];
+  var mzFacts = ['mz_again', 'mz_project', 'mz_owner', 'mz_assignees', 'mz_labels', 'mz_checklist', 'mz_deadline', 'mz_progress', 'mz_last_by', 'mz_last_at', 'mz_chat'];
   var extra = [];
   merges.forEach(function (rows) {
     var k = {};

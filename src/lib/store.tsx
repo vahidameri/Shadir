@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { idbClear, idbGet, idbPutLater, mergeDelta } from './delta'
 import type { DB, Role, Row, SheetName, MizitoItem } from './types'
 import { readWeekCfg, setWeekCfg } from './weeks'
 import { readTaskCfg, setTaskCfg } from './taskcfg'
@@ -37,28 +38,29 @@ import { setPhotos } from '../components/ui'
 const demoKey = () => `madar.demo.v6.${locale.lang}`
 const ME_KEY = 'madar.me'
 // Last data received from the server, per signed-in account: the app opens instantly from it
-// and refreshes in the background. Cleared on sign-out.
+// and refreshes in the background. Kept in IndexedDB (lib/delta), written after a refresh, never on
+// the way of a click. Cleared on sign-out.
 const snapKey = (who: string) => `madar.snap.${who.toLowerCase()}`
-function loadSnap(who: string): { at: number; data: DB; role: Role; name: string } | null {
+interface Snap { at: number; data: DB; role: Role; name: string; h?: Record<string, string>; ver?: string }
+async function loadSnap(who: string): Promise<Snap | null> {
   if (!who) return null
-  try {
-    const s = JSON.parse(localStorage.getItem(snapKey(who)) || 'null')
-    return s && s.data ? s : null
-  } catch {
-    return null
-  }
+  const s = await idbGet<Snap>(snapKey(who))
+  return s && s.data ? s : null
 }
-function saveSnap(who: string, data: DB, role: Role, name: string) {
+function saveSnap(who: string, data: DB, role: Role, name: string, h?: Record<string, string>, ver?: string) {
   if (!who) return
-  try {
-    localStorage.setItem(snapKey(who), JSON.stringify({ at: Date.now(), data, role, name }))
-  } catch {}
+  idbPutLater(snapKey(who), { at: Date.now(), data, role, name, h, ver })
 }
 export function clearSnaps() {
+  void idbClear()
   try {
     Object.keys(localStorage).filter((k) => k.startsWith('madar.snap.')).forEach((k) => localStorage.removeItem(k))
   } catch {}
 }
+// copies kept in local storage by earlier versions: too small for a year of work, moved to IndexedDB
+try {
+  Object.keys(localStorage).filter((k) => k.startsWith('madar.snap.')).forEach((k) => localStorage.removeItem(k))
+} catch {}
 
 // translations were removed in 1.9; drop their old browser caches
 try {
@@ -111,6 +113,8 @@ function normalize(raw: Partial<DB>): DB {
   return db
 }
 
+const normalizeSheet = (sheet: SheetName, rows: Record<string, unknown>[]) => normalize({ [sheet]: rows } as unknown as Partial<DB>)[sheet] as unknown[]
+
 type Mode = 'demo' | 'live'
 
 interface Toast {
@@ -161,6 +165,9 @@ interface Store {
 const Ctx = createContext<Store | null>(null)
 
 function loadDemo(): DB {
+  // a speed test can hand the demo a dataset too big for local storage (never set in normal use)
+  const injected = (window as unknown as { __MADAR_SEED?: DB }).__MADAR_SEED
+  if (injected) return normalize(injected)
   try {
     const raw = localStorage.getItem(demoKey())
     if (raw) return normalize(JSON.parse(raw))
@@ -219,12 +226,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       writeSeq.current++
     }
   }, [])
-  // keep the local snapshot current (debounced) so the next open is instant
-  useEffect(() => {
-    if (mode !== 'live' || !lastSyncRef.current || !session?.email) return
-    const t = setTimeout(() => saveSnap(session.email, db, role, remoteName), 600)
-    return () => clearTimeout(t)
-  }, [db]) // eslint-disable-line react-hooks/exhaustive-deps
   dbRef.current = db
 
   // In live mode the signed-in identity wins; in the demo "view as" switches the viewer.
@@ -271,14 +272,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), action ? 6000 : 3200)
   }, [])
 
+  // the demo keeps its edits in local storage: once things are quiet, not on every click
+  const demoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const persistDemo = (next: DB) => {
-    try {
-      localStorage.setItem(demoKey(), JSON.stringify(next))
-    } catch {}
+    if (demoTimer.current) clearTimeout(demoTimer.current)
+    demoTimer.current = setTimeout(() => {
+      try {
+        localStorage.setItem(demoKey(), JSON.stringify(next))
+      } catch {}
+    }, 800)
   }
 
   // the version of the data last received (the server answers "same" while it has not changed)
   const dataVer = useRef({ ver: '', who: '' })
+  /** the server's fingerprint of every part of the data held (see lib/delta) */
+  const parts = useRef<Record<string, string>>({})
   const refresh = useCallback(async () => {
     if (mode === 'demo') {
       setLastSync(new Date())
@@ -293,16 +301,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     try {
       // after a save of our own the data is asked for in full; otherwise "same" saves the whole download
-      const since = dataVer.current.who === (session?.email || '') ? dataVer.current.ver : ''
-      const { data, user, version, ver } = await fetchAll(config, since)
+      const same = dataVer.current.who === (session?.email || '')
+      const since = same ? dataVer.current.ver : ''
+      // the fingerprints of the parts held: only the parts that changed come back
+      const held = same ? parts.current : {}
+      const { data, user, version, ver, h } = await fetchAll(config, since, held)
       if (seq !== writeSeq.current) return retryLater(1500)
       setServerVersion(version)
       dataVer.current = { ver, who: session?.email || '' }
       if (data) {
-        const fresh = normalize(data)
-        dbRef.current = fresh
-        setDb(fresh)
-        saveSnap(session?.email || user?.email || '', fresh, user?.role || 'viewer', user?.name || '')
+        const fresh = h ? mergeDelta(same ? dbRef.current : emptyDB(), data as unknown as Record<string, Record<string, unknown>[]>, h, held, normalizeSheet) : normalize(data)
+        parts.current = h || {}
+        if (fresh !== dbRef.current) {
+          dbRef.current = fresh
+          setDb(fresh)
+        }
+        saveSnap(session?.email || user?.email || '', fresh, user?.role || 'viewer', user?.name || '', parts.current, ver)
       }
       setRole(user?.role || 'viewer')
       setRemoteName(user?.name || '')
@@ -327,17 +341,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setError('')
       return
     }
-    // open from the last snapshot right away, then refresh in the background
-    const snap = loadSnap(session?.email || '')
-    if (snap && !lastSyncRef.current) {
+    // open from the last copy right away, then refresh (only what changed since) in the background
+    let gone = false
+    loadSnap(session?.email || '').then((snap) => {
+      if (gone || !snap || lastSyncRef.current || fetching.current) {
+        if (!gone) refresh()
+        return
+      }
       const d = normalize(snap.data)
       dbRef.current = d
       setDb(d)
+      parts.current = snap.h || {}
+      dataVer.current = { ver: snap.ver || '', who: session?.email || '' }
       setRole(snap.role)
       setRemoteName(snap.name)
       setLastSync(new Date(snap.at))
-    }
-    refresh()
+      refresh()
+    })
     const iv = setInterval(() => {
       if (document.visibilityState === 'visible') refresh()
     }, 60000)
@@ -345,6 +365,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const onVis = () => document.visibilityState === 'visible' && refresh()
     document.addEventListener('visibilitychange', onVis)
     return () => {
+      gone = true
       clearInterval(iv)
       document.removeEventListener('visibilitychange', onVis)
     }

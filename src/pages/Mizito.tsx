@@ -1,5 +1,6 @@
 // Mizito queue: what the CPTO and the PgM were mentioned on, one row per Mizito task, sorted by
 // priority (P0 first, then SLA, then deadline). Re-mentions thread into the same row.
+import { MoreButton, usePaged } from '../components/Paged'
 import { dirOf } from '../lib/dir'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -14,7 +15,7 @@ import { CaptureSheet, MzBadges, MizitoImport, MizitoSettings, MizitoSheet, MzLi
 import type { MizitoItem } from '../lib/types'
 
 const VIEW_LABEL: Record<MzView, [string, string]> = {
-  queue: ['صف باز', 'Open queue'], inbox: ['تازه از میزیتو', 'New from Mizito'], changed: ['تغییر در میزیتو', 'Changed in Mizito'], p0: ['P0', 'P0'], exec: ['درخواست مدیران ارشد', 'Exec asks'], breached: ['عبور از SLA', 'SLA breached'],
+  queue: ['صف باز', 'Open queue'], inbox: ['تازه از میزیتو', 'New from Mizito'], changed: ['تغییر در میزیتو', 'Changed in Mizito'], again: ['منشن دوباره', 'Asked again'], p0: ['P0', 'P0'], exec: ['درخواست مدیران ارشد', 'Exec asks'], breached: ['عبور از SLA', 'SLA breached'],
   waiting: ['منتظر / مسدود', 'Waiting / blocked'], stale: ['راکد', 'Quiet'], mine_cpto: ['', ''], mine_pgm: ['', ''], closed: ['بسته‌شده', 'Closed'], all: ['همه', 'All'],
 }
 type Group = '' | 'asker' | 'category' | 'p' | 'status' | 'assigned'
@@ -80,6 +81,7 @@ export default function MizitoPage() {
       const first = (m: MizitoItem) => firstFor(m, who)
       // what changed in Mizito: newest change first
       if (view === 'changed') return String(a.mz_changed_at || '') < String(b.mz_changed_at || '') ? 1 : -1
+      if (view === 'again') return String(a.mz_again || '') < String(b.mz_again || '') ? 1 : -1
       if (sort === 'recent') return last(a) < last(b) ? 1 : -1
       if (sort === 'old') return first(a) < first(b) ? -1 : 1
       if (sort === 'new') return first(a) < first(b) ? 1 : -1
@@ -95,6 +97,7 @@ export default function MizitoPage() {
     return [...map.entries()].sort((a, b) => (group === 'p' ? a[0].localeCompare(b[0]) : b[1].length - a[1].length)).map(([k, rows]) => ({ key: k, label: label(k), rows }))
   }, [list, group, sig, c])
 
+  const paged = usePaged(groups, 80, [view, group, sort, q, who, badge])
   if (!(access === 'super' || access === 'exec')) return <Empty text={L('این بخش فقط برای CPTO و مدیر برنامه است', 'For the CPTO and the PgM only')} />
   const open = base.filter((m) => inMzView(db, m, 'queue', sig.get(m.id)))
   const closedWeek = db.Mizito.filter((m) => m.closed_at && daysFromToday(m.closed_at.slice(0, 10)) >= -7).length
@@ -250,7 +253,7 @@ export default function MizitoPage() {
             <Empty text={db.Mizito.length ? L('موردی در این نما نیست', 'Nothing in this view') : L('هنوز موردی ثبت نشده. لینک تسک میزیتو را با «ثبت منشن» اضافه کنید یا از بک‌آفیس ایمپورت کنید.', 'Nothing yet. Add a Mizito link with “Log a mention” or import from the back office.')} />
           ) : (
             <div className="divide-y divide-line">
-              {groups.map((g) => (
+              {paged.groups.map((g) => (
                 <div key={g.key || '-'}>
                   {group && (
                     <div className="flex items-center gap-2 bg-muted/50 px-4 py-2 text-xs font-semibold">
@@ -258,7 +261,7 @@ export default function MizitoPage() {
                       {g.label} <span className="font-normal text-sub num">{fa(g.rows.length)}</span>
                     </div>
                   )}
-                  {g.rows.map((m) => {
+                  {g.shown.map((m) => {
                     const s = sig.get(m.id)!
                     return (
                       <div key={m.id} onClick={() => set('id', m.id)} className={cx('group flex cursor-pointer items-start gap-3 px-4 py-3 transition hover:bg-muted/40', s.p === 0 && 'bg-bad/[0.03]', picked.has(m.id) && 'bg-brand-soft/30')}>
@@ -326,6 +329,7 @@ export default function MizitoPage() {
                   })}
                 </div>
               ))}
+              <MoreButton hidden={paged.hidden} step={paged.step} onMore={paged.more} />
             </div>
           )}
         </Card>

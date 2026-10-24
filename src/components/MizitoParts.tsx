@@ -115,6 +115,11 @@ export function MzSignals({ m, compact }: { m: MizitoItem; compact?: boolean }) 
           {s.toDue === 0 ? L('ددلاین امروز', 'Due today') : s.toDue > 0 ? L(`${fa(s.toDue)} روز تا ددلاین`, `${s.toDue}d left`) : L(`${fa(-s.toDue)} روز تأخیر`, `${-s.toDue}d late`)}
         </span>
       )}
+      {m.mz_again && !mzClosed(m) && (
+        <span className={cx(chip, 'bg-brand font-medium text-white')} title={L(`این تسک بعد از اولین درخواست دوباره منشن شده؛ SLA از آخرین منشن (${m.last_mention_by || ''}) حساب می‌شود`, 'Mentioned again after the first ask; the SLA counts from the latest mention')}>
+          <AtSign size={11} /> {L(`دوباره منشن شد ${timeAgo(toDate(m.mz_again))}`, `Asked again ${timeAgo(toDate(m.mz_again))}`)}
+        </span>
+      )}
       {s.mentions > 1 && (
         <span className={cx(chip, 'bg-brand/10 text-brand')} title={L('تعداد منشن', 'Mentions')}>
           <AtSign size={11} />

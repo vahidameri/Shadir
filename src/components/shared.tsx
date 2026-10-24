@@ -1,4 +1,5 @@
 import { DeliveredButton, DeliveryBadge, DeliveryHistory } from './DeliveryDay'
+import { commentCount } from '../lib/counts'
 import { dirOf } from '../lib/dir'
 import { reminderText } from '../lib/mizito'
 import { taskCfg } from '../lib/taskcfg'
@@ -46,7 +47,7 @@ export function TaskRow({ t, showProject = true, dense }: { t: Task; showProject
   const pname = useProjectName()
   const complete = useCompleteTask()
   const done = closed(t)
-  const nComments = db.Comments.filter((c) => c.entity === 'Tasks' && c.entity_id === t.id).length
+  const nComments = commentCount(db.Comments, 'Tasks', t.id)
   const patch = (p: Partial<Task>) => upsert('Tasks', { ...t, ...p })
   const sg = signals(t)
   const loud = !!t.flag || sg.blockedDays !== null || sg.stale || !!t.link
