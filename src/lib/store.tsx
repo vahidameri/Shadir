@@ -310,7 +310,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setServerVersion(version)
       dataVer.current = { ver, who: session?.email || '' }
       if (data) {
-        const fresh = h ? mergeDelta(same ? dbRef.current : emptyDB(), data as unknown as Record<string, Record<string, unknown>[]>, h, held, normalizeSheet) : normalize(data)
+        // parts are merged into what is held only when the request said what that was; otherwise it is all new
+        const fresh = h ? mergeDelta(same && Object.keys(held).length ? dbRef.current : emptyDB(), data as unknown as Record<string, Record<string, unknown>[]>, h, held, normalizeSheet) : normalize(data)
         parts.current = h || {}
         if (fresh !== dbRef.current) {
           dbRef.current = fresh
@@ -341,13 +342,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setError('')
       return
     }
-    // open from the last copy right away, then refresh (only what changed since) in the background
+    // the data is asked for at once; the last local copy, if the browser hands it over before the
+    // answer arrives, is shown meanwhile. Nothing waits on the local copy (in the Apps Script page
+    // the browser's storage can be slow or never answer).
     let gone = false
+    // at most a moment for the local copy (so the request can say what is already held), then ask
+    let asked = false
+    const ask = () => {
+      if (gone || asked) return
+      asked = true
+      refresh()
+    }
+    const wait = setTimeout(ask, 800)
     loadSnap(session?.email || '').then((snap) => {
-      if (gone || !snap || lastSyncRef.current || fetching.current) {
-        if (!gone) refresh()
-        return
-      }
+      if (gone || !snap || lastSyncRef.current || dbRef.current.Team.length) return ask()
       const d = normalize(snap.data)
       dbRef.current = d
       setDb(d)
@@ -356,8 +364,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setRole(snap.role)
       setRemoteName(snap.name)
       setLastSync(new Date(snap.at))
-      refresh()
-    })
+      ask()
+    }, ask)
     const iv = setInterval(() => {
       if (document.visibilityState === 'visible') refresh()
     }, 60000)
@@ -366,6 +374,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     document.addEventListener('visibilitychange', onVis)
     return () => {
       gone = true
+      clearTimeout(wait)
       clearInterval(iv)
       document.removeEventListener('visibilitychange', onVis)
     }

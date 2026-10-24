@@ -46,21 +46,36 @@ export function mergeDelta(cur: DB, changed: Record<string, Record<string, unkno
 // (local storage stops at ~5 MB, which a year of work passes) and is written in the background.
 const IDB = 'madar'
 const STORE = 'snap'
+// the browser's storage may be missing, blocked or silent (sandboxed pages): every call gives up
+// after a moment instead of waiting
+let opened: Promise<IDBDatabase> | null = null
 function idb(): Promise<IDBDatabase> {
-  return new Promise((res, rej) => {
-    const r = indexedDB.open(IDB, 1)
-    r.onupgradeneeded = () => r.result.createObjectStore(STORE)
-    r.onsuccess = () => res(r.result)
-    r.onerror = () => rej(r.error)
-  })
+  if (!opened) {
+    opened = new Promise<IDBDatabase>((res, rej) => {
+      const timer = setTimeout(() => rej(new Error('idb timeout')), 1500)
+      try {
+        const r = indexedDB.open(IDB, 1)
+        r.onupgradeneeded = () => r.result.createObjectStore(STORE)
+        r.onsuccess = () => (clearTimeout(timer), res(r.result))
+        r.onerror = () => (clearTimeout(timer), rej(r.error))
+        r.onblocked = () => (clearTimeout(timer), rej(new Error('idb blocked')))
+      } catch (e) {
+        clearTimeout(timer)
+        rej(e)
+      }
+    })
+    opened.catch(() => (opened = null))
+  }
+  return opened
 }
 export async function idbGet<T>(key: string): Promise<T | null> {
   try {
     const d = await idb()
     return await new Promise((res) => {
+      const timer = setTimeout(() => res(null), 3000)
       const q = d.transaction(STORE, 'readonly').objectStore(STORE).get(key)
-      q.onsuccess = () => res((q.result as T) ?? null)
-      q.onerror = () => res(null)
+      q.onsuccess = () => (clearTimeout(timer), res((q.result as T) ?? null))
+      q.onerror = () => (clearTimeout(timer), res(null))
     })
   } catch {
     return null

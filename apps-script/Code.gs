@@ -18,7 +18,7 @@
  *   viewer — read only (leadership)
  */
 
-var MADAR_VERSION = '2.3.0'; // shown on the login page and by diagnose()
+var MADAR_VERSION = '2.3.1'; // shown on the login page and by diagnose()
 
 var SCHEMA = {
   Projects: ['id', 'code', 'name', 'description', 'category', 'owner', 'client', 'liaison', 'liaison_contact', 'status', 'priority', 'phase', 'start_date', 'end_date', 'progress', 'health_override', 'objective', 'paused_at', 'pause_reason', 'delivery_day', 'last_delivery', 'archived', 'archived_at', 'links', 'team', 'kind', 'batch'],
@@ -116,8 +116,13 @@ function doGet(e) {
       if (e.parameter.d) {
         var have = {};
         try { have = JSON.parse(e.parameter.h || '{}') || {}; } catch (eh) {}
-        var delta = deltaOut_(readAll_(user), have);
-        return json_({ ok: true, user: me, delta: true, data: delta.data, h: delta.h, ver: ver, version: MADAR_VERSION });
+        var all = readAll_(user);
+        try {
+          var delta = deltaOut_(all, have);
+          return json_({ ok: true, user: me, delta: true, data: delta.data, h: delta.h, ver: ver, version: MADAR_VERSION });
+        } catch (eDelta) {
+          return json_({ ok: true, user: me, data: all, ver: ver, version: MADAR_VERSION });
+        }
       }
       return json_({ ok: true, user: me, data: readAll_(user), ver: ver, version: MADAR_VERSION });
     }
