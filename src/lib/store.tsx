@@ -346,14 +346,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // answer arrives, is shown meanwhile. Nothing waits on the local copy (in the Apps Script page
     // the browser's storage can be slow or never answer).
     let gone = false
-    // at most a moment for the local copy (so the request can say what is already held), then ask
+    // at most 1.5 s for the local copy (so the request can say what is already held), then ask
     let asked = false
     const ask = () => {
       if (gone || asked) return
       asked = true
       refresh()
     }
-    const wait = setTimeout(ask, 800)
+    const wait = setTimeout(ask, 1500)
     loadSnap(session?.email || '').then((snap) => {
       if (gone || !snap || lastSyncRef.current || dbRef.current.Team.length) return ask()
       const d = normalize(snap.data)

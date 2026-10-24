@@ -18,7 +18,7 @@
  *   viewer — read only (leadership)
  */
 
-var MADAR_VERSION = '2.3.1'; // shown on the login page and by diagnose()
+var MADAR_VERSION = '2.4.0'; // shown on the login page and by diagnose()
 
 var SCHEMA = {
   Projects: ['id', 'code', 'name', 'description', 'category', 'owner', 'client', 'liaison', 'liaison_contact', 'status', 'priority', 'phase', 'start_date', 'end_date', 'progress', 'health_override', 'objective', 'paused_at', 'pause_reason', 'delivery_day', 'last_delivery', 'archived', 'archived_at', 'links', 'team', 'kind', 'batch'],
@@ -160,6 +160,11 @@ function doPost(e) {
       if (user.access !== 'super' && user.access !== 'exec') throw new Error('فقط مدیر برنامه و CPTO میزیتو را ایمپورت می‌کنند');
       lock.waitLock(30000);
       return json_({ ok: true, row: mzImport_(body, user) });
+    }
+    if (body.action === 'mzLinks') {
+      if (user.access !== 'super' && user.access !== 'exec') throw new Error('فقط مدیر برنامه و CPTO');
+      lock.waitLock(30000);
+      return json_({ ok: true, row: mzLinks_(body.links || [], user) });
     }
     if (body.action === 'mzDedupe') {
       if (user.access !== 'super' && user.access !== 'exec') throw new Error('فقط مدیر برنامه و CPTO');
@@ -430,7 +435,7 @@ function setApiUrl(url) {
 // --------------------------------------------------------------------------
 
 function readAll_(user) {
-  var out = JSON.parse(JSON.stringify(rawAll_()));
+  var out = JSON.parse(JSON.stringify(rawAll_(true)));
   delete out[USERS_SHEET];
   return user ? applyPrivacy_(out, user) : out;
 }
@@ -462,6 +467,9 @@ function cacheVer_() {
 /** name: the tab that changed; none = everything (setup, demo data, undo). */
 function bumpVersion_(name) {
   RAW_ = null;
+  RAW_FULL_ = false;
+  if (name) delete RAW_LOADED_[name];
+  else { RAW_LOADED_ = {}; RAW_DATA_ = {}; }
   var c = CacheService.getScriptCache();
   var put = { 'atlas.ver': stamp_() };
   if (name) put['atlas.sv.' + name] = stamp_();
@@ -469,10 +477,46 @@ function bumpVersion_(name) {
   c.putAll(put, 21600);
 }
 
-function rawAll_() {
-  if (RAW_) return RAW_;
-  var c = CacheService.getScriptCache();
+/**
+ * The data, tab by tab. eager = every tab now (reading everything for the app); otherwise each tab is
+ * loaded the first time it is used, so a save — which looks at a few tabs — never unpacks the rest.
+ */
+function rawAll_(eager) {
+  if (RAW_ && (!eager || RAW_FULL_)) return RAW_;
   var names = Object.keys(SCHEMA).concat([USERS_SHEET]);
+  if (eager) {
+    var got = rawLoad_(names.filter(function (n) { return !RAW_LOADED_[n]; }));
+    names.forEach(function (n) { if (!RAW_LOADED_[n]) { RAW_LOADED_[n] = 1; RAW_DATA_[n] = got[n]; } });
+    var all = {};
+    names.forEach(function (n) { all[n] = RAW_DATA_[n]; });
+    RAW_ = all;
+    RAW_FULL_ = true;
+    return RAW_;
+  }
+  var lazy = {};
+  names.forEach(function (n) {
+    Object.defineProperty(lazy, n, {
+      enumerable: true,
+      configurable: true,
+      get: function () {
+        if (!RAW_LOADED_[n]) { RAW_DATA_[n] = rawLoad_([n])[n]; RAW_LOADED_[n] = 1; }
+        return RAW_DATA_[n];
+      },
+      set: function (v) { RAW_DATA_[n] = v; RAW_LOADED_[n] = 1; },
+    });
+  });
+  RAW_ = lazy;
+  RAW_FULL_ = false;
+  return RAW_;
+}
+var RAW_FULL_ = false;
+var RAW_LOADED_ = {};
+var RAW_DATA_ = {};
+
+/** Loads the named tabs: from the cache (one batch of calls), else from the Sheet (and caches them). */
+function rawLoad_(names) {
+  if (!names.length) return {};
+  var c = CacheService.getScriptCache();
   // generation and per-tab versions; a missing one gets a fresh stamp so an old copy is never reused
   var vk = ['atlas.gen'].concat(names.map(function (n) { return 'atlas.sv.' + n; }));
   var vs = c.getAll(vk);
@@ -522,8 +566,7 @@ function rawAll_() {
     sk.slice(b, b + 50).forEach(function (k) { part[k] = store[k]; });
     try { c.putAll(part, CACHE_TTL); } catch (e) {}
   }
-  RAW_ = out;
-  return RAW_;
+  return out;
 }
 
 // --------------------------------------------------------------------------
@@ -2235,7 +2278,8 @@ function mzImport_(body, user) {
   });
   var linkKey = function (l) { var x = /_sl([0-9a-f]{24})/i.exec(String(l || '')); return x ? x[1].toLowerCase() : ''; };
   items.forEach(function (t) {
-    if (have[String(t.key)]) return;
+    // a file from the reader carries Mizito's own ids: matched by id only, never by title
+    if (body.exact || have[String(t.key)]) return;
     var lk = linkKey(t.link);
     var same = (byTitle[mzTitleKey_(t.title)] || []).filter(function (r) { var rk = linkKey(r.link); return !(lk && rk && rk !== lk); });
     if (same.length) t.key = String(same[0].mz_key).replace(/^.*_sl/i, '');
@@ -2257,6 +2301,28 @@ function mzAskedAfter_(t, ments, ts) {
   var doneAt = ts(t.completed_at);
   if (!doneAt) return false;
   return ments.some(function (x) { return ts(x.at) > doneAt; });
+}
+
+/** Links for tasks Madar already has ({key, link}); a link never creates a task. */
+function mzLinks_(links, user) {
+  var byKey = {};
+  (rawAll_().Mizito || []).forEach(function (m) { if (m.mz_key) byKey[String(m.mz_key).replace(/^.*_sl/i, '')] = m; });
+  var rows = [], hist = [], missing = 0;
+  links.forEach(function (x) {
+    var m = x && byKey[String(x.key || '')];
+    var link = String((x && x.link) || '').trim();
+    if (!m || !/^https?:\/\//.test(link)) { missing++; return; }
+    if (m.link === link) return;
+    var c = {};
+    for (var k in m) c[k] = m[k];
+    hist.push({ entity: 'Mizito', entity_id: c.id, field: 'link', from: clip_(c.link), to: clip_(link) });
+    c.link = link;
+    c.mz_link_ok = '1';
+    rows.push(c);
+  });
+  if (rows.length) writeRows_('Mizito', rows);
+  try { historyRows_(hist, user); } catch (e) {}
+  return { saved: rows.length, missing: missing };
 }
 
 /** Same compare key as src/lib/mzImport.ts mzTitleKey: no spaces, half-spaces, punctuation or letter-form differences. */

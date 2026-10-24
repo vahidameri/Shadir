@@ -144,7 +144,7 @@ export default function MizitoPage() {
           <>
             {(access === 'super' || access === 'exec') && (
               <button className="btn h-10 bg-white/10 text-white hover:bg-white/20" onClick={() => setImporting(true)}>
-                <Bot size={16} /> {L('ایمپورت از Claude', 'Import from Claude')}
+                <Bot size={16} /> {L('ایمپورت میزیتو', 'Mizito import')}
               </button>
             )}
             {access === 'super' && (

@@ -16,7 +16,7 @@ import { L, locale } from '../lib/i18n'
 import { fa, fmtDate, fmtDayMonth, timeAgo, todayISO } from '../lib/jalali'
 import { uid } from '../lib/api'
 import { historyOf } from '../lib/history'
-import { mzClaudePrompt, mzTitleKey, parseMzImport } from '../lib/mzImport'
+import { mzLinksPrompt, mzReaderPrompt, mzReaderScript, mzTitleKey, parseLinks, parseReaderDoc } from '../lib/mzImport'
 import { historyText } from './TaskTracking'
 import {
   MZ_CUTOFF, MZ_KEYS, P_COLOR, P_HINT, isExecTier, markSeen, recentlyChanged, allPeople, askersOf, commentsOf, firstMzStatus, isMizitoLink, mentionsOf, mzCat, mzCfg, mzClosed, mzFlags, mzKeyOf, mzSignals, nowStampMz, optLabel, reminderText, statusById, tierOf,
@@ -736,47 +736,53 @@ function OptionList({ title, items, onSave, kind }: { title: string; items: (MzO
 }
 
 /** The Mizito agent (browser extension): a key per person, the cutoff, and each agent's last run. */
-/** Mizito import: the prompt for Claude in Chrome, the box its answer is pasted into, and starting over. */
+/**
+ * Mizito into Madar, each task exactly once. ② the reader (a small script run in the Mizito tab) saves
+ * a file in which every task, mention and comment carries Mizito's own id; imported, tasks are matched
+ * by that id only. ③ links come from Claude as title → link and only fill tasks that already exist.
+ */
 export function MizitoImport({ admin }: { admin: boolean }) {
   const { db, action, me: myName, setting, setSetting, toast, refresh } = useStore()
   const leaders = db.Team.filter((x) => (x.access === 'super' || x.access === 'exec') && String(x.active) !== 'false')
   const me = leaders.find((x) => x.name === myName)?.name || leaders[0]?.name || ''
   const [account, setAccount] = useState(me)
   const [raw, setRaw] = useState('')
+  const [linksRaw, setLinksRaw] = useState('')
   const [busy, setBusy] = useState('')
-  const [showPrompt, setShowPrompt] = useState(false)
+  const [progress, setProgress] = useState('')
+  const [show, setShow] = useState<'' | 'code' | 'links'>('')
   const cutoff = setting(MZ_KEYS.cutoff) || MZ_CUTOFF
-  const prompt = mzClaudePrompt(account || me, fmtDate(cutoff, 'long'))
   const people = useMemo(() => allPeople(db), [db])
-  const parsed = useMemo(() => (raw.trim() ? parseMzImport(raw, account, db.Mizito, people) : null), [raw, account, db.Mizito, people])
+  const parsed = useMemo(() => (raw.trim() ? parseReaderDoc(raw, account, people) : null), [raw, account, people])
+  const links = useMemo(() => (linksRaw.trim() ? parseLinks(linksRaw, db.Mizito) : null), [linksRaw, db.Mizito])
+  const who = parsed?.account && leaders.some((x) => x.name === parsed.account) ? parsed.account : account
+  const fail = (e: unknown) => toast(e instanceof Error ? e.message : String(e), 'err')
+  const copy = (text: string, what: string) => navigator.clipboard?.writeText(text).then(() => toast(L(`${what} کپی شد`, 'Copied')), () => toast(L('کپی نشد؛ از کادر انتخاب و کپی کنید', 'Copy failed'), 'err'))
   // the same Mizito task in more than one row (left by earlier imports)
   const dupes = useMemo(() => {
     const by = new Map<string, number>()
     db.Mizito.forEach((m) => { const k = mzTitleKey(m.title); if (k) by.set(k, (by.get(k) || 0) + 1) })
     return [...by.values()].filter((n) => n > 1).reduce((a, n) => a + n - 1, 0)
   }, [db.Mizito])
-  const dedupe = async () => {
-    setBusy('dedupe')
+  const run = async (label: string, job: () => Promise<void>) => {
+    setBusy(label)
     try {
-      const r = (await action('mzDedupe', {})) as { groups?: number; rows?: number } | undefined
-      toast(L(`${fa(r?.rows || 0)} ردیف تکراری در ${fa(r?.groups || 0)} تسک یکی شد`, `${r?.rows || 0} duplicate rows merged`))
-      void refresh()
+      await job()
     } catch (e) {
       fail(e)
     } finally {
       setBusy('')
+      setProgress('')
     }
   }
-  const who = parsed?.account && leaders.some((x) => x.name === parsed.account) ? parsed.account : account
-  const fail = (e: unknown) => toast(e instanceof Error ? e.message : String(e), 'err')
-  const run = async () => {
-    if (!parsed?.items.length) return
-    setBusy('import')
-    try {
+  const importFile = () =>
+    run('import', async () => {
+      if (!parsed?.items.length) return
       const all = parsed.items
       let made = 0, updated = 0
       for (let i = 0; i < all.length; i += 25) {
-        const r = (await action('mzImport', { account: who, items: all.slice(i, i + 25), last: i + 25 >= all.length, total: all.length })) as { made?: number; updated?: number } | undefined
+        setProgress(L(`${fa(Math.min(i + 25, all.length))} از ${fa(all.length)}`, `${Math.min(i + 25, all.length)} of ${all.length}`))
+        const r = (await action('mzImport', { account: who, items: all.slice(i, i + 25), exact: true, last: i + 25 >= all.length, total: all.length })) as { made?: number; updated?: number } | undefined
         if (!r) return toast(L('در حالت نمایشی ایمپورت نمی‌شود', 'No import in demo mode'), 'err')
         made += r.made || 0
         updated += r.updated || 0
@@ -784,80 +790,132 @@ export function MizitoImport({ admin }: { admin: boolean }) {
       toast(L(`ایمپورت شد: ${fa(made)} تسک تازه، ${fa(updated)} به‌روز`, `Imported: ${made} new, ${updated} updated`))
       setRaw('')
       await refresh()
-    } catch (e) {
-      fail(e)
-    } finally {
-      setBusy('')
-    }
-  }
-  const reset = async () => {
+    })
+  const saveLinks = () =>
+    run('links', async () => {
+      if (!links?.pairs.length) return
+      const r = (await action('mzLinks', { links: links.pairs.map((x) => ({ key: x.key, link: x.link })) })) as { saved?: number } | undefined
+      toast(L(`${fa(r?.saved || 0)} لینک ذخیره شد`, `${r?.saved || 0} links saved`))
+      setLinksRaw('')
+      await refresh()
+    })
+  const dedupe = () =>
+    run('dedupe', async () => {
+      const r = (await action('mzDedupe', {})) as { groups?: number; rows?: number } | undefined
+      toast(L(`${fa(r?.rows || 0)} ردیف تکراری در ${fa(r?.groups || 0)} تسک یکی شد`, `${r?.rows || 0} duplicate rows merged`))
+      await refresh()
+    })
+  const reset = () => {
     const word = L('پاک کن', 'delete')
     const typed = window.prompt(L(`همه‌ی داده‌های میزیتو در مدار پاک می‌شود: تسک‌ها، منشن‌ها، گفتگوها و سابقه‌ی تغییراتشان (دسته، وضعیت و یادداشتی که در مدار گذاشته‌اید هم). کامنت‌ها، فایل‌ها و کارتابل مدار می‌مانند.\n\nبرای تأیید بنویسید: ${word}`, `All Mizito data in Madar will be deleted. Type “${word}” to confirm.`))
     if (typed === null) return
     if (typed.trim() !== word) return toast(L('تأیید نشد؛ چیزی پاک نشد', 'Not confirmed; nothing deleted'), 'err')
-    setBusy('reset')
-    try {
-      const r = (await action('mzReset', {})) as { items?: number; mentions?: number; comments?: number } | undefined
-      toast(L(`پاک شد: ${fa(r?.items || 0)} تسک، ${fa(r?.mentions || 0)} منشن، ${fa(r?.comments || 0)} پیام`, `Deleted: ${r?.items || 0} tasks`))
-      void refresh()
-    } catch (e) {
-      fail(e)
-    } finally {
-      setBusy('')
-    }
+    void run('reset', async () => {
+      const r = (await action('mzReset', {})) as { items?: number } | undefined
+      toast(L(`پاک شد: ${fa(r?.items || 0)} تسک`, `Deleted: ${r?.items || 0} tasks`))
+      await refresh()
+    })
   }
+  const readFile = (f?: File) => f && void f.text().then(setRaw)
   const stats = parsed && {
     tasks: parsed.items.length,
-    links: parsed.items.filter((x) => x.link).length,
     mentions: parsed.items.reduce((a, x) => a + x.mentions.length, 0),
     comments: parsed.items.reduce((a, x) => a + x.comments.length, 0),
     done: parsed.items.filter((x) => x.completed).length,
+    known: parsed.items.filter((x) => db.Mizito.some((m) => String(m.mz_key || '').replace(/^.*_sl/i, '') === x.key)).length,
   }
+  const step = 'grid h-7 w-7 shrink-0 place-items-center rounded-full bg-ink text-xs font-bold text-surface'
   return (
-    <Card eyebrow={<span className="flex items-center gap-1.5"><Bot size={12} /> {L('ایمپورت میزیتو', 'Mizito import')}</span>} title={L('آوردن تسک‌ها از «دستیار میزیتو» با Claude', 'Tasks from the Mizito assistant, via Claude')} className="@2xl:col-span-2">
-      <ol className="mb-4 list-decimal space-y-1 ps-5 text-xs leading-6 text-sub">
-        <li>{L('میزیتو را در کروم باز کنید و افزونه‌ی Claude را روی همان تب باز کنید.', 'Open Mizito in Chrome and open the Claude extension on that tab.')}</li>
-        <li>{L('«متن آماده برای Claude» را کپی کنید و به Claude بدهید. اگر بخش‌بخش جواب داد، بعد از هر بخش بگویید «ادامه».', 'Copy the prompt below and give it to Claude; say “continue” after each part.')}</li>
-        <li>{L('جواب Claude (همه‌ی بخش‌ها، پشت سر هم) را در کادر پایین بچسبانید ← «ایمپورت». تکراری‌ها دوباره اضافه نمی‌شوند.', 'Paste Claude’s answer (all parts) below → Import. Nothing is added twice.')}</li>
-      </ol>
+    <Card eyebrow={<span className="flex items-center gap-1.5"><Bot size={12} /> {L('ایمپورت میزیتو', 'Mizito import')}</span>} title={L('تسک‌های «دستیار میزیتو»، هر کدام فقط یک بار', 'Tasks from the Mizito assistant, each exactly once')} className="@2xl:col-span-2">
       <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
         <span>{L('میزیتوی چه کسی:', 'Whose Mizito:')}</span>
         <select value={account} onChange={(e) => setAccount(e.target.value)} className="input h-8 w-auto text-xs">
           {leaders.map((x) => <option key={x.id} value={x.name}>{x.name}</option>)}
         </select>
-        <span className="ms-2">{L('از تاریخ:', 'Since:')}</span>
+        <span className="ms-2">{L('پیام‌ها از:', 'Messages since:')}</span>
         <DatePicker compact value={cutoff} onChange={(v) => admin && v && setSetting(MZ_KEYS.cutoff, v)} />
-        <span className="flex-1" />
-        <button className="btn-outline btn-sm" onClick={() => setShowPrompt(!showPrompt)}>{showPrompt ? L('بستن متن', 'Hide prompt') : L('دیدن متن آماده', 'Show prompt')}</button>
-        <button className="btn-primary btn-sm" onClick={() => navigator.clipboard?.writeText(prompt).then(() => toast(L('متن برای Claude کپی شد', 'Prompt copied')))}><Copy size={13} /> {L('کپی متن آماده برای Claude', 'Copy the prompt for Claude')}</button>
       </div>
-      {showPrompt && <pre dir="rtl" className="mb-4 max-h-72 overflow-auto whitespace-pre-wrap rounded-2xl bg-muted/60 p-3 text-[0.6875rem] leading-6">{prompt}</pre>}
-      <textarea value={raw} onChange={(e) => setRaw(e.target.value)} rows={7} dir="ltr" placeholder={L('جواب Claude را اینجا بچسبانید (JSON)…', 'Paste Claude’s answer here (JSON)…')} className="input w-full py-2 font-mono text-[0.6875rem] leading-5" />
-      <div className="mt-2 flex flex-wrap items-center gap-3">
-        <label className="btn-ghost btn-sm cursor-pointer text-sub">
-          <Paperclip size={13} /> {L('یا فایل JSON', 'or a JSON file')}
-          <input type="file" accept=".json,.txt,application/json,text/plain" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void f.text().then(setRaw); e.target.value = '' }} />
-        </label>
-        {stats && parsed && (
-          <span className="num text-xs text-sub">
-            {L(`${fa(stats.tasks)} تسک یکتا${parsed.listed > stats.tasks ? ` (از ${fa(parsed.listed)} ردیف؛ تکراری‌ها یکی شد)` : ''} · ${fa(stats.links)} با لینک · ${fa(stats.mentions)} منشن · ${fa(stats.comments)} کامنت · ${fa(stats.done)} انجام‌شده · ${fa(parsed.parts)} بخش · به نام ${who}`, `${stats.tasks} tasks · ${stats.links} with link · ${stats.mentions} mentions · ${stats.comments} comments · for ${who}`)}
-            {parsed.broken > 0 && <b className="ms-2 text-bad">{L(`${fa(parsed.broken)} بخش خوانده نشد`, `${parsed.broken} parts unreadable`)}</b>}
-          </span>
-        )}
-        <span className="flex-1" />
-        <button className="btn-primary btn-sm" disabled={!stats?.tasks || !!busy} onClick={run}>{busy === 'import' ? L('در حال ایمپورت…', 'Importing…') : L('ایمپورت', 'Import')}</button>
-      </div>
-      {parsed && parsed.problems.length > 0 && (
-        <details className="mt-2 text-xs text-warn">
-          <summary className="cursor-pointer">{L(`${fa(parsed.problems.length)} نکته`, `${parsed.problems.length} notes`)}</summary>
-          <ul className="mt-1 list-disc space-y-0.5 ps-5 text-sub">{parsed.problems.slice(0, 50).map((p, i) => <li key={i}>{p}</li>)}</ul>
-        </details>
-      )}
+
+      <ol className="space-y-4">
+        <li className="flex gap-3">
+          <span className={step}>۱</span>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold">{L('خواندن تسک‌ها از میزیتو', 'Read the tasks from Mizito')}</div>
+            <p className="mt-1 text-xs leading-6 text-sub">{L('یک کد کوچک در تب میزیتو اجرا می‌شود، داده‌ی خود میزیتو را می‌خواند (همان که اپ میزیتو نشان می‌دهد) و یک فایل دانلود می‌کند. چیزی در میزیتو تغییر نمی‌کند. هر تسک، منشن و کامنت شناسه‌ی خود میزیتو را دارد، پس هرگز دو بار ثبت نمی‌شود.', 'A small script in the Mizito tab reads Mizito’s own data and downloads a file. Nothing changes in Mizito. Every task, mention and comment carries Mizito’s id, so nothing is ever recorded twice.')}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button className="btn-primary btn-sm" onClick={() => copy(mzReaderPrompt(cutoff), L('متن برای Claude', 'Prompt'))}><Copy size={13} /> {L('کپی برای Claude', 'Copy for Claude')}</button>
+              <button className="btn-outline btn-sm" onClick={() => copy(mzReaderScript(cutoff), L('کد', 'Code'))}><Copy size={13} /> {L('کپی کد (کنسول مرورگر)', 'Copy code (console)')}</button>
+              <button className="btn-ghost btn-sm text-sub" onClick={() => setShow(show === 'code' ? '' : 'code')}>{L('راهنما', 'How')}</button>
+            </div>
+            {show === 'code' && (
+              <div className="mt-2 space-y-1 rounded-xl bg-muted/60 p-3 text-xs leading-6">
+                <div><b>{L('با Claude:', 'With Claude:')}</b> {L('تب میزیتو را باز کنید ← افزونه‌ی Claude ← «کپی برای Claude» را بچسبانید. Claude فقط کد را اجرا می‌کند (حدود یک دقیقه).', 'Open the Mizito tab → Claude → paste. Claude only runs the code (about a minute).')}</div>
+                <div><b>{L('یا خودتان:', 'Or yourself:')}</b> {L('در تب میزیتو F12 ← Console ← کد را بچسبانید ← Enter. (بار اول کروم می‌خواهد بنویسید allow pasting.)', 'In the Mizito tab: F12 → Console → paste → Enter (the first time Chrome asks you to type “allow pasting”).')}</div>
+                <div>{L('بالای صفحه‌ی میزیتو پیشرفت نشان داده می‌شود و در آخر فایل mizito-….json دانلود می‌شود (و در کلیپ‌بورد هم کپی می‌شود).', 'Progress shows on the Mizito page; at the end mizito-….json downloads (and is copied too).')}</div>
+              </div>
+            )}
+          </div>
+        </li>
+
+        <li className="flex gap-3">
+          <span className={step}>۲</span>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold">{L('ایمپورت فایل', 'Import the file')}</div>
+            <label
+              className="mt-2 flex cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-line p-4 text-center text-xs text-sub transition hover:border-brand/40"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => (e.preventDefault(), readFile(e.dataTransfer.files?.[0]))}
+            >
+              <Paperclip size={16} />
+              {L('فایل mizito-….json را اینجا بکشید یا بزنید تا انتخاب شود', 'Drop mizito-….json here or click to choose')}
+              <input type="file" accept=".json,application/json,text/plain" className="hidden" onChange={(e) => (readFile(e.target.files?.[0]), (e.target.value = ''))} />
+            </label>
+            <textarea value={raw} onChange={(e) => setRaw(e.target.value)} rows={2} dir="ltr" placeholder={L('…یا متن کپی‌شده را بچسبانید', '…or paste the copied text')} className="input mt-2 w-full py-2 font-mono text-[0.6875rem]" />
+            {raw.trim() && !parsed && <div className="mt-1 text-xs text-bad">{L('این خروجی کد خواندن نیست. فایل mizito-….json را که کد دانلود کرده بدهید.', 'This is not the reader’s file.')}</div>}
+            {stats && parsed && (
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <span className="num text-xs text-sub">{L(`${fa(stats.tasks)} تسک (${fa(stats.tasks - stats.known)} تازه، ${fa(stats.known)} موجود) · ${fa(stats.mentions)} منشن · ${fa(stats.comments)} کامنت · ${fa(stats.done)} انجام‌شده · به نام ${who}`, `${stats.tasks} tasks (${stats.tasks - stats.known} new) · ${stats.mentions} mentions · ${stats.comments} comments · for ${who}`)}</span>
+                <span className="flex-1" />
+                <button className="btn-primary btn-sm" disabled={!!busy} onClick={importFile}>{busy === 'import' ? L(`در حال ایمپورت ${progress}`, `Importing ${progress}`) : L('ایمپورت', 'Import')}</button>
+              </div>
+            )}
+            {parsed && parsed.problems.length > 0 && <ul className="mt-1 list-disc ps-5 text-xs text-warn">{parsed.problems.map((p, i) => <li key={i}>{p}</li>)}</ul>}
+          </div>
+        </li>
+
+        <li className="flex gap-3">
+          <span className={step}>۳</span>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold">{L('لینک تسک‌ها (اختیاری)', 'Task links (optional)')}</div>
+            <p className="mt-1 text-xs leading-6 text-sub">{L('لینک «لینک وظیفه» فقط از صفحه‌ی میزیتو برداشته می‌شود. Claude فهرست عنوان ← لینک را می‌دهد؛ هر لینک فقط روی تسکی می‌نشیند که همین حالا در مدار هست. لینک هیچ‌وقت تسک تازه نمی‌سازد. لینک را دستی هم می‌شود روی هر مورد گذاشت.', 'Claude lists title → link; each link only fills a task already in Madar. A link never creates a task.')}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button className="btn-outline btn-sm" onClick={() => copy(mzLinksPrompt(fmtDate(cutoff, 'long')), L('متن لینک‌ها', 'Prompt'))}><Copy size={13} /> {L('کپی متن لینک‌ها برای Claude', 'Copy the links prompt')}</button>
+              <button className="btn-ghost btn-sm text-sub" onClick={() => setShow(show === 'links' ? '' : 'links')}>{show === 'links' ? L('بستن', 'Hide') : L('دیدن متن', 'Show')}</button>
+            </div>
+            {show === 'links' && <pre dir="rtl" className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded-xl bg-muted/60 p-3 text-[0.6875rem] leading-6">{mzLinksPrompt(fmtDate(cutoff, 'long'))}</pre>}
+            <textarea value={linksRaw} onChange={(e) => setLinksRaw(e.target.value)} rows={3} dir="ltr" placeholder={L('جواب Claude (همه‌ی بخش‌ها) را اینجا بچسبانید…', 'Paste Claude’s answer here…')} className="input mt-2 w-full py-2 font-mono text-[0.6875rem]" />
+            {linksRaw.trim() && !links && <div className="mt-1 text-xs text-bad">{L('فهرست لینکی در متن پیدا نشد', 'No list of links found')}</div>}
+            {links && (
+              <div className="mt-2 space-y-1 text-xs">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="num text-sub">{L(`${fa(links.pairs.length)} لینک با تسکش جور شد`, `${links.pairs.length} links matched`)}</span>
+                  <span className="flex-1" />
+                  <button className="btn-primary btn-sm" disabled={!links.pairs.length || !!busy} onClick={saveLinks}>{busy === 'links' ? L('در حال ذخیره…', 'Saving…') : L('ذخیره‌ی لینک‌ها', 'Save links')}</button>
+                </div>
+                {links.unmatched.length > 0 && <details className="text-warn"><summary className="cursor-pointer">{L(`${fa(links.unmatched.length)} عنوان در مدار پیدا نشد (اول قدم ۱ و ۲)`, `${links.unmatched.length} titles not found`)}</summary><ul className="list-disc ps-5 text-sub">{links.unmatched.map((t, i) => <li key={i} dir={dirOf(t)}>{t}</li>)}</ul></details>}
+                {links.ambiguous.length > 0 && <details className="text-warn"><summary className="cursor-pointer">{L(`${fa(links.ambiguous.length)} عنوان چند تسک دارد؛ دستی بگذارید`, `${links.ambiguous.length} titles match several tasks`)}</summary><ul className="list-disc ps-5 text-sub">{links.ambiguous.map((t, i) => <li key={i} dir={dirOf(t)}>{t}</li>)}</ul></details>}
+                {links.bad.length > 0 && <div className="text-warn">{L(`${fa(links.bad.length)} مورد لینک درست نداشت`, `${links.bad.length} without a valid link`)}</div>}
+              </div>
+            )}
+          </div>
+        </li>
+      </ol>
+
       {dupes > 0 && (
-        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-warn/40 bg-warn/5 p-3">
+        <div className="mt-5 flex flex-wrap items-center gap-3 rounded-2xl border border-warn/40 bg-warn/5 p-3">
           <div className="min-w-0 flex-1 text-xs leading-6">
-            <div className="font-medium">{L(`${fa(dupes)} ردیف تکراری در میزیتوی مدار`, `${dupes} duplicate rows`)}</div>
-            <div className="text-sub">{L('تسک‌هایی که چند بار آمده‌اند (هم‌عنوان، بدون دو لینک متفاوت) در یک ردیف یکی می‌شوند؛ منشن‌ها، کامنت‌ها، یادداشت‌ها و کارتابلشان روی همان ردیف می‌ماند.', 'Rows of the same task become one; mentions, comments, notes and cartable items move to it.')}</div>
+            <div className="font-medium">{L(`${fa(dupes)} ردیف تکراری از ایمپورت‌های قبلی`, `${dupes} duplicate rows from earlier imports`)}</div>
+            <div className="text-sub">{L('بهترین کار: «شروع از صفر» و بعد قدم ۱ و ۲. یا اینجا یکی‌شان کنید.', 'Best: start over, then steps 1 and 2. Or merge them here.')}</div>
           </div>
           <button className="btn-outline btn-sm" disabled={!!busy} onClick={dedupe}>{busy === 'dedupe' ? L('در حال یکی کردن…', 'Merging…') : L('یکی کردن تکراری‌ها', 'Merge duplicates')}</button>
         </div>
@@ -865,8 +923,8 @@ export function MizitoImport({ admin }: { admin: boolean }) {
       {admin && (
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-bad/30 p-3">
           <div className="min-w-0 flex-1 text-xs leading-6">
-            <div className="font-medium text-bad">{L('شروع دوباره از صفر', 'Start over')}</div>
-            <div className="text-sub">{L('همه‌ی داده‌های میزیتو در مدار پاک می‌شود؛ بعد دوباره ایمپورت کنید.', 'Deletes all Mizito data in Madar; then import again.')}</div>
+            <div className="font-medium text-bad">{L('شروع از صفر', 'Start over')}</div>
+            <div className="text-sub">{L('اگر از ایمپورت‌های قبلی (با Claude) داده‌ی تکراری یا ناقص مانده، یک بار پاک کنید و قدم ۱ و ۲ را بزنید. کامنت، فایل و کارتابل مدار می‌مانند.', 'If earlier imports left duplicates, delete once and do steps 1 and 2. Madar comments, files and cartable stay.')}</div>
           </div>
           <button className="btn-outline btn-sm border-bad/40 text-bad" disabled={!!busy} onClick={reset}><Trash2 size={13} /> {busy === 'reset' ? L('در حال پاک کردن…', 'Deleting…') : L('پاک کردن داده‌های میزیتو', 'Delete Mizito data')}</button>
         </div>

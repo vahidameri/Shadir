@@ -12,6 +12,7 @@
 //  - ids of mentions and comments come from their content, so a re-import adds nothing twice
 //  - one broken part does not stop the others; a cut-off part keeps its complete tasks
 import { toGregorian } from './jalali'
+import readerSrc from './mizito-reader.js?raw'
 
 export interface MzImportItem {
   key: string
@@ -327,6 +328,127 @@ export function parseMzImport(raw: string, fallbackAccount: string, existing: Ex
   })
   out.sort((a, b) => ((a.first_at || '9') < (b.first_at || '9') ? -1 : 1))
   return { account, items: out, problems: [...new Set(problems)], parts, broken, listed }
+}
+
+// ---------------------------------------------------------------- the reader (exactly once)
+// The reliable way in: lib/mizito-reader.js runs in the Mizito tab, reads Mizito's own data and saves a
+// file in which every task, mention and comment carries Mizito's own id. Imported, a task is matched
+// by that id only — never by its title — so it is recorded once, however many times it is imported.
+
+/** The code to run in the Mizito tab (browser console, a bookmark, or Claude's JavaScript tool). */
+export function mzReaderScript(since: string) {
+  return `(${readerSrc.trim()})(${JSON.stringify({ since })})`
+}
+
+/** For Claude in Chrome: run the reader, nothing else. */
+export function mzReaderPrompt(since: string) {
+  return `در تب میزیتو (که در آن وارد شده‌ام) فقط این کار را بکن: کد زیر را با ابزار اجرای JavaScript در همان صفحه اجرا کن و متنی را که برمی‌گرداند به من بگو. کد فقط از میزیتو می‌خواند، چیزی در میزیتو تغییر نمی‌دهد و نتیجه را به‌صورت یک فایل دانلود می‌کند. خودت چیزی را باز نکن، کلیک نکن و چیزی ننویس.
+
+\`\`\`js
+${mzReaderScript(since)}
+\`\`\``
+}
+
+interface ReaderDoc {
+  source: 'madar-reader'
+  account?: string
+  since?: string
+  read_at?: string
+  messages?: number
+  items: MzImportItem[]
+}
+
+/** A file from the reader: tasks keyed by Mizito's id, names matched to the people Madar knows. */
+export function parseReaderDoc(raw: string, fallbackAccount: string, people: string[] = []): MzImportResult | null {
+  let doc: ReaderDoc
+  try {
+    doc = JSON.parse(String(raw || '').trim())
+  } catch {
+    return null
+  }
+  if (!doc || doc.source !== 'madar-reader' || !Array.isArray(doc.items)) return null
+  const who = nameMatcher(people)
+  const names = (l: unknown) => (Array.isArray(l) ? l : []).map(who).filter(Boolean)
+  const problems: string[] = []
+  const seen = new Set<string>()
+  const items = doc.items
+    .filter((t) => t && /^[0-9a-f]{24}$/i.test(String(t.key)) && !seen.has(t.key) && !!seen.add(t.key))
+    .map((t) => ({
+      ...t,
+      owner: who(t.owner),
+      assignees: names(t.assignees),
+      completed_by: who(t.completed_by),
+      last_by: who(t.last_by),
+      mentions: (t.mentions || []).map((x) => ({ ...x, by: who(x.by) })),
+      comments: (t.comments || []).map((c) => ({ ...c, by: who(c.by), mentions: names(c.mentions) })),
+    }))
+  if (items.length !== doc.items.length) problems.push(`${doc.items.length - items.length} ردیف تکراری یا بی‌شناسه در فایل کنار گذاشته شد`)
+  const account = who(doc.account)
+  if (!account) problems.push('نام صاحب فایل در مدار پیدا نشد؛ «میزیتوی چه کسی» را خودتان انتخاب کنید')
+  return { account: account || fallbackAccount, items, problems, parts: 1, broken: 0, listed: doc.items.length }
+}
+
+// ---------------------------------------------------------------- links (they never add a task)
+export interface LinkMatch {
+  pairs: { key: string; title: string; link: string }[]
+  unmatched: string[]
+  ambiguous: string[]
+  bad: string[]
+}
+
+/** Claude's list of {title, link}: each link goes to the one task in Madar with that title. Nothing is created. */
+export function parseLinks(raw: string, rows: { mz_key?: string; title?: string; link?: string }[]): LinkMatch | null {
+  const out: LinkMatch = { pairs: [], unmatched: [], ambiguous: [], bad: [] }
+  const src = String(raw || '')
+  const fenced = [...src.matchAll(/```(?:json)?\s*([\s\S]*?)(?:```|$)/gi)].map((m) => m[1].trim()).filter(Boolean)
+  const list: { title?: string; link?: string }[] = []
+  for (const c of fenced.length ? fenced : [src.slice(Math.max(0, src.search(/[[{]/)))]) {
+    try {
+      const v = JSON.parse(c)
+      const arr = Array.isArray(v) ? v : Array.isArray(v?.links) ? v.links : Array.isArray(v?.tasks) ? v.tasks : []
+      list.push(...arr)
+    } catch {}
+  }
+  if (!list.length) return null
+  const byTitle = new Map<string, { mz_key?: string; title?: string }[]>()
+  rows.forEach((r) => {
+    const k = mzTitleKey(r.title)
+    if (k && r.mz_key) byTitle.set(k, [...(byTitle.get(k) || []), r])
+  })
+  const done = new Set<string>()
+  list.forEach((x) => {
+    const title = String(x?.title || '').trim()
+    const link = String(x?.link || '').trim().replace(/\s+/g, '')
+    if (!title) return
+    if (!/^https?:\/\/[^\s]*#\/ws\//.test(link) || !mzKeyFromLink(link)) return out.bad.push(title)
+    const tk = mzTitleKey(title)
+    let hit = byTitle.get(tk) || []
+    // a title Claude cut short: the one task whose title starts with it
+    if (!hit.length && tk.length >= 8) hit = [...byTitle.entries()].filter(([k]) => k.startsWith(tk) || tk.startsWith(k)).flatMap(([, v]) => v)
+    if (!hit.length) return out.unmatched.push(title)
+    if (hit.length > 1) return out.ambiguous.push(title)
+    const key = String(hit[0].mz_key)
+    if (done.has(key)) return
+    done.add(key)
+    out.pairs.push({ key, title: String(hit[0].title || title), link })
+  })
+  return out
+}
+
+/** For Claude in Chrome: only the links, as a list of title → link. */
+export function mzLinksPrompt(since: string) {
+  return `در میزیتو فقط لینک تسک‌ها را جمع کن؛ در میزیتو چیزی را تغییر نده و هیچ‌وقت دکمه‌ی «تایید» را نزن.
+
+۱. از نوار سمت راست «گفتگو» ← «دستیار میزیتو» را باز کن.
+۲. از ${since} تا امروز، برای هر تسکی که در پیام‌ها آمده (هر تسک فقط یک بار):
+   «مشاهده وظیفه» ← منوی ⋮ بالای پنل ← «لینک وظیفه» ← آدرس کامل داخل کادر (اگر بریده بود «کپی» را بزن و متن کامل را بردار) ← پنل را ببند.
+۳. خروجی فقط یک بلوک JSON، عنوان دقیقاً همان‌طور که در میزیتو نوشته شده:
+
+\`\`\`json
+[{ "title": "عنوان کامل تسک", "link": "https://mizito.noyanet.com/#/ws/tasks/..." }]
+\`\`\`
+
+اگر زیاد است، هر بار ۳۰ تسک بفرست و منتظر «ادامه» بمان.`
 }
 
 /** What to tell Claude in Chrome, on the Mizito page, so its answer can be pasted straight into Madar. */
