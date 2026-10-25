@@ -18,7 +18,7 @@
  *   viewer — read only (leadership)
  */
 
-var MADAR_VERSION = '2.4.0'; // shown on the login page and by diagnose()
+var MADAR_VERSION = '2.5.0'; // shown on the login page and by diagnose()
 
 var SCHEMA = {
   Projects: ['id', 'code', 'name', 'description', 'category', 'owner', 'client', 'liaison', 'liaison_contact', 'status', 'priority', 'phase', 'start_date', 'end_date', 'progress', 'health_override', 'objective', 'paused_at', 'pause_reason', 'delivery_day', 'last_delivery', 'archived', 'archived_at', 'links', 'team', 'kind', 'batch'],
@@ -2250,6 +2250,7 @@ function mzReset_(user) {
     var keep = {};
     ['key_at', 'revoked'].forEach(function (k) { if (st[k]) keep[k] = st[k]; });
     keep.reset_at = mzNow_();
+    try { CacheService.getScriptCache().put('mzb.gen', stamp_(), 21600); } catch (eGen) {}
     upsert_('Config', { id: id, value: JSON.stringify(keep) }, MZ_AGENT);
   });
   log_(user || MZ_AGENT, 'mizito reset', 'Mizito', JSON.stringify(out));
@@ -2266,6 +2267,13 @@ function mzImport_(body, user) {
   var account = String(body.account || user.name);
   var m = (rawAll_().Team || []).filter(function (x) { return x.name === account; })[0];
   if (!m || (m.access !== 'super' && m.access !== 'exec')) throw new Error('ایمپورت میزیتو فقط به نام مدیر برنامه یا CPTO است');
+  // a batch already applied (a retry after a lost answer, a double click) is not applied again
+  var cache = CacheService.getScriptCache();
+  var bkey = body.batch ? 'mzb.' + (cache.get('mzb.gen') || '0') + '.' + String(body.batch).slice(0, 120) : '';
+  if (bkey) {
+    var done = cache.get(bkey);
+    if (done) { try { return JSON.parse(done); } catch (eDone) {} }
+  }
   var items = (body.items || []).filter(function (t) { return t && t.key && t.title; });
   // the same task already in Madar under another key (an older import, or the agent): same row
   var have = {}, byTitle = {};
@@ -2285,7 +2293,15 @@ function mzImport_(body, user) {
     if (same.length) t.key = String(same[0].mz_key).replace(/^.*_sl/i, '');
   });
   var r = mzIngest_({ items: items, version: 'import' }, { name: account });
-  if (body.last) mzSetStatus_(account, { done_at: mzNow_(), via: 'import', run: { tasks: Number(body.total) || items.length } });
+  if (body.last) {
+    var patch = { done_at: mzNow_(), via: 'import', run: { tasks: Number(body.total) || items.length } };
+    // how far this person's import has got (the next range starts the day after)
+    var to = body.range && /^\d{4}-\d{2}-\d{2}$/.test(String(body.range.to)) ? String(body.range.to) : '';
+    var st = mzStatus_(account);
+    if (to && (!st.range_to || to > String(st.range_to))) patch.range_to = to;
+    mzSetStatus_(account, patch);
+  }
+  if (bkey) { try { cache.put(bkey, JSON.stringify(r), 21600); } catch (ePut) {} }
   return r;
 }
 

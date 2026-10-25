@@ -11,8 +11,7 @@
 //  - names are matched to the people Madar knows, so tiers (and SLA) follow the right person
 //  - ids of mentions and comments come from their content, so a re-import adds nothing twice
 //  - one broken part does not stop the others; a cut-off part keeps its complete tasks
-import { toGregorian } from './jalali'
-import readerSrc from './mizito-reader.js?raw'
+import { isoToJalaliParts, jalaliMonthLength, jalaliPartsToISO, toGregorian } from './jalali'
 
 export interface MzImportItem {
   key: string
@@ -330,157 +329,59 @@ export function parseMzImport(raw: string, fallbackAccount: string, existing: Ex
   return { account, items: out, problems: [...new Set(problems)], parts, broken, listed }
 }
 
-// ---------------------------------------------------------------- the reader (exactly once)
-// The reliable way in: lib/mizito-reader.js runs in the Mizito tab, reads Mizito's own data and saves a
-// file in which every task, mention and comment carries Mizito's own id. Imported, a task is matched
-// by that id only — never by its title — so it is recorded once, however many times it is imported.
-
-/** The code to run in the Mizito tab (browser console, a bookmark, or Claude's JavaScript tool). */
-export function mzReaderScript(since: string) {
-  return `(${readerSrc.trim()})(${JSON.stringify({ since })})`
+/** The next range to read: the day after the last one imported, to the end of that Jalali month. */
+export function nextRange(lastTo: string, start: string, today: string): { from: string; to: string } {
+  const from = lastTo ? addDaysISO(lastTo, 1) : start
+  const j = isoToJalaliParts(from)
+  if (!j) return { from, to: today }
+  const end = jalaliPartsToISO(j.jy, j.jm, jalaliMonthLength(j.jy, j.jm))
+  return { from, to: end < today ? end : today }
+}
+const addDaysISO = (iso: string, n: number) => {
+  const d = new Date(iso + 'T12:00:00')
+  d.setDate(d.getDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+/** "1405/04/01" for an ISO day */
+export const jNum = (iso: string) => {
+  const j = isoToJalaliParts(iso)
+  return j ? `${j.jy}/${String(j.jm).padStart(2, '0')}/${String(j.jd).padStart(2, '0')}` : iso
 }
 
-/** For Claude in Chrome: run the reader, nothing else. */
-export function mzReaderPrompt(since: string) {
-  return `در تب میزیتو (که در آن وارد شده‌ام) فقط این کار را بکن: کد زیر را با ابزار اجرای JavaScript در همان صفحه اجرا کن و متنی را که برمی‌گرداند به من بگو. کد فقط از میزیتو می‌خواند، چیزی در میزیتو تغییر نمی‌دهد و نتیجه را به‌صورت یک فایل دانلود می‌کند. خودت چیزی را باز نکن، کلیک نکن و چیزی ننویس.
-
-\`\`\`js
-${mzReaderScript(since)}
-\`\`\``
-}
-
-interface ReaderDoc {
-  source: 'madar-reader'
-  account?: string
-  since?: string
-  read_at?: string
-  messages?: number
-  items: MzImportItem[]
-}
-
-/** A file from the reader: tasks keyed by Mizito's id, names matched to the people Madar knows. */
-export function parseReaderDoc(raw: string, fallbackAccount: string, people: string[] = []): MzImportResult | null {
-  let doc: ReaderDoc
-  try {
-    doc = JSON.parse(String(raw || '').trim())
-  } catch {
-    return null
-  }
-  if (!doc || doc.source !== 'madar-reader' || !Array.isArray(doc.items)) return null
-  const who = nameMatcher(people)
-  const names = (l: unknown) => (Array.isArray(l) ? l : []).map(who).filter(Boolean)
-  const problems: string[] = []
-  const seen = new Set<string>()
-  const items = doc.items
-    .filter((t) => t && /^[0-9a-f]{24}$/i.test(String(t.key)) && !seen.has(t.key) && !!seen.add(t.key))
-    .map((t) => ({
-      ...t,
-      owner: who(t.owner),
-      assignees: names(t.assignees),
-      completed_by: who(t.completed_by),
-      last_by: who(t.last_by),
-      mentions: (t.mentions || []).map((x) => ({ ...x, by: who(x.by) })),
-      comments: (t.comments || []).map((c) => ({ ...c, by: who(c.by), mentions: names(c.mentions) })),
-    }))
-  if (items.length !== doc.items.length) problems.push(`${doc.items.length - items.length} ردیف تکراری یا بی‌شناسه در فایل کنار گذاشته شد`)
-  const account = who(doc.account)
-  if (!account) problems.push('نام صاحب فایل در مدار پیدا نشد؛ «میزیتوی چه کسی» را خودتان انتخاب کنید')
-  return { account: account || fallbackAccount, items, problems, parts: 1, broken: 0, listed: doc.items.length }
-}
-
-// ---------------------------------------------------------------- links (they never add a task)
-export interface LinkMatch {
-  pairs: { key: string; title: string; link: string }[]
-  unmatched: string[]
-  ambiguous: string[]
-  bad: string[]
-}
-
-/** Claude's list of {title, link}: each link goes to the one task in Madar with that title. Nothing is created. */
-export function parseLinks(raw: string, rows: { mz_key?: string; title?: string; link?: string }[]): LinkMatch | null {
-  const out: LinkMatch = { pairs: [], unmatched: [], ambiguous: [], bad: [] }
-  const src = String(raw || '')
-  const fenced = [...src.matchAll(/```(?:json)?\s*([\s\S]*?)(?:```|$)/gi)].map((m) => m[1].trim()).filter(Boolean)
-  const list: { title?: string; link?: string }[] = []
-  for (const c of fenced.length ? fenced : [src.slice(Math.max(0, src.search(/[[{]/)))]) {
-    try {
-      const v = JSON.parse(c)
-      const arr = Array.isArray(v) ? v : Array.isArray(v?.links) ? v.links : Array.isArray(v?.tasks) ? v.tasks : []
-      list.push(...arr)
-    } catch {}
-  }
-  if (!list.length) return null
-  const byTitle = new Map<string, { mz_key?: string; title?: string }[]>()
-  rows.forEach((r) => {
-    const k = mzTitleKey(r.title)
-    if (k && r.mz_key) byTitle.set(k, [...(byTitle.get(k) || []), r])
-  })
-  const done = new Set<string>()
-  list.forEach((x) => {
-    const title = String(x?.title || '').trim()
-    const link = String(x?.link || '').trim().replace(/\s+/g, '')
-    if (!title) return
-    if (!/^https?:\/\/[^\s]*#\/ws\//.test(link) || !mzKeyFromLink(link)) return out.bad.push(title)
-    const tk = mzTitleKey(title)
-    let hit = byTitle.get(tk) || []
-    // a title Claude cut short: the one task whose title starts with it
-    if (!hit.length && tk.length >= 8) hit = [...byTitle.entries()].filter(([k]) => k.startsWith(tk) || tk.startsWith(k)).flatMap(([, v]) => v)
-    if (!hit.length) return out.unmatched.push(title)
-    if (hit.length > 1) return out.ambiguous.push(title)
-    const key = String(hit[0].mz_key)
-    if (done.has(key)) return
-    done.add(key)
-    out.pairs.push({ key, title: String(hit[0].title || title), link })
-  })
-  return out
-}
-
-/** For Claude in Chrome: only the links, as a list of title → link. */
-export function mzLinksPrompt(since: string) {
-  return `در میزیتو فقط لینک تسک‌ها را جمع کن؛ در میزیتو چیزی را تغییر نده و هیچ‌وقت دکمه‌ی «تایید» را نزن.
-
-۱. از نوار سمت راست «گفتگو» ← «دستیار میزیتو» را باز کن.
-۲. از ${since} تا امروز، برای هر تسکی که در پیام‌ها آمده (هر تسک فقط یک بار):
-   «مشاهده وظیفه» ← منوی ⋮ بالای پنل ← «لینک وظیفه» ← آدرس کامل داخل کادر (اگر بریده بود «کپی» را بزن و متن کامل را بردار) ← پنل را ببند.
-۳. خروجی فقط یک بلوک JSON، عنوان دقیقاً همان‌طور که در میزیتو نوشته شده:
-
-\`\`\`json
-[{ "title": "عنوان کامل تسک", "link": "https://mizito.noyanet.com/#/ws/tasks/..." }]
-\`\`\`
-
-اگر زیاد است، هر بار ۳۰ تسک بفرست و منتظر «ادامه» بمان.`
-}
-
-/** What to tell Claude in Chrome, on the Mizito page, so its answer can be pasted straight into Madar. */
-export function mzClaudePrompt(account: string, since: string) {
+/** What to tell Claude in Chrome, on the Mizito page, for one range of days. */
+export function mzClaudePrompt(account: string, from: string, to: string, fromFa: string, toFa: string) {
+  const a = jNum(from), b = jNum(to)
   return `روی میزیتو (https://mizito.noyanet.com) هستیم و من «${account}» هستم. فقط بخوان؛ در میزیتو هیچ چیزی را تغییر نده، کامنت نگذار، تیک نزن و هیچ دکمه‌ی «تایید» یا «ذخیره» را نزن.
+
+بازه: فقط پیام‌های «دستیار میزیتو» از ${fromFa} (${a}) تا ${toFa} (${b})، هر دو روز هم جزو بازه است. پیام‌های قبل و بعد از این بازه را کاملاً نادیده بگیر.
 
 کار:
 ۱. از نوار سمت راست «گفتگو» را باز کن و گفتگوی «دستیار میزیتو» را انتخاب کن.
-۲. در این گفتگو آن‌قدر بالا برو (اسکرول) تا به پیام‌های قبل از ${since} برسی. همه‌ی پیام‌های از ${since} تا امروز را در نظر بگیر؛ هیچ پیامی را جا نینداز، حتی اگر چند پیام درباره‌ی یک تسک باشد.
-۳. هر پیامی که درباره‌ی یک تسک است (منشن، ارجاع، کامنت، تغییر مهلت، انجام شدن یا هر نوع دیگر) را برای آن تسک ثبت کن: چه کسی، چه زمانی، و متن پیام. «چه کسی» همان فردی است که منشن کرده یا کار را انجام داده (نامش در متن پیام آمده)، نه «دستیار میزیتو». نام‌ها را کامل و دقیقاً همان‌طور که در میزیتو نوشته شده بنویس.
-۴. برای هر تسکِ یکتا (فقط یک بار برای هر تسک):
-   - روی «مشاهده وظیفه» بزن تا پنل تسک باز شود.
-   - این‌ها را از پنل بخوان: عنوان (کامل و دقیقاً همان متن، بدون کوتاه کردن)، توضیحات کامل، پروژه، سازنده‌ی تسک، مسئولان، مهلت، وضعیت (باز یا انجام‌شده، و اگر انجام شده چه کسی و کی)، درصد پیشرفت، چک‌لیست (هر مورد و تیک خوردن یا نخوردنش)، برچسب‌ها، و همه‌ی کامنت‌ها (نویسنده، زمان، متن کامل، نام فایل‌های پیوست، و کسانی که در کامنت منشن شده‌اند).
-   - لینک: منوی ⋮ بالای پنل ← «لینک وظیفه». آدرس کامل داخل کادر را بخوان (اگر بریده نشان داده شد، روی «کپی» بزن و متن کامل را بردار). هرگز «تایید» را نزن. آدرس باید با https://mizito.noyanet.com/#/ws/tasks/ شروع شود.
-   - پنل را ببند و سراغ تسک بعدی برو.
-۵. تاریخ‌ها را همیشه کامل و شمسی با ارقام انگلیسی بنویس: «1405/07/12 14:30». اگر میزیتو تاریخ نسبی نشان می‌دهد («دیروز»، «۲ ساعت پیش»)، اول ماوس را روی آن نگه دار تا تاریخ دقیق دیده شود؛ اگر نشد، با توجه به تاریخ امروز تبدیلش کن.
-۶. چیزی حدس نزن و از خودت نساز؛ اگر چیزی نبود، "" یا [] بگذار.
+۲. آن‌قدر بالا برو تا به اولین پیام ${a} برسی، و از همان‌جا رو به پایین تا آخرین پیام ${b} همه را ببین. هیچ پیامی از این بازه را جا نینداز.
+۳. هر پیام این بازه که درباره‌ی یک تسک است (منشن، ارجاع، کامنت، تغییر مهلت، انجام شدن یا هر نوع دیگر) را برای همان تسک ثبت کن: by = کسی که منشن کرده یا کار را انجام داده (نامش در متن پیام آمده، نه «دستیار میزیتو»)، at = زمان پیام، text = متن پیام. اگر یک تسک چند بار در این بازه آمده، همه‌ی پیام‌هایش زیر همان یک تسک بیاید.
+۴. برای هر تسکِ یکتا فقط یک بار:
+   - «مشاهده وظیفه» را بزن.
+   - از پنل بخوان: عنوان (کامل و دقیقاً همان متن)، توضیحات کامل، پروژه، سازنده، مسئولان، مهلت، وضعیت (باز یا انجام‌شده؛ اگر انجام شده چه کسی و کی)، درصد پیشرفت، چک‌لیست، برچسب‌ها، و همه‌ی کامنت‌ها (نویسنده، زمان، متن کامل، نام پیوست‌ها، منشن‌شده‌ها).
+   - لینک: منوی ⋮ بالای پنل ← «لینک وظیفه» ← آدرس کامل داخل کادر (اگر بریده بود «کپی» را بزن و متن کامل را بردار؛ هرگز «تایید» را نزن). باید با https://mizito.noyanet.com/#/ws/tasks/ شروع شود.
+   - پنل را ببند.
+۵. تاریخ‌ها کامل، شمسی و با ارقام انگلیسی: «1405/04/12 14:30». تاریخ نسبی («دیروز»، «۲ ساعت پیش») را با ماوس روی آن ببین یا با تاریخ امروز به تاریخ کامل تبدیل کن.
+۶. چیزی حدس نزن؛ اگر نبود "" یا [] بگذار.
 
-خروجی: فقط یک بلوک JSON دقیقاً با این ساختار، بدون هیچ توضیح دیگری. تسک‌ها به ترتیب تاریخ اولین پیام دستیار (قدیمی‌ترین اول) باشند:
+خروجی فقط یک بلوک JSON با همین ساختار (تسک‌ها به ترتیب اولین پیامشان در بازه):
 
 \`\`\`json
 {
   "account": "${account}",
+  "range": { "from": "${a}", "to": "${b}" },
   "tasks": [
     {
       "title": "",
       "link": "https://mizito.noyanet.com/#/ws/tasks/...",
-      "first_mention_at": "1405/04/09 10:15",
+      "first_mention_at": "${a} 10:15",
       "project": "",
       "owner": "",
       "assignees": [""],
-      "deadline": "1405/07/20",
+      "deadline": "",
       "status": "open",
       "done_at": "",
       "done_by": "",
@@ -488,17 +389,16 @@ export function mzClaudePrompt(account: string, since: string) {
       "description": "",
       "labels": [""],
       "checklist": [{ "title": "", "done": false }],
-      "mentions": [{ "by": "", "at": "1405/04/09 10:15", "text": "" }],
-      "comments": [{ "by": "", "at": "1405/04/09 11:00", "text": "", "mentions": [""], "files": [""] }]
+      "mentions": [{ "by": "", "at": "${a} 10:15", "text": "" }],
+      "comments": [{ "by": "", "at": "${a} 11:00", "text": "", "mentions": [""], "files": [""] }]
     }
   ]
 }
 \`\`\`
 
-- "status" همیشه یکی از "open" یا "done" (خالی نگذار).
-- هر تسک فقط یک بار در کل خروجی بیاید؛ همه‌ی پیام‌های دستیار درباره‌ی آن را در "mentions" همان تسک بگذار. تسکی را که در یک بخش آوردی، در بخش‌های بعد تکرار نکن.
-- "description" و متن کامنت‌ها را کامل بنویس، خلاصه نکن.
-- "mentions" = همه‌ی پیام‌های «دستیار میزیتو» درباره‌ی همین تسک.
-- اگر تعداد تسک‌ها زیاد است و جواب در یک پیام جا نمی‌شود، کار را بخش‌بخش انجام بده: هر بار حداکثر ۱۵ تسک، هر بخش یک JSON کامل با همین ساختار، و بنویس «بخش ۱ از ۴» و ... . بعد از هر بخش منتظر بمان تا بگویم «ادامه».
-- در آخر بنویس چند پیام و چند تسک یکتا دیدی تا بتوانم شمارش را چک کنم.`
+- "status" همیشه "open" یا "done".
+- هر تسک فقط یک بار در کل خروجی؛ تسکی را که در یک بخش آوردی در بخش بعد تکرار نکن.
+- توضیحات و کامنت‌ها را کامل بنویس، خلاصه نکن.
+- اگر جواب در یک پیام جا نمی‌شود، هر بار ۱۵ تسک بفرست با «بخش ۱ از N» و منتظر «ادامه» بمان.
+- در آخر بنویس در این بازه چند پیام و چند تسک یکتا دیدی.`
 }
