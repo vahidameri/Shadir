@@ -44,7 +44,7 @@ const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields: Field[
       { key: 'title', label: ['عنوان تسک', 'Task title'], type: 'text', required: true },
       { key: 'description', label: ['توضیحات', 'Description'], type: 'textarea' },
       { key: 'project_id', label: ['محصول / پروژه', 'Product / project'], type: 'project', half: true },
-      { key: 'area', label: ['حوزه', 'Area'], type: 'area', half: true },
+      { key: 'area', label: ['حوزه (کار بیرون از پروژه‌ها)', 'Area (work outside projects)'], type: 'area', half: true },
       { key: 'kr_id', label: ['نتیجه‌ی کلیدی (OKR)', 'Key result (OKR)'], type: 'kr', half: true },
       { key: 'plan_id', label: ['آیتم برنامه (رودمپ)', 'Plan item (roadmap)'], type: 'plan', half: true },
       { key: 'assignee', label: ['مسئول انجام (یک یا چند نفر)', 'Assignees (one or more)'], type: 'assignees' },

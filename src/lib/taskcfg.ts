@@ -32,6 +32,8 @@ const FIELD_DEFAULT: Record<TaskField, FieldMode> = { assigned_at: 'on', flag: '
 export const fieldKey = (f: TaskField) => `task.field.${f}`
 
 interface Person { id: string; access?: string }
+/** Areas until the program manager sets their own (task settings → areas). */
+const DEFAULT_AREAS = 'OKR تیم‌ها,شرکت و مدیریت,ذی‌نفعان,جذب و تیم,بودجه و قراردادها,شخصی'
 interface TaskCfg { defaultDue: string; flexDefaultDue: string; dueRequired: boolean; projectRequired: boolean; noDue: string[]; personal: string[]; areas: string[]; fields: Record<TaskField, FieldMode>; flags: Flag[]; staleDays: number; blockedDays: number; pingDays: number }
 
 let cfg: TaskCfg = { defaultDue: '0', flexDefaultDue: '', dueRequired: true, projectRequired: false, noDue: [], personal: [], areas: [], fields: { ...FIELD_DEFAULT }, flags: DEFAULT_FLAGS, staleDays: 7, blockedDays: 3, pingDays: 2 }
@@ -51,7 +53,8 @@ export function readTaskCfg(get: (k: string) => string | undefined, team: Person
     projectRequired: get(TASK_KEYS.projectRequired) === '1',
     noDue: list(TASK_KEYS.noDue),
     personal: list(TASK_KEYS.personal),
-    areas: (get(TASK_KEYS.areas) || '').split(/[,،\n]/).map((x) => x.trim()).filter(Boolean),
+    // work outside the projects (the CPTO's and PgM's own areas); edited in task settings
+    areas: (get(TASK_KEYS.areas) || DEFAULT_AREAS).split(/[,،\n]/).map((x) => x.trim()).filter(Boolean),
     fields: Object.fromEntries(TASK_FIELDS.map((f) => {
       const v = get(fieldKey(f))
       return [f, v === 'off' || v === 'on' || v === 'req' ? v : FIELD_DEFAULT[f]]

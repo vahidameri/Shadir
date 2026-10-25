@@ -439,6 +439,8 @@ export interface MizitoItem {
   mz_chat?: string
   /** when the task was last mentioned again (after the first ask); set by the server */
   mz_again?: string
+  /** a flag, from the same list as tasks (task settings → flags) */
+  flag?: string
   mz_link_ok?: string
 }
 

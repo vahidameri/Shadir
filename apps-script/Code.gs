@@ -18,7 +18,7 @@
  *   viewer — read only (leadership)
  */
 
-var MADAR_VERSION = '2.5.1'; // shown on the login page and by diagnose()
+var MADAR_VERSION = '2.6.0'; // shown on the login page and by diagnose()
 
 var SCHEMA = {
   Projects: ['id', 'code', 'name', 'description', 'category', 'owner', 'client', 'liaison', 'liaison_contact', 'status', 'priority', 'phase', 'start_date', 'end_date', 'progress', 'health_override', 'objective', 'paused_at', 'pause_reason', 'delivery_day', 'last_delivery', 'archived', 'archived_at', 'links', 'team', 'kind', 'batch'],
@@ -65,7 +65,7 @@ var SCHEMA = {
   // source = agent when the Mizito agent brought it; review = new (waiting for a look) | ignored.
   // mz_* columns mirror the task in Mizito and are written by the agent only.
   Mizito: ['id', 'mz_key', 'link', 'title', 'description', 'docs', 'asked_by', 'mentioned', 'category', 'action', 'status', 'priority_override', 'override_reason', 'urgent', 'assigned_to', 'due_date', 'received_at', 'last_mention_at', 'last_mention_by', 'outcome', 'notes', 'created_at', 'updated_at', 'closed_at', 'ext_id', 'batch',
-    'source', 'review', 'mz_state', 'mz_done_at', 'mz_done_by', 'mz_progress', 'mz_project', 'mz_owner', 'mz_assignees', 'mz_labels', 'mz_checklist', 'mz_deadline', 'mz_last_by', 'mz_last_at', 'mz_sig', 'synced_at', 'mz_change', 'mz_changed_at', 'mz_first', 'mz_link_ok', 'mz_chat', 'mz_again'],
+    'source', 'review', 'mz_state', 'mz_done_at', 'mz_done_by', 'mz_progress', 'mz_project', 'mz_owner', 'mz_assignees', 'mz_labels', 'mz_checklist', 'mz_deadline', 'mz_last_by', 'mz_last_at', 'mz_sig', 'synced_at', 'mz_change', 'mz_changed_at', 'mz_first', 'mz_link_ok', 'mz_chat', 'mz_again', 'flag'],
   // account = whose Mizito the agent read it in; mz_id = the mention's id there, mz_comment = the comment that mentioned
   MizitoMentions: ['id', 'item_id', 'by', 'at', 'note', 'status', 'batch', 'mz_id', 'account', 'mz_comment'],
   // the conversation on a Mizito task, as the agent read it (one row per Mizito comment)
@@ -1035,7 +1035,7 @@ function historyRows_(rows, user) {
 var BULK_SHEETS = { Tasks: 1, FollowUps: 1, Mizito: 1, MizitoMentions: 1, MizitoComments: 1, Contacts: 1, Team: 1, Projects: 1, History: 1, Comments: 1, Allocations: 1, Objectives: 1, KeyResults: 1, Kpis: 1, Checkins: 1, Sprints: 1, Plans: 1 };
 
 function bulk_(name, rows, user) {
-  if (user.access !== 'super') throw new Error('فقط مدیر برنامه می‌تواند ایمپورت کند');
+  if (user.access !== 'super' && !(name === 'Mizito' && user.access === 'exec')) throw new Error('فقط مدیر برنامه می‌تواند ایمپورت کند');
   if (!BULK_SHEETS[name]) throw new Error('این تب قابل ایمپورت نیست: ' + name);
   rows = (rows || []).filter(function (r) { return r && r.id; });
   if (!rows.length) return { count: 0 };
@@ -2404,14 +2404,13 @@ function mzDedupe_(dry) {
     if (rows.length < 2) return;
     var links = {};
     rows.forEach(function (m) { var k = linkKey(m.link); if (k) links[k] = 1; });
-    if (Object.keys(links).length > 1) return; // two real tasks with the same title
     rows.sort(function (a, b) { return (linkKey(b.link) ? 1 : 0) - (linkKey(a.link) ? 1 : 0) || (String(a.received_at || '9') < String(b.received_at || '9') ? -1 : 1); });
     merges.push(rows);
   });
   if (dry) return { groups: merges.length, rows: merges.reduce(function (a, g) { return a + g.length - 1; }, 0) };
 
   var keepRows = [], gone = {}, moveTo = {};
-  var madar = ['category', 'action', 'priority_override', 'override_reason', 'urgent', 'assigned_to', 'outcome', 'notes', 'docs', 'link', 'description'];
+  var madar = ['flag', 'category', 'action', 'priority_override', 'override_reason', 'urgent', 'assigned_to', 'outcome', 'notes', 'docs', 'link', 'description'];
   var mzFacts = ['mz_again', 'mz_project', 'mz_owner', 'mz_assignees', 'mz_labels', 'mz_checklist', 'mz_deadline', 'mz_progress', 'mz_last_by', 'mz_last_at', 'mz_chat'];
   var extra = [];
   merges.forEach(function (rows) {

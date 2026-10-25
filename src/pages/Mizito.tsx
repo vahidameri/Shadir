@@ -1,5 +1,6 @@
 // Mizito queue: what the CPTO and the PgM were mentioned on, one row per Mizito task, sorted by
 // priority (P0 first, then SLA, then deadline). Re-mentions thread into the same row.
+import { FlagMark, FlagPicker } from '../components/TaskTracking'
 import { MoreButton, usePaged } from '../components/Paged'
 import { dirOf } from '../lib/dir'
 import { useEffect, useMemo, useState } from 'react'
@@ -21,7 +22,7 @@ const VIEW_LABEL: Record<MzView, [string, string]> = {
 type Group = '' | 'asker' | 'category' | 'p' | 'status' | 'assigned'
 
 export default function MizitoPage() {
-  const { db, canEdit, access, me, upsert, toast, setting } = useStore()
+  const { db, canEdit, access, me, upsert, bulk, toast, setting } = useStore()
   const [params, setParams] = useSearchParams()
   const get = (k: string) => params.get(k) || ''
   const set = (k: string, v: string) => {
@@ -102,19 +103,18 @@ export default function MizitoPage() {
   const open = base.filter((m) => inMzView(db, m, 'queue', sig.get(m.id)))
   const closedWeek = db.Mizito.filter((m) => m.closed_at && daysFromToday(m.closed_at.slice(0, 10)) >= -7).length
   const setStatus = async (ids: string[], status: string) => {
-    for (const id of ids) {
-      const m = db.Mizito.find((x) => x.id === id)
-      if (m && m.status !== status) await upsert('Mizito', { ...m, status })
-    }
+    const rows = ids.map((id) => db.Mizito.find((x) => x.id === id)).filter((m) => m && m.status !== status).map((m) => ({ ...m!, status }))
+    // one item: a normal save (logged); several: one save for all
+    if (rows.length === 1) await upsert('Mizito', rows[0])
+    else if (rows.length) await bulk('Mizito', rows)
     if (ids.length > 1) toast(L(`وضعیت ${fa(ids.length)} مورد به‌روز شد`, `${ids.length} items updated`))
     setPicked(new Set())
   }
   // the agent's new items: keep (it joins the queue as is) or set aside (cancelled, never reopened by the agent)
+  // all at once (one save), not one by one
   const review = async (ids: string[], keep: boolean) => {
-    for (const id of ids) {
-      const m = db.Mizito.find((x) => x.id === id)
-      if (m) await upsert('Mizito', keep ? { ...m, review: '' } : { ...m, review: 'ignored', status: firstMzStatus('cancelled') })
-    }
+    const rows = ids.map((id) => db.Mizito.find((x) => x.id === id)).filter(Boolean).map((m) => (keep ? { ...m!, review: '' } : { ...m!, review: 'ignored', status: firstMzStatus('cancelled') }))
+    if (rows.length) await bulk('Mizito', rows)
     toast(keep ? L(`${fa(ids.length)} مورد به صف اضافه شد`, `${ids.length} added to the queue`) : L(`${fa(ids.length)} مورد کنار گذاشته شد`, `${ids.length} set aside`))
     setPicked(new Set())
   }
@@ -225,6 +225,9 @@ export default function MizitoPage() {
         {picked.size > 0 && (
           <div className="sticky top-2 z-20 mb-3 flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-surface px-3 py-2 shadow-float">
             <span className="text-sm font-medium">{L(`${fa(picked.size)} مورد انتخاب شد`, `${picked.size} selected`)}</span>
+            <button className="btn-ghost btn-sm" onClick={() => setPicked(new Set())}>{L('لغو انتخاب', 'Clear')}</button>
+            <span className="text-xs text-sub">{L('پرچم:', 'Flag:')}</span>
+            <FlagPicker value="" onChange={(f) => void bulk('Mizito', [...picked].map((id) => db.Mizito.find((x) => x.id === id)).filter(Boolean).map((m) => ({ ...m!, flag: f }))).then(() => setPicked(new Set()))} />
             <span className="text-xs text-sub">{L('وضعیت:', 'Status:')}</span>
             {c.statuses.map((x) => (
               <button key={x.id} className={cx('btn-sm', x.cat === 'done' ? 'btn-primary' : 'btn-outline')} onClick={() => setStatus([...picked], x.id)}>{optLabel(x)}</button>
@@ -253,6 +256,12 @@ export default function MizitoPage() {
             <Empty text={db.Mizito.length ? L('موردی در این نما نیست', 'Nothing in this view') : L('هنوز موردی ثبت نشده. لینک تسک میزیتو را با «ثبت منشن» اضافه کنید یا از بک‌آفیس ایمپورت کنید.', 'Nothing yet. Add a Mizito link with “Log a mention” or import from the back office.')} />
           ) : (
             <div className="divide-y divide-line">
+              {canEdit && (
+                <label className="flex cursor-pointer items-center gap-3 bg-muted/30 px-4 py-2 text-xs text-sub">
+                  <input type="checkbox" checked={list.length > 0 && list.every((m) => picked.has(m.id))} onChange={(e) => setPicked(e.target.checked ? new Set(list.map((m) => m.id)) : new Set())} />
+                  {L(`انتخاب همه (${fa(list.length)})`, `Select all (${list.length})`)}
+                </label>
+              )}
               {paged.groups.map((g) => (
                 <div key={g.key || '-'}>
                   {group && (
@@ -269,6 +278,7 @@ export default function MizitoPage() {
                         <PBadge p={s.p} />
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
+                            {canEdit ? <span onClick={(e) => e.stopPropagation()}><FlagPicker value={m.flag || ''} onChange={(f) => void upsert('Mizito', { ...m, flag: f })} /></span> : m.flag && <FlagMark id={m.flag} />}
                             <MzBadges m={m} />
                             {mzFlags(m).fresh && <span className="rounded-full bg-brand px-1.5 text-[0.625rem] font-medium leading-5 text-white">{L('تازه', 'New')}</span>}
                             <span dir={dirOf(m.title)} className="font-medium">{m.title}</span>

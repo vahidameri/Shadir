@@ -361,7 +361,7 @@ export default function Tasks() {
                               )}
                             </div>
                           </td>
-                          <td className="td text-xs text-sub">{pname(t.project_id) || (canPersonal(db.Team.find((m) => m.name === leadAssignee(t))) ? L('شخصی', 'Personal') : '—')}</td>
+                          <td className="td text-xs text-sub">{pname(t.project_id) || t.area || (canPersonal(db.Team.find((m) => m.name === leadAssignee(t))) ? L('شخصی', 'Personal') : '—')}</td>
                           <td className="td">
                             <span className="flex items-center gap-1.5">
                               <TrackBadge track={trackOf(t, db)} />
