@@ -4,7 +4,7 @@ import { MoreButton, usePaged } from '../components/Paged'
 import { dirOf } from '../lib/dir'
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowRight, Plus, Target } from 'lucide-react'
+import { ArrowRight, Plus, Target, X } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { useEditor } from '../components/Editor'
 import { Avatar, Band, Card, Empty, HealthDot, Overlap, Progress, Segmented, StatStrip, cx } from '../components/ui'
@@ -28,7 +28,15 @@ type View = 'attention' | 'open' | 'done'
 export default function TeamDetail() {
   const { id = '' } = useParams()
   const team = id === '-' ? '' : id
-  const { db, access, canEdit } = useStore()
+  const { db, access, canEdit, upsert, toast } = useStore()
+  const [adding, setAdding] = useState('')
+  // who is in which team is set here (or in the back office); the Teams page counts people by it
+  const setTeam = async (id: string, track: string) => {
+    const m = db.Team.find((x) => x.id === id)
+    if (!m) return
+    await upsert('Team', { ...m, track })
+    toast(track ? L(`${m.name} به ${teamName(track)} اضافه شد`, `${m.name} added`) : L(`${m.name} از این تیم برداشته شد`, `${m.name} removed`))
+  }
   const { open } = useEditor()
   const [view, setView] = useState<View>('attention')
   const s = useMemo(() => teamStats(db, team), [db, team])
@@ -128,7 +136,31 @@ export default function TeamDetail() {
           </div>
 
           <div className="min-w-0 space-y-4">
-            <Card title={L('افراد', 'People')}>
+            <Card
+              title={L('افراد', 'People')}
+              action={
+                canEdit && access === 'super' && team ? (
+                  <select
+                    value={adding}
+                    onChange={(e) => {
+                      const id = e.target.value
+                      setAdding('')
+                      if (id) void setTeam(id, team)
+                    }}
+                    className="input h-8 w-auto text-xs"
+                    aria-label={L('افزودن نفر', 'Add a person')}
+                  >
+                    <option value="">{L('+ افزودن نفر', '+ Add a person')}</option>
+                    {db.Team.filter((m) => m.track !== team && String(m.active) !== 'false').map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                        {m.track ? ` (${L('الان', 'now')}: ${teamName(m.track)})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                ) : undefined
+              }
+            >
               {members.length ? (
                 <ul className="space-y-1">
                   {members.map(({ m, open: n, late, blocked }) => (
@@ -144,6 +176,20 @@ export default function TeamDetail() {
                           {late > 0 && <b className="ms-1.5 text-bad">{fa(late)} {L('معوق', 'late')}</b>}
                           {blocked > 0 && <b className="ms-1.5 text-bad">{fa(blocked)} {L('مسدود', 'blocked')}</b>}
                         </span>
+                        {canEdit && access === 'super' && (
+                          <button
+                            className="icon-btn h-7 w-7 shrink-0 text-sub hover:text-bad"
+                            title={L('برداشتن از این تیم', 'Remove from this team')}
+                            aria-label={L('برداشتن از این تیم', 'Remove from this team')}
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              void setTeam(m.id, '')
+                            }}
+                          >
+                            <X size={13} />
+                          </button>
+                        )}
                       </Link>
                     </li>
                   ))}

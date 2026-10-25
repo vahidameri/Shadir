@@ -13,7 +13,7 @@ import { L, lbl, tr, type T2 } from '../lib/i18n'
 import { TRACK, TRACKS } from '../lib/tracks'
 import {
   CHANNEL, CONFIDENCE, CONTRACT_KIND, CONTRACT_STATUS, DELIVERABLE_STATUS, MEETING_SERIES, MEETING_STATUS, PLAN_PURPOSE, AGILE_SERIES, FOLLOWUP_STATUS, HEALTH, MILESTONE_STATUS, PRIORITY, PROJECT_STATUS, RISK_STATUS, RISK_TYPE, SCOPE_STATUS,
-  ACCESS, JOB_TITLE_OPTIONS, TEAM_NAMES } from '../lib/labels'
+  ACCESS, JOB_TITLE_OPTIONS } from '../lib/labels'
 import { Sheet, cx } from './ui'
 import { DatePicker } from './DatePicker'
 import { ItemSheet } from './ItemSheet'
@@ -229,7 +229,6 @@ const SCHEMAS: Record<EditableSheet, { title: T2; prefix: string; fields: Field[
       { key: 'name_en', label: ['نام انگلیسی', 'Name in English'], type: 'text', half: true },
       { key: 'username', label: ['نام کاربری', 'Username'], type: 'text', half: true, placeholder: ['خودکار از نام انگلیسی', 'From the English name'] },
       { key: 'role', label: ['سمت', 'Title'], type: 'title', half: true },
-      { key: 'team', label: ['تیم‌ها', 'Teams'], type: 'multi', options: TEAM_NAMES },
       { key: 'track', label: ['تیم', 'Team'], type: 'side', half: true },
       { key: 'capacity', label: ['ظرفیت', 'Capacity'], type: 'number', half: true },
       { key: 'email', label: ['ایمیل گوگل', 'Google email'], type: 'text', half: true },

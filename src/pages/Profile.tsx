@@ -2,7 +2,8 @@ import { isAssignee } from '../lib/assignees'
 import { dirOf } from '../lib/dir'
 import { closed } from '../lib/columns'
 import { Link, useParams } from 'react-router-dom'
-import { JOB_TITLE, TEAM_NAMES, teamCodes } from '../lib/labels'
+import { JOB_TITLE } from '../lib/labels'
+import { TRACK } from '../lib/tracks'
 import { Mail, Phone, Pencil, Lock, CalendarDays, Plus } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { useEditor } from '../components/Editor'
@@ -46,7 +47,7 @@ export default function Profile() {
               {m.name}
               <span className="mt-2 block text-base font-normal text-band-sub">
                 {lbl(JOB_TITLE, m.role)}
-                {teamCodes(m.team).length > 0 && ` · ${teamCodes(m.team).map((t) => lbl(TEAM_NAMES, t)).join(L('، ', ', '))}`}
+                {m.track && ` · ${L('تیم', 'Team')} ${lbl(TRACK, m.track) || m.track}`}
               </span>
             </span>
           </span>

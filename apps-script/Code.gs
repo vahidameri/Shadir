@@ -18,7 +18,7 @@
  *   viewer — read only (leadership)
  */
 
-var MADAR_VERSION = '2.5.0'; // shown on the login page and by diagnose()
+var MADAR_VERSION = '2.5.1'; // shown on the login page and by diagnose()
 
 var SCHEMA = {
   Projects: ['id', 'code', 'name', 'description', 'category', 'owner', 'client', 'liaison', 'liaison_contact', 'status', 'priority', 'phase', 'start_date', 'end_date', 'progress', 'health_override', 'objective', 'paused_at', 'pause_reason', 'delivery_day', 'last_delivery', 'archived', 'archived_at', 'links', 'team', 'kind', 'batch'],
@@ -144,11 +144,10 @@ function doPost(e) {
     if (body.action === 'pwLogin') return json_(pwLogin_(body.username, body.password));
     if (body.action === 'otpLogout') return json_(otpLogout_(body.session));
     // the Mizito agent (a browser extension) signs in with its own key, bound to one person
+    // the old Chrome extension (mizito-agent) is retired: nothing reaches Mizito data but an import
+    // made by hand in the app. An extension still installed gets this answer and adds nothing.
     if (body.action === 'mzHello' || body.action === 'mzIngest') {
-      var agent = mzAgent_(body.agent);
-      if (body.action === 'mzHello') return json_({ ok: true, row: mzHello_(agent) });
-      lock.waitLock(30000);
-      return json_({ ok: true, row: mzIngest_(body, agent) });
+      return json_({ ok: false, error: 'ایجنت میزیتو دیگر استفاده نمی‌شود؛ افزونه را از chrome://extensions حذف کنید' });
     }
     var user = auth_(body);
     if (body.action === 'mzAgentKey' || body.action === 'mzAgentRevoke') {
@@ -1178,6 +1177,12 @@ function ensureSheet_(name, headers) {
 }
 
 function setup() {
+  // retired ways of reading Mizito (the extension's keys, the server reader's trigger) are switched off
+  try {
+    PropertiesService.getScriptProperties().deleteProperty('MZ_AGENTS');
+    PropertiesService.getScriptProperties().deleteProperty('MZ_TOKENS');
+    ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'mzServerSyncAll') ScriptApp.deleteTrigger(t); });
+  } catch (eOld) {}
   Object.keys(SCHEMA).forEach(function (name) {
     var sh = ensureSheet_(name, SCHEMA[name]);
     // Upgrade older sheets: append any columns added since they were created.
@@ -2234,6 +2239,12 @@ function keepRows_(name, keep) {
 }
 
 function mzReset_(user) {
+  // nothing may refill Mizito behind the person's back: old agent keys and server-read leftovers go
+  try {
+    PropertiesService.getScriptProperties().deleteProperty('MZ_AGENTS');
+    PropertiesService.getScriptProperties().deleteProperty('MZ_TOKENS');
+    ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'mzServerSyncAll') ScriptApp.deleteTrigger(t); });
+  } catch (eOld) {}
   var none = function () { return false; };
   var out = {
     items: keepRows_('Mizito', none),

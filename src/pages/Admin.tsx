@@ -10,7 +10,8 @@ import { PeopleRegistry } from '../components/PeopleRegistry'
 import { ImportPage } from '../components/Import'
 import { OrgPage } from '../components/OrgSettings'
 import { L, lbl } from '../lib/i18n'
-import { ACCESS, PROJECT_STATUS, JOB_TITLE, TEAM_NAMES, teamCodes, usernameOf } from '../lib/labels'
+import { ACCESS, PROJECT_STATUS, JOB_TITLE, usernameOf } from '../lib/labels'
+import { TRACK, TRACKS } from '../lib/tracks'
 import { closed } from '../lib/columns'
 import { isAssignee } from '../lib/assignees'
 import { isTaskOverdue } from '../lib/metrics'
@@ -88,6 +89,12 @@ export default function Admin({ initial = 'people' }: { initial?: Tab }) {
 function People() {
   const { db, upsert, me, toast } = useStore()
   const { open } = useEditor()
+  // the team a person is in (the Teams page): set right here
+  const setTeam = async (id: string, track: string) => {
+    const m = db.Team.find((x) => x.id === id)!
+    await upsert('Team', { ...m, track })
+    toast(track ? L(`${m.name} ← تیم ${lbl(TRACK, track)}`, `${m.name} → ${lbl(TRACK, track)}`) : L(`${m.name} بدون تیم شد`, `${m.name}: no team`))
+  }
   const setAccess = async (id: string, access: Access) => {
     const m = db.Team.find((x) => x.id === id)!
     await upsert('Team', { ...m, access })
@@ -141,7 +148,13 @@ function People() {
                   <td className="td text-xs" dir="ltr">
                     {m.email || <span className="text-sub">—</span>}
                   </td>
-                  <td className="td text-xs">{teamCodes(m.team).map((t) => lbl(TEAM_NAMES, t)).join(L('، ', ', ')) || '—'}</td>
+                  <td className="td">
+                    <select className="input h-9 w-40 text-xs" value={m.track || ''} onChange={(e) => setTeam(m.id, e.target.value)} aria-label={L('تیم', 'Team')}>
+                      <option value="">{L('بدون تیم', 'No team')}</option>
+                      {TRACKS.map((t) => <option key={t} value={t}>{lbl(TRACK, t)}</option>)}
+                      {m.track && !TRACKS.includes(m.track) && <option value={m.track}>{m.track} {L('(تعریف‌نشده)', '(not defined)')}</option>}
+                    </select>
+                  </td>
                   <td className="td text-center text-xs num">
                     <span className={cx(late ? 'font-semibold text-bad' : 'text-sub')}>{fa(openN)}</span>
                     {late > 0 && <span className="text-bad"> · {L(`${fa(late)} معوق`, `${late} late`)}</span>}
