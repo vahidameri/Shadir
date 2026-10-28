@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Plus, Pencil, Lock } from 'lucide-react'
+import { KeyRound, Plus, Pencil, Lock } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { useEditor } from '../components/Editor'
-import { Band, Card, Overlap, Segmented, StatStrip, Avatar, cx } from '../components/ui'
+import { Band, Card, Overlap, StatStrip, Avatar, cx } from '../components/ui'
 import { PauseButton } from '../components/PauseButton'
 import Settings from './Settings'
 import { PeopleRegistry } from '../components/PeopleRegistry'
@@ -18,10 +18,23 @@ import { isTaskOverdue } from '../lib/metrics'
 import { fa } from '../lib/jalali'
 import type { Access } from '../lib/types'
 
-type Tab = 'people' | 'contacts' | 'org' | 'projects' | 'import' | 'settings'
+type Tab = 'people' | 'contacts' | 'org' | 'projects' | 'tasks' | 'planning' | 'mizito' | 'import' | 'settings'
 
 /** Back office — the program manager's control room: people & access, organisation, projects, settings.
  *  Contracts have their own page (/contracts) for the program manager and the CEO. */
+/** The back office, one module per tab. */
+const MODULES: { id: Tab; fa: string; en: string; hintFa: string; hintEn: string }[] = [
+  { id: 'people', fa: 'افراد و دسترسی', en: 'People & access', hintFa: '', hintEn: '' },
+  { id: 'org', fa: 'تیم‌ها و سمت‌ها', en: 'Teams & titles', hintFa: '', hintEn: '' },
+  { id: 'contacts', fa: 'اشخاص و رده‌ها', en: 'Contacts & tiers', hintFa: '', hintEn: '' },
+  { id: 'projects', fa: 'پروژه‌ها', en: 'Projects', hintFa: '', hintEn: '' },
+  { id: 'tasks', fa: 'تسک‌ها', en: 'Tasks', hintFa: 'قواعد تسک، فیلدها، حوزه‌ها، ستون‌ها و پرچم‌ها.', hintEn: 'Task rules, fields, areas, columns and flags.' },
+  { id: 'planning', fa: 'برنامه‌ریزی و نمایش', en: 'Planning & views', hintFa: 'چرخه‌ی هفتگی، اسپرینت، سلامت تیم، داشبورد و تقویم.', hintEn: 'Week cycle, sprints, team health, dashboard and calendar.' },
+  { id: 'mizito', fa: 'میزیتو', en: 'Mizito', hintFa: 'ایمپورت، وضعیت‌ها، دسته‌ها، اولویت و SLA.', hintEn: 'Import, statuses, categories, priority and SLA.' },
+  { id: 'import', fa: 'ایمپورت', en: 'Import', hintFa: '', hintEn: '' },
+  { id: 'settings', fa: 'عمومی', en: 'General', hintFa: 'ورود با گوگل، اتوماسیون‌ها، اعلان‌ها، زبان و تقویم.', hintEn: 'Google sign-in, automations, notifications, language and calendar.' },
+]
+
 export default function Admin({ initial = 'people' }: { initial?: Tab }) {
   const { db, access } = useStore()
   const { open } = useEditor()
@@ -34,19 +47,13 @@ export default function Admin({ initial = 'people' }: { initial?: Tab }) {
         title={L('بک‌آفیس', 'Back office')}
         actions={
           <>
-            <Segmented
-              dark
-              value={tab}
-              onChange={setTab}
-              options={[
-                { value: 'people', label: L('دپارتمان و دسترسی', 'Department & access') },
-                { value: 'contacts', label: L('اشخاص و رده‌ها', 'People & tiers') },
-                { value: 'org', label: L('سمت‌ها و سازمان', 'Titles & organisation') },
-                { value: 'projects', label: L('پروژه‌ها', 'Projects') },
-                { value: 'import', label: L('ایمپورت', 'Import') },
-                { value: 'settings', label: L('تنظیمات', 'Settings') },
-              ]}
-            />
+            <div className="flex max-w-full gap-1 overflow-x-auto rounded-full bg-white/10 p-1">
+              {MODULES.map((m) => (
+                <button key={m.id} onClick={() => setTab(m.id)} className={cx('h-8 shrink-0 rounded-full px-3 text-xs font-medium transition', tab === m.id ? 'bg-white text-band' : 'text-white/80 hover:bg-white/10')}>
+                  {L(m.fa, m.en)}
+                </button>
+              ))}
+            </div>
             {tab === 'people' && (
               <>
                 <button className="btn h-10 border border-white/15 text-white hover:bg-white/10" onClick={() => setTab('org')}>
@@ -80,14 +87,41 @@ export default function Admin({ initial = 'people' }: { initial?: Tab }) {
         {tab === 'contacts' && <PeopleRegistry admin={access === 'super'} />}
         {tab === 'import' && <ImportPage />}
         {tab === 'org' && <OrgPage admin={access === 'super'} />}
-        {tab === 'settings' && <Settings embedded />}
+        {tab !== 'people' && tab !== 'projects' && tab !== 'contacts' && tab !== 'import' && tab !== 'org' && (
+          <p className="mb-3 px-1 text-xs text-sub">{L(MODULES.find((m) => m.id === tab)!.hintFa, MODULES.find((m) => m.id === tab)!.hintEn)}</p>
+        )}
+        {tab === 'tasks' && <Settings embedded section="tasks" />}
+        {tab === 'planning' && <Settings embedded section="planning" />}
+        {tab === 'mizito' && <Settings embedded section="mizito" />}
+        {tab === 'settings' && <Settings embedded section="general" />}
       </Overlap>
     </>
   )
 }
 
 function People() {
-  const { db, upsert, me, toast } = useStore()
+  const { db, upsert, me, toast, action } = useStore()
+  // a person's own password: set one, make a new one (shown once), or back to the team password
+  const password = async (m: { id: string; name: string; email?: string }) => {
+    const choice = window.prompt(L(`رمز ${m.name}:\n۱ = رمز تازه را خودم می‌نویسم\n۲ = رمز تصادفی بساز (نشان داده می‌شود${m.email ? ' و به ایمیلش می‌رود' : ''})\n۳ = برگشت به رمز مشترک تیم\n\nعدد را بنویسید:`, `Password for ${m.name}: 1 = I type it, 2 = generate, 3 = back to the team password`), '2')
+    if (!choice) return
+    try {
+      if (choice.trim() === '1') {
+        const pw = window.prompt(L('رمز تازه (حداقل ۶ کاراکتر):', 'New password (6+ characters):'))
+        if (!pw) return
+        await action('setUserPassword', { id: m.id, password: pw })
+        toast(L(`رمز ${m.name} عوض شد`, `${m.name}’s password changed`))
+      } else if (choice.trim() === '2') {
+        const r = (await action('resetUserPassword', { id: m.id, mail: !!m.email })) as { password?: string; username?: string; sent?: boolean } | undefined
+        if (r?.password) window.prompt(L(`رمز تازه‌ی ${m.name}${r.sent ? ' (به ایمیلش هم رفت)' : ''} — کپی کنید و به او بدهید:`, 'New password — copy it:'), `${r.username} / ${r.password}`)
+      } else if (choice.trim() === '3') {
+        await action('clearUserPassword', { id: m.id })
+        toast(L(`${m.name} دوباره با رمز مشترک تیم وارد می‌شود`, `${m.name} uses the team password again`))
+      }
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e), 'err')
+    }
+  }
   const { open } = useEditor()
   // the team a person is in (the Teams page): set right here
   const setTeam = async (id: string, track: string) => {
@@ -169,6 +203,9 @@ function People() {
                     </button>
                   </td>
                   <td className="td text-end">
+                    <button className="icon-btn h-8 w-8" onClick={() => password(m)} title={L('رمز ورود: تعیین یا ریست', 'Password: set or reset')} aria-label={L('رمز ورود', 'Password')}>
+                      <KeyRound size={14} />
+                    </button>
                     <button className="icon-btn h-8 w-8" onClick={() => open('Team', m as never)} title={L('ویرایش', 'Edit')}>
                       <Pencil size={14} />
                     </button>

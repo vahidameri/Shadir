@@ -186,7 +186,6 @@ export function parseMzImport(raw: string, fallbackAccount: string, existing: Ex
   const account = who(blocks.find((b) => b.account)?.account) || fallbackAccount
 
   // tasks Madar has: by Mizito id and by title (a title with two different Mizito ids is ambiguous)
-  const realKey = (k: string) => /^[0-9a-f]{24}$/i.test(k)
   const haveByKey = new Map<string, Existing>()
   const haveByTitle = new Map<string, Existing[]>()
   existing.forEach((m) => {
@@ -212,24 +211,28 @@ export function parseMzImport(raw: string, fallbackAccount: string, existing: Ex
       const link = String(t.link || '').trim().replace(/\s+/g, '')
       const fromLink = mzKeyFromLink(link)
       const tk = mzTitleKey(title)
-      // which task is this: the link's id; else the same title already in this paste or in Madar
+      // which task is this. The title decides first (Claude may give the same task another link on
+      // another day): the same title in this paste, then in Madar; then the link's id; then a title
+      // that is a cut-short form of exactly one task in Madar. Only then is it a new task.
       let key = ''
-      if (fromLink && (items.has(fromLink) || haveByKey.has(fromLink))) key = fromLink
+      const here = byTitle.get(tk)
+      if (here && items.has(here)) key = here
       if (!key) {
-        const here = byTitle.get(tk)
-        const hereItem = here ? items.get(here) : undefined
-        if (hereItem && !(fromLink && realKey(hereItem.key) && mzKeyFromLink(hereItem.link) && mzKeyFromLink(hereItem.link) !== fromLink)) key = hereItem.key
-      }
-      if (!key) {
-        const same = (haveByTitle.get(tk) || []).filter((m) => !(fromLink && linkKeyOf(m) && linkKeyOf(m) !== fromLink))
-        if (same.length === 1) key = keyOfExisting(same[0])
-        else if (same.length > 1) {
+        const same = haveByTitle.get(tk) || []
+        if (same.length) {
           key = keyOfExisting(same.find((m) => linkKeyOf(m)) || same[0])
-          problems.push(`«${title.slice(0, 50)}» در مدار چند بار هست؛ «یکی کردن تکراری‌ها» را بزنید`)
+          if (same.length > 1) problems.push(`«${title.slice(0, 50)}» در مدار چند بار هست؛ «یکی کردن تکراری‌ها» را بزنید`)
         }
+      }
+      if (!key && fromLink && (items.has(fromLink) || haveByKey.has(fromLink))) key = fromLink
+      if (!key && tk.length >= 12) {
+        const near = [...haveByTitle.entries()].filter(([k2]) => k2.length >= 12 && (k2.startsWith(tk) || tk.startsWith(k2))).flatMap(([, v]) => v)
+        if (near.length === 1) key = keyOfExisting(near[0])
       }
       if (!key) key = fromLink || 'imp' + hash(tk)
 
+      // the id comes from the words (copied as written in Mizito); the server also knows a message by its
+      // writer and minute, so neither a re-worded copy nor a drifted time comes in twice
       const mentionId = (by: string, at: string, body: string) => {
         const b2 = mzTitleKey(body)
         return 'imp' + hash(`${key}|${mzTitleKey(by)}|${b2.length >= 15 ? b2.slice(0, 300) : b2 + '|' + at.slice(0, 10)}`)
@@ -329,12 +332,20 @@ export function parseMzImport(raw: string, fallbackAccount: string, existing: Ex
   return { account, items: out, problems: [...new Set(problems)], parts, broken, listed }
 }
 
-/** The next range to read: the day after the last one imported, to the end of that Jalali month. */
-export function nextRange(lastTo: string, start: string, today: string): { from: string; to: string } {
+/**
+ * The next range to read: the day after the last one imported, for `days` days (a week by default —
+ * Claude reads a short range completely; a month at once is where messages got skipped).
+ */
+export function nextRange(lastTo: string, start: string, today: string, days = 7): { from: string; to: string } {
   const from = lastTo ? addDaysISO(lastTo, 1) : start
-  const j = isoToJalaliParts(from)
-  if (!j) return { from, to: today }
-  const end = jalaliPartsToISO(j.jy, j.jm, jalaliMonthLength(j.jy, j.jm))
+  if (days >= 28) {
+    const j = isoToJalaliParts(from)
+    if (j) {
+      const end = jalaliPartsToISO(j.jy, j.jm, jalaliMonthLength(j.jy, j.jm))
+      return { from, to: end < today ? end : today }
+    }
+  }
+  const end = addDaysISO(from, days - 1)
   return { from, to: end < today ? end : today }
 }
 const addDaysISO = (iso: string, n: number) => {
@@ -366,6 +377,7 @@ export function mzClaudePrompt(account: string, from: string, to: string, fromFa
    - پنل را ببند.
 ۵. تاریخ‌ها کامل، شمسی و با ارقام انگلیسی: «1405/04/12 14:30». تاریخ نسبی («دیروز»، «۲ ساعت پیش») را با ماوس روی آن ببین یا با تاریخ امروز به تاریخ کامل تبدیل کن.
 ۶. چیزی حدس نزن؛ اگر نبود "" یا [] بگذار.
+۷. پیش از نوشتن خروجی، یک بار دیگر گفتگو را از اولین پیام ${a} تا آخرین پیام ${b} مرور کن و هر پیام را با فهرستت تطبیق بده؛ پیامی که جا افتاده را اضافه کن. تعداد کل پیام‌های بازه باید با جمع "mentions" همه‌ی تسک‌ها برابر باشد.
 
 خروجی فقط یک بلوک JSON با همین ساختار (تسک‌ها به ترتیب اولین پیامشان در بازه):
 
@@ -400,5 +412,5 @@ export function mzClaudePrompt(account: string, from: string, to: string, fromFa
 - هر تسک فقط یک بار در کل خروجی؛ تسکی را که در یک بخش آوردی در بخش بعد تکرار نکن.
 - توضیحات و کامنت‌ها را کامل بنویس، خلاصه نکن.
 - اگر جواب در یک پیام جا نمی‌شود، هر بار ۱۵ تسک بفرست با «بخش ۱ از N» و منتظر «ادامه» بمان.
-- در آخر بنویس در این بازه چند پیام و چند تسک یکتا دیدی.`
+- در آخر بنویس در این بازه چند پیام و چند تسک یکتا دیدی (این دو عدد را در مدار با پیش‌نمایش مقایسه می‌کنم).`
 }

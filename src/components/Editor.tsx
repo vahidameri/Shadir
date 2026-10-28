@@ -678,7 +678,7 @@ function FieldInput({ f, value, set, form, disabled, autoFocus, onSubmit }: { f:
 }
 
 function EditorModal({ sheet, row, isNew, onClose }: { sheet: EditableSheet; row: Record<string, unknown>; isNew: boolean; onClose: () => void }) {
-  const { db, upsert, remove, toast, canEdit: editor, access, me } = useStore()
+  const { db, upsert, remove, toast, canEdit: editor, access, me, upsertMany } = useStore()
   // projects, people, allocations and contracts are managed by leadership only
   const canEdit = editor && (!['Projects', 'Team', 'Allocations', 'Contracts'].includes(sheet) || can.manage(access)) && (sheet !== 'Contracts' || can.contracts(access))
   const auto = useAuto()
@@ -741,7 +741,7 @@ function EditorModal({ sheet, row, isNew, onClose }: { sheet: EditableSheet; row
       // an objective takes its key results with it; their tasks go back to "other work"
       if (sheet === 'Objectives' || sheet === 'KeyResults') {
         const krIds = sheet === 'KeyResults' ? [String(form.id)] : db.KeyResults.filter((k) => k.objective_id === form.id).map((k) => k.id)
-        for (const t of db.Tasks.filter((x) => x.kr_id && krIds.includes(x.kr_id))) await upsert('Tasks', { ...t, kr_id: '' })
+        await upsertMany('Tasks', db.Tasks.filter((x) => x.kr_id && krIds.includes(x.kr_id)).map((t) => ({ ...t, kr_id: '' })))
         if (sheet === 'Objectives') for (const id of krIds) await remove('KeyResults', id)
       }
       await remove(sheet, String(form.id))

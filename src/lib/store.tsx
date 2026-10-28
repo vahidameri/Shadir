@@ -141,6 +141,8 @@ interface Store {
   setConfig: (c: Config) => void
   refresh: () => Promise<void>
   upsert: <S extends SheetName>(sheet: S, row: Row<S>) => Promise<void>
+  /** several rows of one tab: shown at once, saved in one request (selections, sending a cartable) */
+  upsertMany: <S extends SheetName>(sheet: S, rows: Row<S>[]) => Promise<void>
   remove: (sheet: SheetName, id: string) => Promise<void>
   resetDemo: () => void
   canEdit: boolean
@@ -439,6 +441,40 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [config, mode, toast],
   )
 
+  const upsertMany = useCallback(
+    async <S extends SheetName>(sheet: S, inputs: Row<S>[]) => {
+      if (!inputs.length) return
+      const prev = dbRef.current
+      let list = prev[sheet] as Row<S>[]
+      const logs: ReturnType<typeof diffRows> = []
+      const rows: Row<S>[] = []
+      for (const input of inputs) {
+        let row = mapRow(sheet, input as unknown as Record<string, unknown>, toCanonRef.current) as unknown as Row<S>
+        const old = list.find((r) => r.id === row.id)
+        if (sheet === 'Mizito') row = stampMizito(old as unknown as MizitoItem | undefined, row as unknown as MizitoItem) as unknown as Row<S>
+        if (sheet === 'Plans') row = stampPlan(old as unknown as PlanItem | undefined, row as unknown as PlanItem, nowStamp()) as unknown as Row<S>
+        if (sheet === 'Tasks') row = stampTask(old as unknown as Task | undefined, row as unknown as Task) as unknown as Row<S>
+        logs.push(...diffRows(sheet, old as unknown as Record<string, unknown> | undefined, row as unknown as Record<string, unknown>, canonMeRef.current))
+        list = old ? list.map((r) => (r.id === row.id ? row : r)) : [...list, row]
+        rows.push(row)
+      }
+      const next = { ...prev, [sheet]: list, ...(logs.length ? { History: [...prev.History, ...logs] } : {}) } as DB
+      dbRef.current = next
+      setDb(next)
+      if (mode === 'demo') return persistDemo(next)
+      try {
+        await track(remoteAction(config, 'upsertMany', { sheet, rows }))
+        setLastSync(new Date())
+      } catch (e) {
+        dbRef.current = prev
+        setDb(prev)
+        toast(`${L('ذخیره نشد', 'Not saved')}: ${e instanceof Error ? e.message : e}`, 'err')
+        throw e
+      }
+    },
+    [config, mode, toast], // eslint-disable-line react-hooks/exhaustive-deps
+  )
+
   const upsertRef = useRef<typeof upsert>(undefined)
   upsertRef.current = upsert
 
@@ -578,9 +614,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
 
   const value = useMemo<Store>(
-    () => ({ db: live, archived, serverVersion, mode, role, me, setMe, loading, error, lastSync, config, setConfig, refresh, upsert, remove, resetDemo, canEdit: role !== 'viewer', access, authed, email, upload, action, bulk, undoBatch, setting, setSetting, toasts, toast, dismissToast }),
+    () => ({ db: live, archived, serverVersion, mode, role, me, setMe, loading, error, lastSync, config, setConfig, refresh, upsert, upsertMany, remove, resetDemo, canEdit: role !== 'viewer', access, authed, email, upload, action, bulk, undoBatch, setting, setSetting, toasts, toast, dismissToast }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [live, archived, serverVersion, access, mode, role, me, authed, email, upload, action, bulk, undoBatch, loading, error, lastSync, config, refresh, upsert, remove, toasts, toast, dismissToast],
+    [live, archived, serverVersion, access, mode, role, me, authed, email, upload, action, bulk, undoBatch, loading, error, lastSync, config, refresh, upsert, upsertMany, remove, toasts, toast, dismissToast],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

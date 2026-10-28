@@ -224,7 +224,7 @@ export default function Overview() {
         title={L('نمای کلی', 'Overview')}
         sub={L('وضعیت دپارتمان محصول و فناوری در یک نگاه', 'The product & technology department at a glance')}
         actions={access === 'super' && (
-          <Link to="/admin?tab=settings" className="btn h-10 w-10 bg-white/10 px-0 text-white hover:bg-white/20" title={L('بخش‌های این صفحه', 'Sections on this page')} aria-label={L('بخش‌های این صفحه', 'Sections on this page')}>
+          <Link to="/admin?tab=planning" className="btn h-10 w-10 bg-white/10 px-0 text-white hover:bg-white/20" title={L('بخش‌های این صفحه', 'Sections on this page')} aria-label={L('بخش‌های این صفحه', 'Sections on this page')}>
             <Settings2 size={17} />
           </Link>
         )}

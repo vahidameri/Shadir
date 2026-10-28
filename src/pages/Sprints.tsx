@@ -42,7 +42,7 @@ export default function Sprints() {
         <Band title={L('اسپرینت‌ها', 'Sprints')} />
         <Overlap>
           <div className="card p-6">
-            <Empty icon={<Zap size={22} />} text={L('هیچ تیمی با اسپرینت کار نمی‌کند. در تنظیمات، تیم‌هایی را که اسپرینت دارند انتخاب کنید.', 'No team works in sprints yet. Pick the sprint teams in settings.')} action={access === 'super' ? <Link to="/admin?tab=settings" className="btn-outline btn-sm"><Settings2 size={14} /> {L('تنظیمات', 'Settings')}</Link> : undefined} />
+            <Empty icon={<Zap size={22} />} text={L('هیچ تیمی با اسپرینت کار نمی‌کند. در تنظیمات، تیم‌هایی را که اسپرینت دارند انتخاب کنید.', 'No team works in sprints yet. Pick the sprint teams in settings.')} action={access === 'super' ? <Link to="/admin?tab=planning" className="btn-outline btn-sm"><Settings2 size={14} /> {L('تنظیمات', 'Settings')}</Link> : undefined} />
           </div>
         </Overlap>
       </>

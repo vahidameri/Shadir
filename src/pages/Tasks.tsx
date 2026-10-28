@@ -1,4 +1,5 @@
 import { assigneesOf, isAssignee, joinNames, leadAssignee } from '../lib/assignees'
+import { CartableMany } from '../components/CartableParts'
 import { dirOf } from '../lib/dir'
 import { useEffect, useMemo, useState } from 'react'
 import { canPersonal } from '../lib/taskcfg'
@@ -40,7 +41,7 @@ const VIEW_TONE: Partial<Record<View, string>> = { blocked: 'text-bad', late: 't
 const PAGE = 120
 
 export default function Tasks() {
-  const { db, me, canEdit, upsert, access, toast } = useStore()
+  const { db, me, canEdit, upsert, access, toast, upsertMany } = useStore()
   const { lang } = useI18n()
   const { open } = useEditor()
   const pname = useProjectName()
@@ -147,7 +148,7 @@ export default function Tasks() {
     })
   const bulk = async (p: Partial<Task>) => {
     const rows = db.Tasks.filter((t) => picked.has(t.id))
-    for (const t of rows) await patch(t, p)
+    await upsertMany('Tasks', rows.map((t) => ({ ...t, ...p })))
     setPicked(new Set())
     toast(L(`${fa(rows.length)} تسک به‌روز شد`, `${rows.length} tasks updated`))
   }
@@ -264,6 +265,7 @@ export default function Tasks() {
         {leader && picked.size > 0 && view === 'list' && (
           <div className="sticky top-2 z-20 mb-3 flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-surface px-3 py-2 shadow-float">
             <span className="text-sm font-medium">{L(`${fa(picked.size)} تسک انتخاب شد`, `${picked.size} selected`)}</span>
+            <CartableMany items={db.Tasks.filter((t) => picked.has(t.id)).map((t) => ({ entity: 'Tasks', entity_id: t.id, title: t.title, due_date: t.due_date }))} onDone={() => setPicked(new Set())} />
             <span className="text-line-strong">·</span>
             <span className="text-xs text-sub">{L('اساین به', 'Assign to')}</span>
             <PersonPicker value="" placeholder={L('انتخاب فرد', 'Choose')} onChange={(a) => bulk({ assignee: a })} />

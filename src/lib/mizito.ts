@@ -5,7 +5,8 @@
 import { mzTitleKey } from './mzImport'
 import type { Contact, DB, MizitoComment, MizitoItem, MizitoMention } from './types'
 import { daysFromToday, todayISO } from './jalali'
-import { L, type T2 } from './i18n'
+import { L, lbl, type T2 } from './i18n'
+import { JOB_TITLE } from './labels'
 
 export const MZ_KEYS = {
   base: 'mz.base', // Mizito address, e.g. https://mizito.noyanet.com
@@ -162,9 +163,31 @@ function contactOf(db: DB, name: string): Contact | undefined {
   return ix.get(String(name || '').trim()) || ix.get('~' + mzTitleKey(name))
 }
 /** A person's tier: their Contacts row, else the lowest tier. */
+/**
+ * A person's tier, from Madar's own records: their Contacts row's tier; else their title there (or,
+ * for the department, their job title) read by rank words; else the lowest tier. The SLA and the
+ * «senior asks» view follow it.
+ */
 export function tierOf(db: DB, name: string): Tier | undefined {
+  if (!name) return undefined
   const c = contactOf(db, name)
-  return tierById(c?.tier) || (name ? cfg.tiers[cfg.tiers.length - 1] : undefined)
+  const set = tierById(c?.tier)
+  if (set) return set
+  const k = mzTitleKey(name)
+  const m = db.Team.find((x) => x.name === name || mzTitleKey(x.name) === k)
+  const byTitle = rankTier([c?.title || '', m ? `${m.role} ${lbl(JOB_TITLE, m.role)}` : ''].join(' '))
+  return byTitle || cfg.tiers[cfg.tiers.length - 1]
+}
+/** Rank words in a title → the tier at that rank (tiers ordered by weight, highest first). */
+function rankTier(title: string): Tier | undefined {
+  const t = title.toLowerCase()
+  if (!t.trim()) return undefined
+  const ranked = [...cfg.tiers].sort((a, b) => b.weight - a.weight)
+  const at = (i: number) => ranked[Math.min(i, ranked.length - 1)]
+  if (/مدیرعامل|مدیر عامل|هیئت|هیات|رئیس|ceo|founder|بنیان|board/.test(t)) return at(0)
+  if (/معاون|\bc[a-z]?o\b|cpto|cto|cpo|cfo|coo|cmo|chief|vp|vice/.test(t)) return at(1)
+  if (/مدیر|سرپرست|head|manager|lead|director/.test(t)) return at(2)
+  return undefined
 }
 export function allPeople(db: DB): string[] {
   return [...new Set([...db.Team.filter((m) => String(m.active) !== 'false').map((m) => m.name), ...db.Contacts.filter((c) => String(c.active) !== 'false').map((c) => c.name)].filter(Boolean))]

@@ -18,7 +18,7 @@ import { closed } from '../lib/columns'
 import type { CartableBox, CartableItem } from '../lib/types'
 
 export default function CartablePage() {
-  const { db, me, access, upsert, action, toast, mode } = useStore()
+  const { db, me, access, action, toast, mode, upsertMany } = useStore()
   const owners = cartableOwners(db)
   const [owner, setOwner] = useState(() => (access === 'super' ? owners.find((n) => n !== me) || me : me))
   const [box, setBox] = useState<CartableBox>('daily')
@@ -53,7 +53,8 @@ export default function CartablePage() {
 
   const send = async () => {
     const at = nowStamp()
-    for (const c of drafts) await upsert('Cartable', { ...c, status: 'sent', sent_at: at, period: c.period < period ? period : c.period })
+    // all drafts go together, in one save
+    await upsertMany('Cartable', drafts.map((c) => ({ ...c, status: 'sent', sent_at: at, period: c.period < period ? period : c.period })))
     if (mail && mode !== 'demo') {
       try {
         const r = (await action('mailCartable', { owner, box, period })) as { sent?: boolean; reason?: string } | undefined

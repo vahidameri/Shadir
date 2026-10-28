@@ -1,5 +1,6 @@
 // Mizito queue: what the CPTO and the PgM were mentioned on, one row per Mizito task, sorted by
 // priority (P0 first, then SLA, then deadline). Re-mentions thread into the same row.
+import { CartableMany } from '../components/CartableParts'
 import { FlagMark, FlagPicker } from '../components/TaskTracking'
 import { MoreButton, usePaged } from '../components/Paged'
 import { dirOf } from '../lib/dir'
@@ -22,7 +23,7 @@ const VIEW_LABEL: Record<MzView, [string, string]> = {
 type Group = '' | 'asker' | 'category' | 'p' | 'status' | 'assigned'
 
 export default function MizitoPage() {
-  const { db, canEdit, access, me, upsert, bulk, toast, setting } = useStore()
+  const { db, canEdit, access, me, upsert, upsertMany, toast, setting } = useStore()
   const [params, setParams] = useSearchParams()
   const get = (k: string) => params.get(k) || ''
   const set = (k: string, v: string) => {
@@ -105,8 +106,7 @@ export default function MizitoPage() {
   const setStatus = async (ids: string[], status: string) => {
     const rows = ids.map((id) => db.Mizito.find((x) => x.id === id)).filter((m) => m && m.status !== status).map((m) => ({ ...m!, status }))
     // one item: a normal save (logged); several: one save for all
-    if (rows.length === 1) await upsert('Mizito', rows[0])
-    else if (rows.length) await bulk('Mizito', rows)
+    if (rows.length) await upsertMany('Mizito', rows)
     if (ids.length > 1) toast(L(`وضعیت ${fa(ids.length)} مورد به‌روز شد`, `${ids.length} items updated`))
     setPicked(new Set())
   }
@@ -114,7 +114,7 @@ export default function MizitoPage() {
   // all at once (one save), not one by one
   const review = async (ids: string[], keep: boolean) => {
     const rows = ids.map((id) => db.Mizito.find((x) => x.id === id)).filter(Boolean).map((m) => (keep ? { ...m!, review: '' } : { ...m!, review: 'ignored', status: firstMzStatus('cancelled') }))
-    if (rows.length) await bulk('Mizito', rows)
+    if (rows.length) await upsertMany('Mizito', rows)
     toast(keep ? L(`${fa(ids.length)} مورد به صف اضافه شد`, `${ids.length} added to the queue`) : L(`${fa(ids.length)} مورد کنار گذاشته شد`, `${ids.length} set aside`))
     setPicked(new Set())
   }
@@ -226,8 +226,9 @@ export default function MizitoPage() {
           <div className="sticky top-2 z-20 mb-3 flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-surface px-3 py-2 shadow-float">
             <span className="text-sm font-medium">{L(`${fa(picked.size)} مورد انتخاب شد`, `${picked.size} selected`)}</span>
             <button className="btn-ghost btn-sm" onClick={() => setPicked(new Set())}>{L('لغو انتخاب', 'Clear')}</button>
+            <CartableMany items={[...picked].map((id) => db.Mizito.find((x) => x.id === id)).filter(Boolean).map((m) => ({ entity: 'Mizito', entity_id: m!.id, title: m!.title, due_date: m!.due_date }))} onDone={() => setPicked(new Set())} />
             <span className="text-xs text-sub">{L('پرچم:', 'Flag:')}</span>
-            <FlagPicker value="" onChange={(f) => void bulk('Mizito', [...picked].map((id) => db.Mizito.find((x) => x.id === id)).filter(Boolean).map((m) => ({ ...m!, flag: f }))).then(() => setPicked(new Set()))} />
+            <FlagPicker value="" onChange={(f) => void upsertMany('Mizito', [...picked].map((id) => db.Mizito.find((x) => x.id === id)).filter(Boolean).map((m) => ({ ...m!, flag: f }))).then(() => setPicked(new Set()))} />
             <span className="text-xs text-sub">{L('وضعیت:', 'Status:')}</span>
             {c.statuses.map((x) => (
               <button key={x.id} className={cx('btn-sm', x.cat === 'done' ? 'btn-primary' : 'btn-outline')} onClick={() => setStatus([...picked], x.id)}>{optLabel(x)}</button>

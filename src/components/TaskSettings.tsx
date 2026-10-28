@@ -164,7 +164,7 @@ export function FieldsCard({ admin }: { admin: boolean }) {
 
 /** Statuses: rename, recolour, reorder, add; each added status has a category; added ones can be removed (their tasks go back to "to do"). */
 export function ColumnsCard({ admin }: { admin: boolean }) {
-  const { db, setSetting, upsert, toast } = useStore()
+  const { db, setSetting, toast, upsertMany } = useStore()
   const list = columns()
   const [name, setName] = useState('')
   const [cat, setCat] = useState<StatusCat>('active')
@@ -184,7 +184,7 @@ export function ColumnsCard({ admin }: { admin: boolean }) {
   const del = async (c: Column) => {
     const moved = db.Tasks.filter((t) => t.status === c.id)
     await save(list.filter((x) => x.id !== c.id))
-    for (const t of moved) await upsert('Tasks', { ...t, status: firstOf('open') })
+    await upsertMany('Tasks', moved.map((t) => ({ ...t, status: firstOf('open') })))
     toast(L(`ستون حذف شد${moved.length ? ` و ${moved.length} تسک به «برای انجام» رفت` : ''}`, `Column removed${moved.length ? `; ${moved.length} task(s) moved to To do` : ''}`))
   }
   return (

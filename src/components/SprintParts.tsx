@@ -134,7 +134,7 @@ export function WorkRow({ t, sprints, onMove }: { t: Task; sprints: Sprint[]; on
 
 /** Completing a sprint: freeze what was done, move what wasn't (next sprint or backlog), write the retro. */
 export function CompleteSprint({ s, onClose }: { s: Sprint; onClose: () => void }) {
-  const { db, upsert, toast } = useStore()
+  const { db, upsert, toast, upsertMany } = useStore()
   const st = sprintStats(db, s)
   const next = plannedSprints(db, s.team || '')
   const [to, setTo] = useState(next[0]?.id || '')
@@ -144,7 +144,7 @@ export function CompleteSprint({ s, onClose }: { s: Sprint; onClose: () => void 
     setBusy(true)
     // close first, remembering what was unfinished, so the report still shows it after it moves on
     await upsert('Sprints', { ...s, status: 'closed', closed_at: nowStamp(), completed_points: st.done, committed_points: st.committed, retro, carried: st.carried.map((t) => t.id).join(',') })
-    for (const t of st.carried) await upsert('Tasks', { ...t, sprint_id: to })
+    await upsertMany('Tasks', st.carried.map((t) => ({ ...t, sprint_id: to })))
     toast(L(`${s.name} بسته شد`, `${s.name} completed`))
     onClose()
   }

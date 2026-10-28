@@ -203,3 +203,34 @@ export function CartableRow({ c, onEdit }: { c: CartableItem; onEdit?: () => voi
 }
 
 export const countLabel = (n: number) => L(`${fa(n)} مورد`, `${n} items`)
+
+/** A whole selection to someone's cartable at once (one save); items already there are skipped. */
+export function CartableMany({ items, onDone }: { items: { entity: CartableItem['entity']; entity_id: string; title: string; due_date?: string }[]; onDone?: () => void }) {
+  const { db, me, upsertMany, toast } = useStore()
+  const owners = cartableOwners(db)
+  if (!owners.length || !items.length) return null
+  const send = async (owner: string) => {
+    const there = (x: { entity: CartableItem['entity']; entity_id: string }) => db.Cartable.some((c) => c.owner === owner && c.entity === x.entity && c.entity_id === x.entity_id && (c.status === 'sent' || c.status === 'draft'))
+    const fresh = items.filter((x) => !there(x))
+    const mine = owner === me
+    const at = nowStamp()
+    await upsertMany(
+      'Cartable',
+      fresh.map((x, i) => ({
+        id: uid('CB'), owner, box: 'daily' as CartableBox, period: periodOf('daily'), from: me, entity: x.entity, entity_id: x.entity_id, title: x.title, ask: '', kind: 'review',
+        priority: 'medium', due_date: x.due_date || '', status: mine ? 'sent' : 'draft', response: '', sent_at: mine ? at : '', done_at: '', sort: Date.now() + i, created_at: at,
+      })),
+    )
+    toast(L(`${fa(fresh.length)} مورد به کارتابل ${owner === me ? 'شما' : owner} رفت${items.length > fresh.length ? ` (${fa(items.length - fresh.length)} از قبل بود)` : ''}${mine ? '' : '؛ با «ارسال کارتابل» فرستاده می‌شود'}`, `${fresh.length} added`))
+    onDone?.()
+  }
+  return (
+    <>
+      {owners.map((n) => (
+        <button key={n} className="btn-outline btn-sm" onClick={() => void send(n)}>
+          <Inbox size={14} /> {n === me ? L('به کارتابل من', 'To my cartable') : L(`به کارتابل ${n.split(' ')[0]}`, `To ${n.split(' ')[0]}’s`)}
+        </button>
+      ))}
+    </>
+  )
+}

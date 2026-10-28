@@ -18,7 +18,7 @@
  *   viewer — read only (leadership)
  */
 
-var MADAR_VERSION = '2.6.0'; // shown on the login page and by diagnose()
+var MADAR_VERSION = '2.7.0'; // shown on the login page and by diagnose()
 
 var SCHEMA = {
   Projects: ['id', 'code', 'name', 'description', 'category', 'owner', 'client', 'liaison', 'liaison_contact', 'status', 'priority', 'phase', 'start_date', 'end_date', 'progress', 'health_override', 'objective', 'paused_at', 'pause_reason', 'delivery_day', 'last_delivery', 'archived', 'archived_at', 'links', 'team', 'kind', 'batch'],
@@ -175,6 +175,10 @@ function doPost(e) {
       lock.waitLock(30000);
       return json_({ ok: true, row: mzReset_(user) });
     }
+    if (body.action === 'setUserPassword' || body.action === 'resetUserPassword' || body.action === 'clearUserPassword') {
+      if (user.access !== 'super') throw new Error('فقط مدیر برنامه رمز افراد را تعیین می‌کند');
+      return json_({ ok: true, row: userPassword_(body.action, body.id, body.password, !!body.mail) });
+    }
     if (body.action === 'setTeamPassword') {
       if (user.access !== 'super') throw new Error('فقط مدیر برنامه می‌تواند رمز را تغییر دهد');
       return json_(setTeamPassword_(body.password));
@@ -190,6 +194,7 @@ function doPost(e) {
     else if (body.action === 'mailMinutes') result = mailMinutes_(body.meeting_id, user);
     else if (body.action === 'mailCartable') result = mailCartable_(body.owner, body.box, body.period, user);
     else if (body.action === 'syncMeeting') result = syncMeeting_(body.meeting_id, user);
+    else if (body.action === 'upsertMany') result = upsertMany_(body.sheet, body.rows, user);
     else {
       if (!SCHEMA[body.sheet]) throw new Error('Unknown sheet: ' + body.sheet);
             guardPrivate_(body.sheet, body.action === 'delete' ? { id: body.id } : body.row, user);
@@ -348,6 +353,34 @@ function setTeamPassword_(pw) {
   return { ok: true };
 }
 
+/** A person's own password: set (given), reset (a new one made here and shown once), or cleared (team password again). */
+function userPassword_(action, id, pw, mail) {
+  var m = (rawAll_().Team || []).filter(function (x) { return String(x.id) === String(id); })[0];
+  if (!m) throw new Error('این نفر پیدا نشد');
+  var props = PropertiesService.getScriptProperties();
+  if (action === 'clearUserPassword') {
+    props.deleteProperty('PW.' + m.id);
+    return { id: m.id, cleared: true };
+  }
+  if (action === 'resetUserPassword') {
+    var abc = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    pw = '';
+    for (var i = 0; i < 10; i++) pw += abc.charAt(Math.floor(Math.random() * abc.length));
+  }
+  pw = String(pw || '');
+  if (pw.length < 6) throw new Error('رمز باید حداقل ۶ کاراکتر باشد');
+  props.setProperty('PW.' + m.id, pwHash_(pw));
+  CacheService.getScriptCache().remove('pw.n.' + usernameOf_(m));
+  var sent = false;
+  if (mail && m.email) {
+    try {
+      MailApp.sendEmail({ to: m.email, subject: 'مدار: رمز تازه‌ی شما', htmlBody: mailBox_('<h3 style="margin:0 0 8px">رمز تازه</h3>', '<p>نام کاربری: <b>' + esc_(usernameOf_(m)) + '</b><br>رمز: <b dir="ltr">' + esc_(pw) + '</b></p><p>بعد از ورود، اگر خواستید از مدیر برنامه رمز دیگری بخواهید.</p>') });
+      sent = true;
+    } catch (e) {}
+  }
+  return { id: m.id, username: usernameOf_(m), password: action === 'resetUserPassword' ? pw : '', sent: sent };
+}
+
 function pwLogin_(username, password) {
   var u = String(username || '').trim().toLowerCase();
   if (!u || !password) throw new Error('نام کاربری و رمز را وارد کنید');
@@ -359,7 +392,9 @@ function pwLogin_(username, password) {
   var m = (rawAll_().Team || []).filter(function (x) {
     return String(x.active).toLowerCase() !== 'false' && (usernameOf_(x) === u || String(x.email || '').toLowerCase() === u);
   })[0];
-  if (!m || pwHash_(String(password)) !== props.getProperty('TEAM_PASSWORD')) {
+  // a person's own password (set in the back office) replaces the team password for them
+  var own = m ? props.getProperty('PW.' + m.id) : '';
+  if (!m || pwHash_(String(password)) !== (own || props.getProperty('TEAM_PASSWORD'))) {
     c.put('pw.n.' + u, String(tries + 1), 600);
     throw new Error('نام کاربری یا رمز اشتباه است');
   }
@@ -1001,17 +1036,47 @@ var HISTORY_FIELDS = {
 
 function clip_(v) { return String(v === undefined || v === null ? '' : v).slice(0, 300); }
 
-function history_(sheet, before, row, user) {
+function history_(sheet, before, row, user, collect) {
   var fields = HISTORY_FIELDS[sheet];
   if (!fields || !row) return;
-  if (!before) return historyRows_([{ entity: sheet, entity_id: row.id, field: '_created', from: '', to: clip_(row.status) }], user);
+  var created = [{ entity: sheet, entity_id: row.id, field: '_created', from: '', to: clip_(row.status) }];
+  if (!before) return collect ? collect.push.apply(collect, created) : historyRows_(created, user);
   var out = [];
   fields.forEach(function (f) {
     if (!(f in row)) return;
     var a = clip_(before[f]), b = clip_(row[f]);
     if (a !== b) out.push({ entity: sheet, entity_id: row.id, field: f, from: a, to: b });
   });
-  historyRows_(out, user);
+  if (collect) collect.push.apply(collect, out);
+  else historyRows_(out, user);
+}
+
+/**
+ * Several rows of one tab in one request (a selection, «ارسال کارتابل»): every row passes the same
+ * checks as a single save, then all are written at once with one change log.
+ */
+function upsertMany_(sheet, rows, user) {
+  if (!SCHEMA[sheet] || sheet === 'History') throw new Error('Unknown sheet: ' + sheet);
+  rows = (rows || []).filter(function (r) { return r && r.id; });
+  if (!rows.length) return { count: 0 };
+  var logged = !!HISTORY_FIELDS[sheet];
+  var log = [], out = [], befores = {};
+  rows.forEach(function (row) {
+    guardPrivate_(sheet, row, user);
+    guardWrite_(sheet, row, user);
+    var before = existingRow_(sheet, row.id);
+    if (sheet === 'Mizito' && before) row = mzKeepAgentFields_(before, row);
+    var now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
+    if (SCHEMA[sheet].indexOf('updated_at') !== -1) row.updated_at = row.updated_at || now;
+    if (logged) history_(sheet, before, row, user, log);
+    befores[row.id] = before;
+    out.push(row);
+  });
+  writeRows_(sheet, out);
+  log_(user, 'update ' + out.length, sheet, out[0].id);
+  if (log.length) { try { historyRows_(log, user); } catch (e) {} }
+  if (sheet === 'Tasks') out.forEach(function (r) { try { mailAssigned_(befores[r.id], r, user); } catch (e) {} });
+  return { count: out.length };
 }
 
 function historyRows_(rows, user) {
@@ -1886,6 +1951,14 @@ function mzIngest_(body, agent) {
   (data.MizitoMentions || []).forEach(function (x) { if (x.mz_id) mentionIds[String(x.mz_id)] = 1; });
   var comments = {};
   (data.MizitoComments || []).forEach(function (c) { comments[String(c.id)] = c; });
+  // the same mention or comment is also known by who wrote it and the minute (its id may have been
+  // made differently by an earlier import): it never comes in twice
+  var sigOf = function (item, by, at) { return item + '|' + mzTitleKey_(by) + '|' + String(at || '').slice(0, 16); };
+  var mentionSig = {}, commentSig = {};
+  var textSig = function (item, by, body) { var k = mzTitleKey_(body); return k.length >= 15 ? item + '|' + mzTitleKey_(by) + '|' + k.slice(0, 200) : ''; };
+  (data.MizitoMentions || []).forEach(function (x) { if (x.at) mentionSig[sigOf(x.item_id, x.by, x.at)] = 1; var ts2 = textSig(x.item_id, x.by, x.mz_comment); if (ts2) mentionSig[ts2] = 1; });
+  (data.Mizito || []).forEach(function (r) { if (r.ext_id && r.received_at) mentionSig[sigOf(r.id, r.asked_by, r.received_at)] = 1; });
+  (data.MizitoComments || []).forEach(function (c) { if (c.at) commentSig[sigOf(c.item_id, c.by, c.at)] = 1; var t2 = textSig(c.item_id, c.by, c.body); if (t2) commentSig[t2] = 1; });
 
   var items = {}, mentions = [], notes = [], hist = [];
   var made = 0, updated = 0;
@@ -1921,6 +1994,7 @@ function mzIngest_(body, agent) {
       };
       m.last_mention_at = m.received_at;
       m.last_mention_by = m.asked_by;
+      if (first) mentionSig[sigOf(m.id, first.by, ts(first.at))] = 1;
       if (catOf(m.status) === 'done') m.closed_at = ts(t.completed_at) || now;
       if (t.completed && catOf(m.status) !== 'done') { m.mz_again = ments[ments.length - 1] ? ts(ments[ments.length - 1].at) : ''; m.review = 'new'; }
       hist.push({ entity: 'Mizito', entity_id: m.id, field: '_created', from: '', to: m.status });
@@ -2031,6 +2105,10 @@ function mzIngest_(body, agent) {
       if (mentionIds[id] || id === String(m.ext_id || '')) return;
       mentionIds[id] = 1;
       var at = ts(x.at);
+      var sg = sigOf(m.id, x.by, at), stx = textSig(m.id, x.by, x.comment);
+      if ((at && mentionSig[sg]) || (stx && mentionSig[stx])) return;
+      mentionSig[sg] = 1;
+      if (stx) mentionSig[stx] = 1;
       // asked again: a mention Madar did not have, made after the latest ask it knew of (an older
       // mention read late, or one from a second person's first read, is history, not a new ask)
       if (cur && listed(cur.mentioned, agent.name) && at > prevAsk) fresh.push({ by: x.by || '', at: at });
@@ -2043,6 +2121,10 @@ function mzIngest_(body, agent) {
       if (!c || !c.id) return;
       var row = { id: 'MC-' + c.id, item_id: m.id, by: c.by || '', at: ts(c.at), body: long(c.body), mentions: (c.mentions || []).join(', '), reply_to: c.reply_to ? 'MC-' + c.reply_to : '', files: long((c.files || []).join('\n'), 1000) };
       var old = comments[row.id];
+      var csg = sigOf(m.id, row.by, row.at), ctx = textSig(m.id, row.by, row.body);
+      if (!old && ((row.at && commentSig[csg]) || (ctx && commentSig[ctx]))) return;
+      commentSig[csg] = 1;
+      if (ctx) commentSig[ctx] = 1;
       if (old && String(old.body) === row.body && String(old.files || '') === row.files && String(old.mentions || '') === row.mentions) return;
       if (!old && cur && cur.mz_state && row.at > String(cur.mz_last_at || cur.received_at || '')) newComments.push(row);
       comments[row.id] = row;
@@ -2298,10 +2380,12 @@ function mzImport_(body, user) {
   var linkKey = function (l) { var x = /_sl([0-9a-f]{24})/i.exec(String(l || '')); return x ? x[1].toLowerCase() : ''; };
   items.forEach(function (t) {
     // a file from the reader carries Mizito's own ids: matched by id only, never by title
-    if (body.exact || have[String(t.key)]) return;
-    var lk = linkKey(t.link);
-    var same = (byTitle[mzTitleKey_(t.title)] || []).filter(function (r) { var rk = linkKey(r.link); return !(lk && rk && rk !== lk); });
-    if (same.length) t.key = String(same[0].mz_key).replace(/^.*_sl/i, '');
+    // the title decides first (the same task may come with another link on another day)
+    var same = byTitle[mzTitleKey_(t.title)] || [];
+    if (same.length) {
+      var withLink = same.filter(function (r) { return linkKey(r.link); })[0];
+      t.key = String((withLink || same[0]).mz_key).replace(/^.*_sl/i, '');
+    }
   });
   var r = mzIngest_({ items: items, version: 'import' }, { name: account });
   if (body.last) {
@@ -2396,8 +2480,22 @@ function mzFill_(t, cur) {
 function mzDedupe_(dry) {
   var data = rawAll_();
   var linkKey = function (l) { var x = /_sl([0-9a-f]{24})/i.exec(String(l || '')); return x ? x[1].toLowerCase() : ''; };
+  // rows are the same task when their titles match or they share a Mizito key (union of both)
+  var parent = {};
+  var find = function (x) { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+  var unite = function (a, b) { a = find(a); b = find(b); if (a !== b) parent[b] = a; };
+  var firstBy = {};
+  (data.Mizito || []).forEach(function (m) {
+    parent[m.id] = m.id;
+    var keys = ['t:' + mzTitleKey_(m.title), 'k:' + String(m.mz_key || '').replace(/^.*_sl/i, '')];
+    keys.forEach(function (k) {
+      if (k === 't:' || k === 'k:') return;
+      if (firstBy[k]) unite(firstBy[k], m.id);
+      else firstBy[k] = m.id;
+    });
+  });
   var groups = {};
-  (data.Mizito || []).forEach(function (m) { var tk = mzTitleKey_(m.title); if (tk) (groups[tk] = groups[tk] || []).push(m); });
+  (data.Mizito || []).forEach(function (m) { var r = find(m.id); (groups[r] = groups[r] || []).push(m); });
   var merges = [];
   Object.keys(groups).forEach(function (tk) {
     var rows = groups[tk];
@@ -2473,9 +2571,13 @@ function mzDedupe_(dry) {
   repoint('Files', 'entity_id');
   repoint('Cartable', 'entity_id');
   repoint('History', 'entity_id');
-  deleteRows_('MizitoMentions', dropM);
-  deleteRows_('MizitoComments', dropC);
-  deleteRows_('Mizito', Object.keys(gone));
+  // removed in one write per tab (row by row was too slow for many duplicates)
+  var dm = {}, dc = {};
+  dropM.forEach(function (id) { dm[String(id)] = 1; });
+  dropC.forEach(function (id) { dc[String(id)] = 1; });
+  if (dropM.length) keepRows_('MizitoMentions', function (r) { return !dm[String(r.id)]; });
+  if (dropC.length) keepRows_('MizitoComments', function (r) { return !dc[String(r.id)]; });
+  keepRows_('Mizito', function (r) { return !gone[String(r.id)]; });
   return { groups: keepRows.length, rows: Object.keys(gone).length };
 }
 

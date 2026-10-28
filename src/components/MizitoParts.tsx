@@ -754,7 +754,8 @@ export function MizitoImport({ admin }: { admin: boolean }) {
   const cutoff = setting(MZ_KEYS.cutoff) || MZ_CUTOFF
   // where this person's import got to (kept by the server); the next range starts the day after
   const lastTo = agentRun(setting(MZ_KEYS.agent + account)).range_to || ''
-  const suggested = useMemo(() => nextRange(lastTo, cutoff, todayISO()), [lastTo, cutoff])
+  const [span, setSpan] = useState(7)
+  const suggested = useMemo(() => nextRange(lastTo, cutoff, todayISO(), span), [lastTo, cutoff, span])
   const [range, setRange] = useState(suggested)
   useEffect(() => setRange(suggested), [suggested.from, suggested.to]) // eslint-disable-line react-hooks/exhaustive-deps
   const prompt = mzClaudePrompt(account || me, range.from, range.to, fmtDate(range.from, 'long'), fmtDate(range.to, 'long'))
@@ -847,6 +848,12 @@ export function MizitoImport({ admin }: { admin: boolean }) {
       </div>
       <div className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl bg-muted/50 p-3 text-sm">
         <span className="font-medium">{L('بازه:', 'Range:')}</span>
+        <select value={span} onChange={(e) => setSpan(Number(e.target.value))} className="input h-8 w-auto text-xs" aria-label={L('طول بازه', 'Range length')}>
+          <option value={3}>{L('۳ روز', '3 days')}</option>
+          <option value={7}>{L('یک هفته (پیشنهادی)', 'A week (suggested)')}</option>
+          <option value={14}>{L('دو هفته', 'Two weeks')}</option>
+          <option value={31}>{L('یک ماه', 'A month')}</option>
+        </select>
         <span>{L('از', 'from')}</span>
         <DatePicker compact value={range.from} onChange={(v) => v && setRange((r) => ({ ...r, from: v }))} />
         <span>{L('تا', 'to')}</span>
@@ -857,7 +864,7 @@ export function MizitoImport({ admin }: { admin: boolean }) {
         <button className="btn-primary btn-sm" disabled={range.from > range.to} onClick={() => navigator.clipboard?.writeText(prompt).then(() => toast(L('متن برای Claude کپی شد', 'Prompt copied')))}><Copy size={13} /> {L('کپی متن برای Claude', 'Copy the prompt')}</button>
         <button className="btn-ghost btn-sm text-sub" onClick={() => setShowPrompt(!showPrompt)}>{showPrompt ? L('بستن', 'Hide') : L('دیدن متن', 'Show')}</button>
       </div>
-      <p className="mb-3 text-xs leading-6 text-sub">{L('هر بار یک ماه (یا کمتر) بخوانید و به ترتیب جلو بروید: ۱ تا ۳۱ تیر، بعد مرداد، … . تسکی که در ماه‌های بعد دوباره منشن شود زیر همان ردیف قبلی می‌آید و «دوباره منشن شد» می‌گیرد. بعد از هر ایمپورت، بازه‌ی بعدی خودش پیشنهاد می‌شود.', 'Read one month at a time, in order. A task mentioned again later lands on its earlier row. The next range is suggested after each import.')}</p>
+      <p className="mb-3 text-xs leading-6 text-sub">{L('هر بار یک هفته بخوانید و به ترتیب جلو بروید (بازه‌ی کوتاه را Claude کامل می‌خواند؛ یک ماه یک‌جا پیام جا می‌اندازد). تسکی که در ماه‌های بعد دوباره منشن شود زیر همان ردیف قبلی می‌آید و «دوباره منشن شد» می‌گیرد. بعد از هر ایمپورت، بازه‌ی بعدی خودش پیشنهاد می‌شود.', 'Read one week at a time, in order. A task mentioned again later lands on its earlier row. The next range is suggested after each import.')}</p>
       {showPrompt && <pre dir="rtl" className="mb-3 max-h-72 overflow-auto whitespace-pre-wrap rounded-2xl bg-muted/60 p-3 text-[0.6875rem] leading-6">{prompt}</pre>}
       <textarea value={raw} onChange={(e) => setRaw(e.target.value)} rows={6} dir="ltr" placeholder={L('جواب Claude (همه‌ی بخش‌ها، پشت سر هم) را اینجا بچسبانید…', 'Paste Claude’s answer (all parts) here…')} className="input w-full py-2 font-mono text-[0.6875rem] leading-5" />
       <div className="mt-2 flex flex-wrap items-center gap-3">

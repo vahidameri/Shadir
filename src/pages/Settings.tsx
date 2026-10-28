@@ -16,7 +16,10 @@ import { WEEK_KEYS, weekCfg } from '../lib/weeks'
 import { CalendarLayersCard, DashboardWidgetsCard, SprintSettingsCard, TeamHealthCard } from '../components/ViewSettings'
 import { ColumnsCard, FieldsCard, FlagsCard, NotifyCard, Switch, TaskCard } from '../components/TaskSettings'
 
-export default function Settings({ embedded }: { embedded?: boolean }) {
+/** Settings; in the back office one module at a time (section), on its own page everything. */
+export type SettingsSection = 'general' | 'tasks' | 'planning' | 'mizito'
+export default function Settings({ embedded, section }: { embedded?: boolean; section?: SettingsSection }) {
+  const show = (x: SettingsSection) => !section || section === x
   const { config, setConfig, mode, resetDemo, role, db, access } = useStore()
   const g = useGoogle()
   const { session } = g
@@ -43,6 +46,7 @@ export default function Settings({ embedded }: { embedded?: boolean }) {
     <>
       {!embedded && <Band title={L('تنظیمات', 'Settings')} sub={L(`اتصال ${APP_NAME()} به گوگل، اتوماسیون‌ها و نمایش.`, `${APP_NAME()}’s Google connection, automations and display.`)} />}
       <Wrap embedded={embedded}>
+        {show('general') && (
         <Card
           eyebrow={<span className="flex items-center gap-1.5"><Zap size={12} /> {L('اتوماسیون', 'Automations')}</span>}
           title={L('کارهایی که خودکار انجام می‌شوند', 'Work that happens on its own')}
@@ -76,17 +80,19 @@ export default function Settings({ embedded }: { embedded?: boolean }) {
           )}
         </Card>
 
-        <WeekCard admin={admin} />
-        <NotifyCard admin={admin} />
-        <TaskCard admin={admin} />
-        <FieldsCard admin={admin} />
-        <ColumnsCard admin={admin} />
-        <FlagsCard admin={admin} />
-        <DashboardWidgetsCard admin={admin} />
-        <TeamHealthCard admin={admin} />
-        <CalendarLayersCard admin={admin} />
-        <SprintSettingsCard admin={admin} />
+        )}
+        {show('planning') && <WeekCard admin={admin} />}
+        {show('general') && <NotifyCard admin={admin} />}
+        {show('tasks') && <TaskCard admin={admin} />}
+        {show('tasks') && <FieldsCard admin={admin} />}
+        {show('tasks') && <ColumnsCard admin={admin} />}
+        {show('tasks') && <FlagsCard admin={admin} />}
+        {show('planning') && <DashboardWidgetsCard admin={admin} />}
+        {show('planning') && <TeamHealthCard admin={admin} />}
+        {show('planning') && <CalendarLayersCard admin={admin} />}
+        {show('planning') && <SprintSettingsCard admin={admin} />}
 
+        {show('general') && (
         <Card eyebrow="Google" title={L('ورود با گوگل و تقویم', 'Google sign-in & calendar')}>
           <div className="space-y-4">
             {admin && <TeamPasswordField />}
@@ -147,6 +153,8 @@ export default function Settings({ embedded }: { embedded?: boolean }) {
           </div>
         </Card>
 
+        )}
+        {show('general') && (
         <Card eyebrow={L('نمایش', 'Display')} title={L('زبان و تقویم', 'Language & calendar')}>
           <div className="space-y-5">
             <div className="flex items-center justify-between gap-4">
@@ -166,11 +174,14 @@ export default function Settings({ embedded }: { embedded?: boolean }) {
             )}
           </div>
         </Card>
+        )}
       </Wrap>
-      <div className="mt-6">
-        <div className="eyebrow mb-3 px-1">{L('میزیتو', 'Mizito')}</div>
-        <MizitoSettings admin={admin} />
-      </div>
+      {show('mizito') && (
+        <div className={section ? '' : 'mt-6'}>
+          {!section && <div className="eyebrow mb-3 px-1">{L('میزیتو', 'Mizito')}</div>}
+          <MizitoSettings admin={admin} />
+        </div>
+      )}
     </>
   )
 }
