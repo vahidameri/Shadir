@@ -754,7 +754,7 @@ export function MizitoImport({ admin }: { admin: boolean }) {
   const cutoff = setting(MZ_KEYS.cutoff) || MZ_CUTOFF
   // where this person's import got to (kept by the server); the next range starts the day after
   const lastTo = agentRun(setting(MZ_KEYS.agent + account)).range_to || ''
-  const [span, setSpan] = useState(7)
+  const [span, setSpan] = useState(31)
   const suggested = useMemo(() => nextRange(lastTo, cutoff, todayISO(), span), [lastTo, cutoff, span])
   const [range, setRange] = useState(suggested)
   useEffect(() => setRange(suggested), [suggested.from, suggested.to]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -810,7 +810,8 @@ export function MizitoImport({ admin }: { admin: boolean }) {
       for (let i = 0; i < all.length; i += size) {
         const items = all.slice(i, i + size)
         setProgress(L(`${fa(Math.min(i + size, all.length))} از ${fa(all.length)}`, `${Math.min(i + size, all.length)} of ${all.length}`))
-        const r = await send({ account: who, items, batch: batchId(who, items), last: i + size >= all.length, total: all.length, range })
+        // how far the import got: the range the answer itself covers, when it says (else the one chosen)
+        const r = await send({ account: who, items, batch: batchId(who, items), last: i + size >= all.length, total: all.length, range: parsed.range || range })
         if (!r) return toast(L('در حالت نمایشی ایمپورت نمی‌شود', 'No import in demo mode'), 'err')
         made += r.made || 0
         updated += r.updated || 0
@@ -857,9 +858,9 @@ export function MizitoImport({ admin }: { admin: boolean }) {
         <span className="font-medium">{L('بازه:', 'Range:')}</span>
         <select value={span} onChange={(e) => setSpan(Number(e.target.value))} className="input h-8 w-auto text-xs" aria-label={L('طول بازه', 'Range length')}>
           <option value={3}>{L('۳ روز', '3 days')}</option>
-          <option value={7}>{L('یک هفته (پیشنهادی)', 'A week (suggested)')}</option>
+          <option value={7}>{L('یک هفته', 'A week')}</option>
           <option value={14}>{L('دو هفته', 'Two weeks')}</option>
-          <option value={31}>{L('یک ماه', 'A month')}</option>
+          <option value={31}>{L('یک ماه (پیش‌فرض)', 'A month (default)')}</option>
         </select>
         <span>{L('از', 'from')}</span>
         <DatePicker compact value={range.from} onChange={(v) => v && setRange((r) => ({ ...r, from: v }))} />
@@ -871,7 +872,7 @@ export function MizitoImport({ admin }: { admin: boolean }) {
         <button className="btn-primary btn-sm" disabled={range.from > range.to} onClick={() => navigator.clipboard?.writeText(prompt).then(() => toast(L('متن برای Claude کپی شد', 'Prompt copied')))}><Copy size={13} /> {L('کپی متن برای Claude', 'Copy the prompt')}</button>
         <button className="btn-ghost btn-sm text-sub" onClick={() => setShowPrompt(!showPrompt)}>{showPrompt ? L('بستن', 'Hide') : L('دیدن متن', 'Show')}</button>
       </div>
-      <p className="mb-3 text-xs leading-6 text-sub">{L('هر بار یک هفته بخوانید و به ترتیب جلو بروید (بازه‌ی کوتاه را Claude کامل می‌خواند؛ یک ماه یک‌جا پیام جا می‌اندازد). تسکی که در ماه‌های بعد دوباره منشن شود زیر همان ردیف قبلی می‌آید و «دوباره منشن شد» می‌گیرد. بعد از هر ایمپورت، بازه‌ی بعدی خودش پیشنهاد می‌شود.', 'Read one week at a time, in order. A task mentioned again later lands on its earlier row. The next range is suggested after each import.')}</p>
+      <p className="mb-3 text-xs leading-6 text-sub">{L('ماه‌به‌ماه و به ترتیب جلو بروید (اگر Claude پیامی جا انداخت، بازه را کوتاه‌تر کنید). تسکی که در ماه‌های بعد دوباره منشن شود زیر همان ردیف قبلی می‌آید و «دوباره منشن شد» می‌گیرد. بعد از هر ایمپورت، بازه‌ی بعدی خودش پیشنهاد می‌شود.', 'Read one month at a time, in order. A task mentioned again later lands on its earlier row. The next range is suggested after each import.')}</p>
       {showPrompt && <pre dir="rtl" className="mb-3 max-h-72 overflow-auto whitespace-pre-wrap rounded-2xl bg-muted/60 p-3 text-[0.6875rem] leading-6">{prompt}</pre>}
       <textarea value={raw} onChange={(e) => setRaw(e.target.value)} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { if (e.dataTransfer.files?.length) { e.preventDefault(); void readFiles(e.dataTransfer.files) } }} rows={6} dir="ltr" placeholder={L('فایل(های) JSON که Claude ساخته را اینجا بکشید، یا جوابش را بچسبانید…', 'Drop the JSON file(s) Claude made here, or paste its answer…')} className="input w-full py-2 font-mono text-[0.6875rem] leading-5" />
       <div className="mt-2 flex flex-wrap items-center gap-3">
@@ -882,6 +883,7 @@ export function MizitoImport({ admin }: { admin: boolean }) {
         {stats && parsed && (
           <span className="num text-xs text-sub">
             {L(`${fa(stats.tasks)} تسک (${fa(stats.tasks - stats.known)} تازه، ${fa(stats.known)} موجود)${parsed.listed > stats.tasks ? ` از ${fa(parsed.listed)} ردیف` : ''} · ${fa(stats.links)} با لینک · ${fa(stats.mentions)} منشن · ${fa(stats.comments)} کامنت · ${fa(stats.done)} انجام‌شده · ${fa(parsed.parts)} بخش · به نام ${who}`, `${stats.tasks} tasks (${stats.tasks - stats.known} new) · ${stats.links} links · ${stats.mentions} mentions · for ${who}`)}
+            {parsed.range && <span className="ms-2">· {L(`بازه‌ی این جواب: ${fmtDate(parsed.range.from)} تا ${fmtDate(parsed.range.to)}`, `covers ${parsed.range.from} – ${parsed.range.to}`)}</span>}
             {parsed.broken > 0 && <b className="ms-2 text-bad">{L(`${fa(parsed.broken)} بخش خوانده نشد`, `${parsed.broken} parts unreadable`)}</b>}
           </span>
         )}
@@ -944,6 +946,7 @@ export function MizitoSettings({ admin }: { admin: boolean }) {
   return (
     <div className="grid gap-4 @2xl:grid-cols-2">
       <MizitoImport admin={admin} />
+      <AlarmCard admin={admin} />
       <Card eyebrow={<span className="flex items-center gap-1.5"><Settings2 size={12} /> {L('میزیتو', 'Mizito')}</span>} title={L('فهرست‌ها', 'Lists')}>
         <fieldset disabled={!admin} className="space-y-5">
           <label className="block">
@@ -956,7 +959,7 @@ export function MizitoSettings({ admin }: { admin: boolean }) {
           </label>
           <OptionList kind="status" title={L('وضعیت‌ها (و معنی هرکدام)', 'Statuses (and what each means)')} items={c.statuses} onSave={(n) => setSetting(MZ_KEYS.statuses, JSON.stringify(n))} />
           <OptionList kind="plain" title={L('دسته‌ها', 'Categories')} items={c.categories} onSave={(n) => setSetting(MZ_KEYS.categories, JSON.stringify(n))} />
-          <OptionList kind="weight" title={L('نوع اقدام (با وزن در اولویت)', 'Action types (with priority weight)')} items={c.actions} onSave={(n) => setSetting(MZ_KEYS.actions, JSON.stringify(n))} />
+          <OptionList kind="weight" title={L('نوع تسک (تأیید، تصمیم، امضا… — با وزن در اولویت)', 'Task kinds (with priority weight)')} items={c.actions} onSave={(n) => setSetting(MZ_KEYS.actions, JSON.stringify(n))} />
         </fieldset>
       </Card>
       <div className="space-y-4">
@@ -984,5 +987,34 @@ export function MizitoSettings({ admin }: { admin: boolean }) {
         </Card>
       </div>
     </div>
+  )
+}
+
+/** Back office → Mizito: which items get the blinking red light. */
+function AlarmCard({ admin }: { admin: boolean }) {
+  const { setSetting } = useStore()
+  const c = mzCfg()
+  const a = c.alarm
+  const save = (patch: Partial<typeof a>) => setSetting(MZ_KEYS.alarm, JSON.stringify({ ...a, ...patch }))
+  const box = (on: boolean, label: string, set: (v: boolean) => void) => (
+    <label className="flex cursor-pointer items-center gap-2 text-sm">
+      <input type="checkbox" disabled={!admin} checked={on} onChange={(e) => set(e.target.checked)} />
+      {label}
+    </label>
+  )
+  return (
+    <Card eyebrow={L('چراغ هشدار', 'Alarm light')} title={L('کدام موارد چراغ قرمز چشمک‌زن بگیرند', 'Which items blink')}>
+      <p className="mb-3 text-xs leading-6 text-sub">{L('هر مورد بازِ میزیتو که یکی از این‌ها باشد، کنار ردیفش چراغ قرمز چشمک می‌زند. رده از آخرین منشن‌کننده است.', 'Open items matching any of these blink. The tier is the latest mentioner’s.')}</p>
+      <div className="space-y-2">
+        <div className="text-xs font-medium text-sub">{L('منشن از این رده‌ها:', 'Mentioned by these tiers:')}</div>
+        {c.tiers.map((t) => box(a.tiers.includes(t.id), optLabel(t), (v) => save({ tiers: v ? [...a.tiers, t.id] : a.tiers.filter((x) => x !== t.id) })))}
+        <div className="border-t border-line pt-2" />
+        {box(a.keyProjects, L(`پروژه‌های کلیدی (${c.keyProjects.join('، ') || '—'})`, `Key projects (${c.keyProjects.join(', ') || '—'})`), (v) => save({ keyProjects: v }))}
+        {box(a.p0, L('همه‌ی موارد P0', 'Every P0'), (v) => save({ p0: v }))}
+        {box(a.breached, L('همه‌ی موارد گذشته از SLA', 'Every SLA breach'), (v) => save({ breached: v }))}
+        <div className="border-t border-line pt-2" />
+        {box(a.fresh, L('فقط تا وقتی چیز تازه‌ای ندیده‌ام (مورد تازه، منشن دوباره یا تغییر)', 'Only while something new is unseen'), (v) => save({ fresh: v }))}
+      </div>
+    </Card>
   )
 }

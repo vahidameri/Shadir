@@ -20,6 +20,7 @@ export const MZ_KEYS = {
   template: 'mz.template', // reminder text with {name} {title} {days} {link} {asked_by}
   cutoff: 'mz.agent.cutoff', // the agent reads tasks with activity since this day (ISO)
   keyProjects: 'mz.key_projects', // JSON [names]: Mizito projects that get a badge (default میز شاد)
+  alarm: 'mz.alarm', // JSON MzAlarm: which items get the blinking light
   agent: 'mz.agent.', // + a person's name: their agent's last run (written by the server)
 } as const
 /** 1 Tir 1405 */
@@ -77,8 +78,15 @@ interface MzCfg {
   staleDays: number
   template: string
   keyProjects: string[]
+  alarm: MzAlarm
 }
-let cfg: MzCfg = { base: 'https://mizito.noyanet.com', tiers: DEFAULT_TIERS, statuses: DEFAULT_STATUSES, categories: DEFAULT_CATEGORIES, actions: DEFAULT_ACTIONS, weights: DEFAULT_WEIGHTS, thresholds: DEFAULT_THRESHOLDS, staleDays: 7, template: DEFAULT_TEMPLATE, keyProjects: ['میز شاد'] }
+/**
+ * The blinking light (back office → Mizito): open items from the chosen tiers or the key projects,
+ * and, if switched on, every P0 and every SLA breach. fresh = only while something new is unseen.
+ */
+export interface MzAlarm { tiers: string[]; keyProjects: boolean; p0: boolean; breached: boolean; fresh: boolean }
+const DEFAULT_ALARM: MzAlarm = { tiers: ['executive', 'deputy'], keyProjects: true, p0: false, breached: false, fresh: false }
+let cfg: MzCfg = { base: 'https://mizito.noyanet.com', tiers: DEFAULT_TIERS, statuses: DEFAULT_STATUSES, categories: DEFAULT_CATEGORIES, actions: DEFAULT_ACTIONS, weights: DEFAULT_WEIGHTS, thresholds: DEFAULT_THRESHOLDS, staleDays: 7, template: DEFAULT_TEMPLATE, keyProjects: ['میز شاد'], alarm: DEFAULT_ALARM }
 export const mzCfg = () => cfg
 
 function list<T extends { id: string }>(raw: string | undefined, def: T[]): T[] {
@@ -121,6 +129,7 @@ export function readMzCfg(get: (k: string) => string | undefined): MzCfg {
       } catch {}
       return ['میز شاد']
     })(),
+    alarm: obj(get(MZ_KEYS.alarm), DEFAULT_ALARM),
   }
 }
 export const setMzCfg = (c: MzCfg) => (cfg = c)
@@ -461,4 +470,13 @@ export function firstFor(m: MizitoItem, who?: string) {
     }
   }
   return m.received_at || m.created_at || ''
+}
+
+/** Whether an item gets the blinking light, by the back office's alarm rules. */
+export function alarmOn(m: MizitoItem, s: MzSignals) {
+  if (mzClosed(m)) return false
+  const a = cfg.alarm
+  const hit = (!!s.tier && (a.tiers || []).includes(s.tier.id)) || (a.keyProjects && mzFlags(m).keyProject) || (a.p0 && s.p === 0) || (a.breached && s.breached)
+  if (!hit) return false
+  return !a.fresh || m.review === 'new' || !!m.mz_again || changeUnseen(m)
 }

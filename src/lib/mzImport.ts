@@ -47,6 +47,8 @@ export interface MzImportResult {
   broken: number
   /** tasks in the paste before merging the same task listed twice */
   listed: number
+  /** the days the answer covers (ISO): from its "range", else its earliest and latest mention */
+  range?: { from: string; to: string }
 }
 
 /** The Mizito workspace id (the part before _sl in every task link): never a task's id. */
@@ -175,7 +177,7 @@ interface Existing {
 export function parseMzImport(raw: string, fallbackAccount: string, existing: Existing[] = [], people: string[] = []): MzImportResult {
   const problems: string[] = []
   const { parsed, parts, broken } = readParts(String(raw || '').trim(), problems)
-  const blocks: { account?: string; tasks?: unknown[] }[] = []
+  const blocks: { account?: string; tasks?: unknown[]; range?: { from?: string; to?: string } }[] = []
   parsed.forEach((d) => {
     if (Array.isArray(d)) {
       if (d.length && d.every((x) => x && typeof x === 'object' && 'tasks' in (x as object))) blocks.push(...(d as { tasks: unknown[] }[]))
@@ -329,14 +331,20 @@ export function parseMzImport(raw: string, fallbackAccount: string, existing: Ex
     }
   })
   out.sort((a, b) => ((a.first_at || '9') < (b.first_at || '9') ? -1 : 1))
-  return { account, items: out, problems: [...new Set(problems)], parts, broken, listed }
+  // the range: what the answer says it covers (all parts together), else the mentions' own dates
+  const day = (v?: string) => mzDate(v).slice(0, 10)
+  const stated = blocks.map((b) => b.range).filter(Boolean).flatMap((r) => [day(r!.from), day(r!.to)]).filter(Boolean).sort()
+  const seen = out.flatMap((it) => it.mentions.map((x) => x.at.slice(0, 10))).filter(Boolean).sort()
+  const span = stated.length ? stated : seen
+  const range = span.length ? { from: span[0], to: span[span.length - 1] } : undefined
+  return { account, items: out, problems: [...new Set(problems)], parts, broken, listed, range }
 }
 
 /**
  * The next range to read: the day after the last one imported, for `days` days (a week by default —
  * Claude reads a short range completely; a month at once is where messages got skipped).
  */
-export function nextRange(lastTo: string, start: string, today: string, days = 7): { from: string; to: string } {
+export function nextRange(lastTo: string, start: string, today: string, days = 31): { from: string; to: string } {
   const from = lastTo ? addDaysISO(lastTo, 1) : start
   if (days >= 28) {
     const j = isoToJalaliParts(from)
@@ -373,7 +381,7 @@ export function mzClaudePrompt(account: string, from: string, to: string, fromFa
 ۴. برای هر تسکِ یکتا فقط یک بار:
    - «مشاهده وظیفه» را بزن.
    - از پنل بخوان: عنوان (کامل و دقیقاً همان متن)، توضیحات کامل، پروژه، سازنده، مسئولان، مهلت، وضعیت (باز یا انجام‌شده؛ اگر انجام شده چه کسی و کی)، درصد پیشرفت، چک‌لیست، برچسب‌ها، و همه‌ی کامنت‌ها (نویسنده، زمان، متن کامل، نام پیوست‌ها، منشن‌شده‌ها).
-   - لینک: منوی ⋮ بالای پنل ← «لینک وظیفه» ← آدرس کامل داخل کادر (اگر بریده بود «کپی» را بزن و متن کامل را بردار؛ هرگز «تایید» را نزن). باید با https://mizito.noyanet.com/#/ws/tasks/ شروع شود.
+   - لینک: منوی ⋮ بالای پنل ← «لینک وظیفه». ساخته شدن لینک ممکن است چند ثانیه طول بکشد: صبر کن تا آدرس کامل در کادر ظاهر شود (اگر کادر خالی یا «در حال ساخت» بود، چند ثانیه بعد دوباره نگاه کن). بعد آدرس کامل را بردار (اگر بریده بود «کپی» را بزن و متن کامل را بردار؛ هرگز «تایید» را نزن). باید با https://mizito.noyanet.com/#/ws/tasks/ شروع شود. اگر بعد از چند بار صبر هم لینک ساخته نشد، "link" را خالی بگذار و برو سراغ تسک بعد.
    - پنل را ببند.
 ۵. تاریخ‌ها کامل، شمسی و با ارقام انگلیسی: «1405/04/12 14:30». تاریخ نسبی («دیروز»، «۲ ساعت پیش») را با ماوس روی آن ببین یا با تاریخ امروز به تاریخ کامل تبدیل کن.
 ۶. چیزی حدس نزن؛ اگر نبود "" یا [] بگذار.

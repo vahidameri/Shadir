@@ -11,7 +11,7 @@ import { useStore } from '../lib/store'
 import { Band, Card, Empty, FilterSelect, Overlap, SearchInput, Segmented, Sheet, StatStrip, cx } from '../components/ui'
 import { L } from '../lib/i18n'
 import { fa, fmtDate, timeAgo } from '../lib/jalali'
-import { MZ_KEYS, MZ_VIEWS, agentRun, lastAsker, mzClosed, changeUnseen, firstFor, firstMzStatus, isExecTier, mzFlags as flagsOf, recentlyChanged, inMzView, isMizitoLink, mzCat, mzCfg, mzFlags, mzSignals, optLabel, statusById, tierById, type MzView } from '../lib/mizito'
+import { MZ_KEYS, MZ_VIEWS, agentRun, alarmOn, lastAsker, changeUnseen, firstFor, firstMzStatus, isExecTier, mzFlags as flagsOf, recentlyChanged, inMzView, isMizitoLink, mzCat, mzCfg, mzFlags, mzSignals, optLabel, statusById, tierById, type MzView } from '../lib/mizito'
 import { daysFromToday } from '../lib/jalali'
 import { CaptureSheet, MzBadges, MizitoImport, MizitoSettings, MizitoSheet, MzLink, MzSignals, MzStatusChip, PBadge, useReminder } from '../components/MizitoParts'
 import type { MizitoItem } from '../lib/types'
@@ -22,11 +22,6 @@ const VIEW_LABEL: Record<MzView, [string, string]> = {
 }
 type Group = '' | 'asker' | 'category' | 'p' | 'status' | 'assigned'
 
-/** What needs eyes now: open and P0, past its SLA, or a fresh ask from the senior tiers. */
-function important(m: MizitoItem, s: ReturnType<typeof mzSignals>) {
-  if (mzClosed(m)) return false
-  return s.p === 0 || s.breached || (isExecTier(s.tier) && (m.review === 'new' || !!m.mz_again || changeUnseen(m)))
-}
 
 export default function MizitoPage() {
   const { db, canEdit, access, me, upsert, upsertMany, toast, setting } = useStore()
@@ -294,8 +289,8 @@ export default function MizitoPage() {
                     return (
                       <div key={m.id} onClick={() => set('id', m.id)} className={cx('group flex cursor-pointer items-start gap-3 px-4 py-3 transition hover:bg-muted/40', s.p === 0 && 'bg-bad/[0.03]', picked.has(m.id) && 'bg-brand-soft/30')}>
                         {canEdit && <input type="checkbox" className="mt-1.5" checked={picked.has(m.id)} onClick={(e) => e.stopPropagation()} onChange={() => togglePick(m.id)} aria-label={L('انتخاب', 'Select')} />}
-                        {important(m, s) ? (
-                          <span className="relative mt-2 inline-flex h-2.5 w-2.5 shrink-0" title={L('مهم: P0، عبور از SLA یا درخواست تازه‌ی مدیر ارشد', 'Important: P0, SLA breached or a fresh senior ask')}>
+                        {alarmOn(m, s) ? (
+                          <span className="relative mt-2 inline-flex h-2.5 w-2.5 shrink-0" title={L('هشدار (قاعده‌اش در بک‌آفیس ← میزیتو ← چراغ هشدار)', 'Alarm (rules in back office → Mizito)')}>
                             <span className="absolute inset-0 animate-ping rounded-full bg-bad opacity-60" />
                             <span className="relative h-2.5 w-2.5 rounded-full bg-bad" />
                           </span>
