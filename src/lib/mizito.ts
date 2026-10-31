@@ -55,6 +55,9 @@ const DEFAULT_CATEGORIES: MzOption[] = [
 ]
 const DEFAULT_ACTIONS: MzOption[] = [
   { id: 'approve', fa: 'تأیید', en: 'Approve', weight: 10 },
+  { id: 'decide', fa: 'تصمیم', en: 'Decide', weight: 10 },
+  { id: 'sign', fa: 'امضا', en: 'Sign', weight: 8 },
+  { id: 'reply', fa: 'پاسخ', en: 'Reply', weight: 6 },
   { id: 'advise', fa: 'نظر / مشاوره', en: 'Advise', weight: 5 },
   { id: 'followup', fa: 'پیگیری', en: 'Follow-up', weight: 5 },
   { id: 'fyi', fa: 'جهت اطلاع', en: 'FYI', weight: 0 },
@@ -258,10 +261,6 @@ export function markSeen(m: MizitoItem) {
 }
 /** Everyone who mentioned it: the asker and every re-mention. */
 export const askersOf = (db: DB, m: MizitoItem) => [...new Set([m.asked_by, ...mentionsOf(db, m.id).map((x) => x.by)].filter(Boolean))]
-/** The highest tier among the people who asked. */
-function topTier(db: DB, m: MizitoItem): Tier | undefined {
-  return askersOf(db, m).map((n) => tierOf(db, n)).filter(Boolean).sort((a, b) => b!.weight - a!.weight)[0] || undefined
-}
 
 interface MzSignals {
   /** computed or overridden P0..P3 */
@@ -299,9 +298,13 @@ export function mzSignals(db: DB, m: MizitoItem, at?: number): MzSignals {
   return computeSignals(db, m, now)
 }
 
+/** Who asked last: the latest mention's writer (not the task's creator in Mizito). */
+export const lastAsker = (m: MizitoItem) => m.last_mention_by || m.asked_by || ''
+
 function computeSignals(db: DB, m: MizitoItem, now: number): MzSignals {
   const c = cfg
-  const tier = topTier(db, m)
+  // the SLA and the rank follow the latest mention: who asked last, and when
+  const tier = tierOf(db, lastAsker(m))
   const mentions = 1 + mentionsOf(db, m.id).length
   const open = !mzClosed(m)
   const cat = mzCat(m.status)

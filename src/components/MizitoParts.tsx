@@ -761,6 +761,13 @@ export function MizitoImport({ admin }: { admin: boolean }) {
   const prompt = mzClaudePrompt(account || me, range.from, range.to, fmtDate(range.from, 'long'), fmtDate(range.to, 'long'))
   const people = useMemo(() => allPeople(db), [db])
   const parsed = useMemo(() => (raw.trim() ? parseMzImport(raw, account, db.Mizito, people) : null), [raw, account, db.Mizito, people])
+  // one or more files from Claude (one per range or part): each becomes a part of the paste
+  const readFiles = async (files?: FileList | null) => {
+    const list = [...(files || [])]
+    if (!list.length) return
+    const texts = await Promise.all(list.map((f) => f.text()))
+    setRaw(texts.map((t) => (/```/.test(t) ? t : '```json\n' + t.trim() + '\n```')).join('\n'))
+  }
   const who = parsed?.account && leaders.some((x) => x.name === parsed.account) ? parsed.account : account
   const fail = (e: unknown) => toast(e instanceof Error ? e.message : String(e), 'err')
   // the same Mizito task in more than one row (left by earlier imports)
@@ -866,11 +873,11 @@ export function MizitoImport({ admin }: { admin: boolean }) {
       </div>
       <p className="mb-3 text-xs leading-6 text-sub">{L('هر بار یک هفته بخوانید و به ترتیب جلو بروید (بازه‌ی کوتاه را Claude کامل می‌خواند؛ یک ماه یک‌جا پیام جا می‌اندازد). تسکی که در ماه‌های بعد دوباره منشن شود زیر همان ردیف قبلی می‌آید و «دوباره منشن شد» می‌گیرد. بعد از هر ایمپورت، بازه‌ی بعدی خودش پیشنهاد می‌شود.', 'Read one week at a time, in order. A task mentioned again later lands on its earlier row. The next range is suggested after each import.')}</p>
       {showPrompt && <pre dir="rtl" className="mb-3 max-h-72 overflow-auto whitespace-pre-wrap rounded-2xl bg-muted/60 p-3 text-[0.6875rem] leading-6">{prompt}</pre>}
-      <textarea value={raw} onChange={(e) => setRaw(e.target.value)} rows={6} dir="ltr" placeholder={L('جواب Claude (همه‌ی بخش‌ها، پشت سر هم) را اینجا بچسبانید…', 'Paste Claude’s answer (all parts) here…')} className="input w-full py-2 font-mono text-[0.6875rem] leading-5" />
+      <textarea value={raw} onChange={(e) => setRaw(e.target.value)} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { if (e.dataTransfer.files?.length) { e.preventDefault(); void readFiles(e.dataTransfer.files) } }} rows={6} dir="ltr" placeholder={L('فایل(های) JSON که Claude ساخته را اینجا بکشید، یا جوابش را بچسبانید…', 'Drop the JSON file(s) Claude made here, or paste its answer…')} className="input w-full py-2 font-mono text-[0.6875rem] leading-5" />
       <div className="mt-2 flex flex-wrap items-center gap-3">
         <label className="btn-ghost btn-sm cursor-pointer text-sub">
-          <Paperclip size={13} /> {L('یا فایل', 'or a file')}
-          <input type="file" accept=".json,.txt,application/json,text/plain" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void f.text().then(setRaw); e.target.value = '' }} />
+          <Paperclip size={13} /> {L('انتخاب فایل(ها)', 'Choose file(s)')}
+          <input type="file" multiple accept=".json,.txt,application/json,text/plain" className="hidden" onChange={(e) => { void readFiles(e.target.files); e.target.value = '' }} />
         </label>
         {stats && parsed && (
           <span className="num text-xs text-sub">

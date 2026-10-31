@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { KeyRound, Plus, Pencil, Lock } from 'lucide-react'
+import { KeyRound, Plus, Pencil, Lock, Trash2 } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { useEditor } from '../components/Editor'
 import { Band, Card, Overlap, StatStrip, Avatar, cx } from '../components/ui'
@@ -94,6 +94,7 @@ export default function Admin({ initial = 'people' }: { initial?: Tab }) {
         {tab === 'planning' && <Settings embedded section="planning" />}
         {tab === 'mizito' && <Settings embedded section="mizito" />}
         {tab === 'settings' && <Settings embedded section="general" />}
+        {tab === 'settings' && access === 'super' && <WipeCard />}
       </Overlap>
     </>
   )
@@ -278,6 +279,48 @@ function ProjectsAdmin() {
           </tbody>
         </table>
       </div>
+    </Card>
+  )
+}
+
+/** Starting over: Mizito only, all work, or everything but people, contacts and settings. */
+function WipeCard() {
+  const { action, toast, refresh } = useStore()
+  const [scope, setScope] = useState<'mizito' | 'work' | 'all'>('mizito')
+  const [busy, setBusy] = useState(false)
+  const what = {
+    mizito: L('همه‌ی داده‌های میزیتو (تسک‌ها، منشن‌ها، گفتگوها و لاگشان)', 'All Mizito data'),
+    work: L('همه‌ی کارها: تسک‌ها، پیگیری‌ها، جلسات، اسپرینت‌ها، برنامه‌ها، کارتابل‌ها، یادداشت‌ها، کامنت‌ها، لاگ و میزیتو', 'All work: tasks, follow-ups, meetings, sprints, plans, cartables, notes, comments, log and Mizito'),
+    all: L('همه‌چیز جز افراد، اشخاص و تنظیمات (پروژه‌ها، OKR و شاخص‌ها هم)', 'Everything but people, contacts and settings (projects, OKRs and KPIs too)'),
+  }
+  const go = async () => {
+    const word = L('پاک کن', 'delete')
+    const typed = window.prompt(L(`پاک می‌شود: ${what[scope]}.\nبرگشت ندارد (فقط از تاریخچه‌ی نسخه‌های گوگل‌شیت).\n\nبرای تأیید بنویسید: ${word}`, `This deletes: ${what[scope]}. Type “${word}” to confirm.`))
+    if (typed === null) return
+    if (typed.trim() !== word) return toast(L('تأیید نشد؛ چیزی پاک نشد', 'Not confirmed; nothing deleted'), 'err')
+    setBusy(true)
+    try {
+      await action('wipeData', { scope })
+      toast(L('پاک شد؛ از اول شروع کنید', 'Deleted; start afresh'))
+      await refresh()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e), 'err')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Card className="mt-4" eyebrow={L('داده‌ها', 'Data')} title={L('پاک کردن داده‌ها و شروع از صفر', 'Delete data and start over')}>
+      <div className="space-y-2 text-sm">
+        {(['mizito', 'work', 'all'] as const).map((k) => (
+          <label key={k} className="flex cursor-pointer items-start gap-2">
+            <input type="radio" className="mt-1.5" checked={scope === k} onChange={() => setScope(k)} />
+            <span className="leading-7">{what[k]}</span>
+          </label>
+        ))}
+      </div>
+      <p className="mt-2 text-xs leading-6 text-sub">{L('افراد، رمزها، اشخاص و رده‌ها و همه‌ی تنظیمات همیشه می‌مانند. اگر اشتباه شد، از File ← Version history در گوگل‌شیت برمی‌گردد.', 'People, passwords, contacts and settings always stay. If it was a mistake, restore from the sheet’s version history.')}</p>
+      <button className="btn-outline btn-sm mt-3 border-bad/40 text-bad" disabled={busy} onClick={go}><Trash2 size={13} /> {busy ? L('در حال پاک کردن…', 'Deleting…') : L('پاک کردن', 'Delete')}</button>
     </Card>
   )
 }

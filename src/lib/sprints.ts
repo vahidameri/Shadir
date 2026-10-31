@@ -9,16 +9,20 @@ import { L, lbl, type T2 } from './i18n'
 import { addDays, daysBetween, todayISO } from './jalali'
 import { catOf, closed } from './columns'
 import { teamOf } from './teams'
+import { isWorkday } from './weeks'
+import { assigneesOf } from './assignees'
+import { capOf } from './capacity'
 
-export const SPRINT_KEYS = { teams: 'sprint.teams', days: 'sprint.days', prefix: 'sprint.prefix' } as const
-export interface SprintCfg { teams: string[]; days: number; prefix: string }
-let cfg: SprintCfg = { teams: [], days: 14, prefix: 'TECH' }
+export const SPRINT_KEYS = { teams: 'sprint.teams', days: 'sprint.days', prefix: 'sprint.prefix', perDay: 'sprint.points_per_day' } as const
+/** perDay: story points one full-time person finishes in a working day (for capacity) */
+export interface SprintCfg { teams: string[]; days: number; prefix: string; perDay: number }
+let cfg: SprintCfg = { teams: [], days: 14, prefix: 'TECH', perDay: 1 }
 export const sprintCfg = () => cfg
 export function readSprintCfg(get: (k: string) => string | undefined): SprintCfg {
   const set = String(get(SPRINT_KEYS.teams) || '').split(',').map((x) => x.trim()).filter(Boolean)
   // until it is set, any team whose id or name says "tech" works in sprints
   const teams = set.length ? set : TRACKS.filter((t) => /tech|dev|eng|فنی|فناوری/i.test(`${t} ${lbl(TRACK, t)}`))
-  return { teams, days: Number(get(SPRINT_KEYS.days)) || 14, prefix: String(get(SPRINT_KEYS.prefix) || 'TECH').trim().toUpperCase() }
+  return { teams, days: Number(get(SPRINT_KEYS.days)) || 14, prefix: String(get(SPRINT_KEYS.prefix) || 'TECH').trim().toUpperCase(), perDay: Number(get(SPRINT_KEYS.perDay)) || 1 }
 }
 export const setSprintCfg = (c: SprintCfg) => (cfg = c)
 export const sprintTeam = (team: string) => !!team && cfg.teams.includes(team)
@@ -144,4 +148,53 @@ export function nextSprintDraft(db: DB, team: string) {
   const start = last && last.end_date >= todayISO() ? addDays(last.end_date, 1) : todayISO()
   const n = all.length + 1
   return { team, name: L(`اسپرینت ${n}`, `Sprint ${n}`), start_date: start, end_date: addDays(start, cfg.days - 1), status: 'planned', goal: '', committed_points: 0, completed_points: 0, project_id: '' }
+}
+
+/** Working days between two dates (both included), by the week settings. */
+export function workdaysBetween(from: string, to: string) {
+  let n = 0
+  for (let d = from; d && d <= to; d = addDays(d, 1)) if (isWorkday(d)) n++
+  return n
+}
+
+export interface MemberLoad {
+  name: string
+  tasks: Task[]
+  open: number
+  points: number
+  done: number
+  /** points this person can take in the sprint: working days × availability × points per day */
+  capacity: number
+  /** points ÷ capacity, % */
+  load: number
+}
+
+/**
+ * Each person's share of a sprint: the team's people and anyone holding a task in it. A task counts
+ * for its first assignee; capacity is the sprint's working days × their availability (Team.capacity %)
+ * × the points one person finishes in a day (sprint settings).
+ */
+export function memberLoads(db: DB, s: Sprint): MemberLoad[] {
+  const tasks = tasksIn(db, s)
+  const days = s.start_date && s.end_date ? workdaysBetween(s.start_date, s.end_date) : 0
+  const names = new Set<string>(db.Team.filter((m) => m.track === s.team && String(m.active) !== 'false').map((m) => m.name))
+  tasks.forEach((t) => { const a = assigneesOf(t)[0]; if (a) names.add(a) })
+  const out = [...names].map((name) => {
+    const mine = tasks.filter((t) => assigneesOf(t)[0] === name)
+    const m = db.Team.find((x) => x.name === name)
+    const capacity = Math.round(days * ((m ? capOf(m) : 100) / 100) * cfg.perDay * 10) / 10
+    const points = mine.reduce((a, t) => a + pts(t), 0)
+    return {
+      name,
+      tasks: mine,
+      open: mine.filter((t) => !closed(t)).length,
+      points,
+      done: mine.filter((t) => closed(t)).reduce((a, t) => a + pts(t), 0),
+      capacity,
+      load: capacity ? Math.round((points / capacity) * 100) : points ? 999 : 0,
+    }
+  })
+  const unassigned = tasks.filter((t) => !assigneesOf(t)[0])
+  if (unassigned.length) out.push({ name: '', tasks: unassigned, open: unassigned.filter((t) => !closed(t)).length, points: unassigned.reduce((a, t) => a + pts(t), 0), done: 0, capacity: 0, load: 0 })
+  return out.sort((a, b) => (a.name ? 0 : 1) - (b.name ? 0 : 1) || b.load - a.load)
 }

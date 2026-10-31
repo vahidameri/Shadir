@@ -9,7 +9,8 @@ import { useStore } from '../lib/store'
 import { useEditor } from '../components/Editor'
 import { Band, Card, Empty, Overlap, Progress, StatStrip, Tabs, cx } from '../components/ui'
 import { Kanban } from '../components/widgets'
-import { Burndown, CompleteSprint, Velocity, WorkRow } from '../components/SprintParts'
+import { Burndown, CompleteSprint, SprintCapacity, Velocity, WorkRow } from '../components/SprintParts'
+import { assigneesOf } from '../lib/assignees'
 import { teamName } from '../components/TeamParts'
 import { L } from '../lib/i18n'
 import { fa, fmtDayMonth, todayISO } from '../lib/jalali'
@@ -35,6 +36,8 @@ export default function Sprints() {
   }
   const [closing, setClosing] = useState<Sprint | null>(null)
   const [quick, setQuick] = useState('')
+  // one person's cards on the board
+  const [who, setWho] = useState('')
 
   if (!team) {
     return (
@@ -147,7 +150,8 @@ export default function Sprints() {
                     <Burndown s={active} height={140} />
                   </Card>
                 </div>
-                <Kanban tasks={st.tasks} defaults={{ sprint_id: active.id, track: team, issue_type: 'story' }} />
+                <SprintCapacity s={active} who={who} onWho={setWho} />
+                <Kanban tasks={who ? st.tasks.filter((t) => assigneesOf(t)[0] === who) : st.tasks} defaults={{ sprint_id: active.id, track: team, issue_type: 'story', ...(who ? { assignee: who } : {}) }} />
               </div>
             ) : (
               <div className="card p-6">
@@ -175,6 +179,7 @@ export default function Sprints() {
                       {canEdit && s.status === 'planned' && <button className="btn-primary btn-sm" disabled={!!active} title={active ? L('یک اسپرینت در جریان است', 'A sprint is running') : undefined} onClick={() => start(s)}><Play size={13} /> {L('شروع اسپرینت', 'Start sprint')}</button>}
                     </header>
                     {ss.tasks.length ? <div className="divide-y divide-line">{ss.tasks.map((t) => <WorkRow key={t.id} t={t} sprints={live} onMove={(id) => move(t, id)} />)}</div> : <div className="px-4 py-4 text-xs text-sub">{L('کاری در این اسپرینت نیست؛ از بک‌لاگ اضافه کنید.', 'Nothing in this sprint yet; add from the backlog.')}</div>}
+                    {s.status === 'planned' && <div className="border-t border-line p-3"><SprintCapacity s={s} /></div>}
                   </section>
                 )
               })}

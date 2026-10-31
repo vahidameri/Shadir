@@ -103,7 +103,7 @@ async function post(c: Config, body: Record<string, unknown>) {
   // 60s, or 3 minutes for an upload
   const ctl = new AbortController()
   // long jobs (an upload, merging duplicates, importing, a big multi-save) get more time
-  const long = ['upload', 'mzDedupe', 'mzImport', 'mzReset', 'upsertMany'].includes(String(body.action))
+  const long = ['upload', 'mzDedupe', 'mzImport', 'mzReset', 'upsertMany', 'wipeData'].includes(String(body.action))
   const timer = setTimeout(() => ctl.abort(), long ? 300000 : 60000)
   let res: Response
   try {

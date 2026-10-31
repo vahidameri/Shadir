@@ -6,11 +6,11 @@ import { Link } from 'react-router-dom'
 import { Bug, BookOpen, CheckSquare, FlaskConical } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { useEditor } from './Editor'
-import { Avatar, StatusIcon, cx } from './ui'
+import { Avatar, Card, StatusIcon, cx } from './ui'
 import { L, tr } from '../lib/i18n'
 import { fa, fmtDayMonth } from '../lib/jalali'
 import { nowStamp } from '../lib/taskstamp'
-import { ISSUE, burndown, plannedSprints, pts, sprintStats } from '../lib/sprints'
+import { ISSUE, burndown, memberLoads, plannedSprints, pts, sprintCfg, sprintStats, workdaysBetween } from '../lib/sprints'
 import { assigneesOf } from '../lib/assignees'
 import { statusLabel } from '../lib/columns'
 import type { IssueType, Sprint, Task } from '../lib/types'
@@ -183,5 +183,49 @@ export function CompleteSprint({ s, onClose }: { s: Sprint; onClose: () => void 
         </div>
       </div>
     </div>
+  )
+}
+
+/** Who holds what in a sprint, against what they can take in its dates; a click shows only their cards. */
+export function SprintCapacity({ s, who, onWho }: { s: Sprint; who?: string; onWho?: (name: string) => void }) {
+  const { db } = useStore()
+  const rows = memberLoads(db, s)
+  const days = s.start_date && s.end_date ? workdaysBetween(s.start_date, s.end_date) : 0
+  return (
+    <Card
+      eyebrow={L('ظرفیت افراد', 'People & capacity')}
+      title={L(`${fa(days)} روز کاری · ${fa(sprintCfg().perDay)} امتیاز در روز برای هر نفرِ تمام‌وقت`, `${days} working days · ${sprintCfg().perDay} pt/day per full-time person`)}
+      action={who && onWho ? <button className="btn-ghost btn-sm" onClick={() => onWho('')}>{L('همه', 'Everyone')}</button> : undefined}
+    >
+      <ul className="space-y-1.5">
+        {rows.map((r) => (
+          <li key={r.name || '-'}>
+            <button
+              className={cx('grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 rounded-xl px-2 py-1.5 text-start transition hover:bg-muted/60', who === r.name && 'bg-brand-soft/40')}
+              onClick={() => onWho?.(who === r.name ? '' : r.name)}
+            >
+              {r.name ? <Avatar name={r.name} size="sm" /> : <span className="h-7 w-7 rounded-full bg-muted" />}
+              <span className="min-w-0">
+                <span className="flex items-baseline justify-between gap-2 text-sm">
+                  <span className="truncate">{r.name || L('بدون مسئول', 'Unassigned')}</span>
+                  <span className="num shrink-0 text-[0.6875rem] text-sub">
+                    {L(`${fa(r.tasks.length)} کار (${fa(r.open)} باز)`, `${r.tasks.length} items (${r.open} open)`)}
+                  </span>
+                </span>
+                {r.name && (
+                  <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-ink/[0.07]">
+                    <span className={cx('block h-full rounded-full', r.load > 100 ? 'bg-bad' : r.load > 85 ? 'bg-warn' : 'bg-good')} style={{ width: `${Math.min(100, r.load)}%` }} />
+                  </span>
+                )}
+              </span>
+              <span className={cx('num w-24 shrink-0 text-end text-xs', r.load > 100 ? 'font-semibold text-bad' : 'text-sub')}>
+                {r.name ? L(`${fa(r.points)} از ${fa(r.capacity)} امتیاز`, `${r.points} / ${r.capacity} pts`) : L(`${fa(r.points)} امتیاز`, `${r.points} pts`)}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {rows.some((r) => r.load > 100) && <p className="mt-2 text-xs text-bad">{L('سرخ = بیش از ظرفیت در این بازه؛ کاری را به نفر دیگر یا اسپرینت بعد بدهید.', 'Red = over capacity in these dates.')}</p>}
+    </Card>
   )
 }

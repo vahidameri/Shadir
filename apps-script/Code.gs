@@ -18,7 +18,7 @@
  *   viewer — read only (leadership)
  */
 
-var MADAR_VERSION = '2.7.0'; // shown on the login page and by diagnose()
+var MADAR_VERSION = '2.8.0'; // shown on the login page and by diagnose()
 
 var SCHEMA = {
   Projects: ['id', 'code', 'name', 'description', 'category', 'owner', 'client', 'liaison', 'liaison_contact', 'status', 'priority', 'phase', 'start_date', 'end_date', 'progress', 'health_override', 'objective', 'paused_at', 'pause_reason', 'delivery_day', 'last_delivery', 'archived', 'archived_at', 'links', 'team', 'kind', 'batch'],
@@ -169,6 +169,11 @@ function doPost(e) {
       if (user.access !== 'super' && user.access !== 'exec') throw new Error('فقط مدیر برنامه و CPTO');
       lock.waitLock(30000);
       return json_({ ok: true, row: mzDedupe_(!!body.dry) });
+    }
+    if (body.action === 'wipeData') {
+      if (user.access !== 'super') throw new Error('فقط مدیر برنامه داده‌ها را پاک می‌کند');
+      lock.waitLock(30000);
+      return json_({ ok: true, row: wipeData_(String(body.scope || ''), user) });
     }
     if (body.action === 'mzReset') {
       if (user.access !== 'super') throw new Error('فقط مدیر برنامه به این بخش دسترسی دارد');
@@ -2295,6 +2300,21 @@ function deleteRows_(name, ids) {
 // oldest mention first. Row ids are MZ-<Mizito id>, so comments, files and cartable items written
 // in Madar find their task again once it is back.
 // --------------------------------------------------------------------------
+
+/**
+ * Starting over. scope: mizito = Mizito only; work = everything that is work (tasks, follow-ups,
+ * meetings, sprints, plans, the log, cartables…) and Mizito; all = every tab but people (Team),
+ * contacts and settings. Projects, OKRs and KPIs go only with «all».
+ */
+var WIPE_WORK_ = ['Tasks', 'FollowUps', 'Comments', 'Files', 'History', 'Handoffs', 'Cartable', 'Todos', 'Meetings', 'Updates', 'Checkins', 'Plans', 'Sprints', 'Deliveries', 'Deliverables', 'Milestones', 'Risks', 'Scope', 'Allocations'];
+function wipeData_(scope, user) {
+  if (['mizito', 'work', 'all'].indexOf(scope) === -1) throw new Error('بازه‌ی پاک کردن نامعلوم است');
+  var out = { scope: scope, mizito: mzReset_(user) };
+  var tabs = scope === 'work' ? WIPE_WORK_ : scope === 'all' ? Object.keys(SCHEMA).filter(function (n) { return ['Team', 'Config', 'Contacts', 'Mizito', 'MizitoMentions', 'MizitoComments'].indexOf(n) === -1; }) : [];
+  tabs.forEach(function (n) { out[n] = keepRows_(n, function () { return false; }); });
+  log_(user, 'wipe ' + scope, 'all', JSON.stringify(out).slice(0, 400));
+  return out;
+}
 
 /** Keeps the rows keep() says yes to; returns how many went. One read and one write per tab. */
 function keepRows_(name, keep) {

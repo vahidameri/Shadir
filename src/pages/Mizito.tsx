@@ -11,7 +11,7 @@ import { useStore } from '../lib/store'
 import { Band, Card, Empty, FilterSelect, Overlap, SearchInput, Segmented, Sheet, StatStrip, cx } from '../components/ui'
 import { L } from '../lib/i18n'
 import { fa, fmtDate, timeAgo } from '../lib/jalali'
-import { MZ_KEYS, MZ_VIEWS, agentRun, changeUnseen, firstFor, firstMzStatus, isExecTier, mzFlags as flagsOf, recentlyChanged, inMzView, isMizitoLink, mzCat, mzCfg, mzFlags, mzSignals, optLabel, statusById, tierById, type MzView } from '../lib/mizito'
+import { MZ_KEYS, MZ_VIEWS, agentRun, lastAsker, mzClosed, changeUnseen, firstFor, firstMzStatus, isExecTier, mzFlags as flagsOf, recentlyChanged, inMzView, isMizitoLink, mzCat, mzCfg, mzFlags, mzSignals, optLabel, statusById, tierById, type MzView } from '../lib/mizito'
 import { daysFromToday } from '../lib/jalali'
 import { CaptureSheet, MzBadges, MizitoImport, MizitoSettings, MizitoSheet, MzLink, MzSignals, MzStatusChip, PBadge, useReminder } from '../components/MizitoParts'
 import type { MizitoItem } from '../lib/types'
@@ -21,6 +21,12 @@ const VIEW_LABEL: Record<MzView, [string, string]> = {
   waiting: ['منتظر / مسدود', 'Waiting / blocked'], stale: ['راکد', 'Quiet'], mine_cpto: ['', ''], mine_pgm: ['', ''], closed: ['بسته‌شده', 'Closed'], all: ['همه', 'All'],
 }
 type Group = '' | 'asker' | 'category' | 'p' | 'status' | 'assigned'
+
+/** What needs eyes now: open and P0, past its SLA, or a fresh ask from the senior tiers. */
+function important(m: MizitoItem, s: ReturnType<typeof mzSignals>) {
+  if (mzClosed(m)) return false
+  return s.p === 0 || s.breached || (isExecTier(s.tier) && (m.review === 'new' || !!m.mz_again || changeUnseen(m)))
+}
 
 export default function MizitoPage() {
   const { db, canEdit, access, me, upsert, upsertMany, toast, setting } = useStore()
@@ -36,6 +42,7 @@ export default function MizitoPage() {
   const group = get('g') as Group
   const who = get('who')
   const cat = get('cat')
+  const act = get('act')
   const [q, setQ] = useState('')
   const [capture, setCapture] = useState<false | string>(false)
   const openId = get('id')
@@ -71,7 +78,7 @@ export default function MizitoPage() {
     const exec = isExecTier(mzSignals(db, m).tier)
     return badge === 'key' ? key : badge === 'exec' ? exec : badge === 'any' ? key || exec : true
   }
-  const base = db.Mizito.filter((m) => (!who || m.mentioned.split(',').map((x) => x.trim()).includes(who)) && (!cat || m.category === cat) && hasBadge(m) && (!q || [m.title, m.description, m.asked_by, m.assigned_to, m.outcome].some((v) => String(v || '').includes(q))))
+  const base = db.Mizito.filter((m) => (!who || m.mentioned.split(',').map((x) => x.trim()).includes(who)) && (!cat || m.category === cat) && (!act || m.action === act) && hasBadge(m) && (!q || [m.title, m.description, m.asked_by, m.assigned_to, m.outcome].some((v) => String(v || '').includes(q))))
   const counts = Object.fromEntries(MZ_VIEWS.map((v) => [v, base.filter((m) => inMzView(db, m, v, sig.get(m.id))).length])) as Record<MzView, number>
   const list = base
     .filter((m) => inMzView(db, m, view, sig.get(m.id)))
@@ -184,6 +191,7 @@ export default function MizitoPage() {
           <SearchInput value={q} onChange={setQ} />
           <Segmented value={(who || '') as string} onChange={(v) => set('who', v)} options={[{ value: '', label: L('همه', 'Everyone') }, ...leaders.map((n) => ({ value: n, label: n === me ? L(`${n} (من)`, `${n} (me)`) : n }))]} />
           <FilterSelect value={cat} onChange={(v) => set('cat', v)} placeholder={L('همه‌ی دسته‌ها', 'All categories')} options={c.categories.map((x) => ({ value: x.id, label: optLabel(x) }))} />
+          <FilterSelect value={act} onChange={(v) => set('act', v)} placeholder={L('همه‌ی نوع‌ها', 'All kinds')} options={c.actions.map((x) => ({ value: x.id, label: optLabel(x) }))} />
           <FilterSelect
             value={badge}
             onChange={(v) => set('b', v)}
@@ -227,6 +235,16 @@ export default function MizitoPage() {
             <span className="text-sm font-medium">{L(`${fa(picked.size)} مورد انتخاب شد`, `${picked.size} selected`)}</span>
             <button className="btn-ghost btn-sm" onClick={() => setPicked(new Set())}>{L('لغو انتخاب', 'Clear')}</button>
             <CartableMany items={[...picked].map((id) => db.Mizito.find((x) => x.id === id)).filter(Boolean).map((m) => ({ entity: 'Mizito', entity_id: m!.id, title: m!.title, due_date: m!.due_date }))} onDone={() => setPicked(new Set())} />
+            <select className="input h-8 w-auto text-xs" value="" onChange={(e) => e.target.value && void upsertMany('Mizito', [...picked].map((id) => db.Mizito.find((x) => x.id === id)).filter(Boolean).map((m) => ({ ...m!, action: e.target.value === '-' ? '' : e.target.value }))).then(() => setPicked(new Set()))}>
+              <option value="">{L('نوع…', 'Kind…')}</option>
+              {c.actions.map((x) => <option key={x.id} value={x.id}>{optLabel(x)}</option>)}
+              <option value="-">{L('بدون نوع', 'None')}</option>
+            </select>
+            <select className="input h-8 w-auto text-xs" value="" onChange={(e) => e.target.value && void upsertMany('Mizito', [...picked].map((id) => db.Mizito.find((x) => x.id === id)).filter(Boolean).map((m) => ({ ...m!, category: e.target.value === '-' ? '' : e.target.value }))).then(() => setPicked(new Set()))}>
+              <option value="">{L('دسته…', 'Category…')}</option>
+              {c.categories.map((x) => <option key={x.id} value={x.id}>{optLabel(x)}</option>)}
+              <option value="-">{L('بدون دسته', 'None')}</option>
+            </select>
             <span className="text-xs text-sub">{L('پرچم:', 'Flag:')}</span>
             <FlagPicker value="" onChange={(f) => void upsertMany('Mizito', [...picked].map((id) => db.Mizito.find((x) => x.id === id)).filter(Boolean).map((m) => ({ ...m!, flag: f }))).then(() => setPicked(new Set()))} />
             <span className="text-xs text-sub">{L('وضعیت:', 'Status:')}</span>
@@ -276,6 +294,14 @@ export default function MizitoPage() {
                     return (
                       <div key={m.id} onClick={() => set('id', m.id)} className={cx('group flex cursor-pointer items-start gap-3 px-4 py-3 transition hover:bg-muted/40', s.p === 0 && 'bg-bad/[0.03]', picked.has(m.id) && 'bg-brand-soft/30')}>
                         {canEdit && <input type="checkbox" className="mt-1.5" checked={picked.has(m.id)} onClick={(e) => e.stopPropagation()} onChange={() => togglePick(m.id)} aria-label={L('انتخاب', 'Select')} />}
+                        {important(m, s) ? (
+                          <span className="relative mt-2 inline-flex h-2.5 w-2.5 shrink-0" title={L('مهم: P0، عبور از SLA یا درخواست تازه‌ی مدیر ارشد', 'Important: P0, SLA breached or a fresh senior ask')}>
+                            <span className="absolute inset-0 animate-ping rounded-full bg-bad opacity-60" />
+                            <span className="relative h-2.5 w-2.5 rounded-full bg-bad" />
+                          </span>
+                        ) : (
+                          <span className="w-2.5 shrink-0" />
+                        )}
                         <PBadge p={s.p} />
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
@@ -298,16 +324,25 @@ export default function MizitoPage() {
                             )}
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-2 text-[0.6875rem] text-sub">
-                            {m.asked_by && (
-                              <span className="inline-flex items-center gap-1">
-                                {s.tier && <span className="h-2 w-2 rounded-full" style={{ background: s.tier.color }} title={optLabel(s.tier)} />}
-                                <b dir={dirOf(m.asked_by)} className="font-medium text-ink">{m.asked_by}</b>
+                            {lastAsker(m) && (
+                              <span className="inline-flex items-center gap-1" title={L('SLA و رده از آخرین منشن حساب می‌شود', 'SLA and rank follow the latest mention')}>
+                                {s.tier && <span className="h-2 w-2 rounded-full" style={{ background: s.tier.color }} />}
+                                {L('آخرین منشن:', 'last mention:')} <b dir={dirOf(lastAsker(m))} className="font-medium text-ink">{lastAsker(m)}</b>
                                 {s.tier && <span>({optLabel(s.tier)})</span>}
+                                {m.last_mention_at && <span>· {timeAgo(new Date(String(m.last_mention_at).replace(' ', 'T')))}</span>}
                               </span>
                             )}
+                            {m.mz_owner && m.mz_owner !== lastAsker(m) && <span>· {L('ایجادکننده:', 'created by:')} {m.mz_owner}</span>}
                             {m.mz_project && <span>· {m.mz_project}</span>}
                             {m.category && <span>· {optLabel(c.categories.find((x) => x.id === m.category))}</span>}
-                            {m.action && <span>· {optLabel(c.actions.find((x) => x.id === m.action))}</span>}
+                            {canEdit ? (
+                              <select value={m.action || ''} onClick={(e) => e.stopPropagation()} onChange={(e) => void upsert('Mizito', { ...m, action: e.target.value })} aria-label={L('نوع', 'Kind')} className={cx('h-6 rounded-full border-0 px-2 text-[0.6875rem]', m.action ? 'bg-brand/10 font-medium text-brand' : 'bg-muted text-sub')}>
+                                <option value="">{L('نوع؟', 'Kind?')}</option>
+                                {c.actions.map((x) => <option key={x.id} value={x.id}>{optLabel(x)}</option>)}
+                              </select>
+                            ) : (
+                              m.action && <span>· {optLabel(c.actions.find((x) => x.id === m.action))}</span>
+                            )}
                             <span>· {L('منشن', 'mentioned')} {fmtDate(firstFor(m, who))}</span>
                             {s.mentions > 1 && <span>· {L(`${fa(s.mentions)} بار منشن`, `${s.mentions} mentions`)}</span>}
                             {m.assigned_to && <span>· {L('سپرده به', 'with')} {m.assigned_to}</span>}

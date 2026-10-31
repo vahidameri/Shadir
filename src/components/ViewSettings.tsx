@@ -107,6 +107,7 @@ export function SprintSettingsCard({ admin }: { admin: boolean }) {
       <p className="mt-2 text-xs leading-6 text-sub">{L('کارهای این تیم‌ها نوع کار، امتیاز، اسپرینت و کلید خوانا (مثل TECH-42) می‌گیرند.', 'Work of these teams gets an issue type, points, a sprint and a readable key (e.g. TECH-42).')}</p>
       <div className="mt-4 space-y-3">
         <NumField label={L('طول پیش‌فرض اسپرینت', 'Default sprint length')} hint={L('برای اسپرینت جدید', 'For a new sprint')} value={c.days} unit={L('روز', 'days')} disabled={!admin} onSave={(v) => setSetting(SPRINT_KEYS.days, String(v))} />
+        <NumField label={L('امتیاز در روز (هر نفر تمام‌وقت)', 'Points per day (full-time person)')} hint={L('برای ظرفیت افراد در اسپرینت: روزهای کاری × درصد حضور × این عدد', 'Capacity = working days × availability × this')} value={c.perDay} unit={L('امتیاز', 'pts')} disabled={!admin} onSave={(v) => setSetting(SPRINT_KEYS.perDay, String(v))} />
         <div className="flex items-center justify-between gap-4">
           <div>
             <div className="text-sm font-medium">{L('پیشوند کلید کارها', 'Key prefix')}</div>
