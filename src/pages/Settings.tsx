@@ -13,7 +13,7 @@ import { L, lbl, tr, useI18n } from '../lib/i18n'
 import { ROLE } from '../lib/labels'
 import { APP_NAME } from '../lib/brand'
 import { WEEK_KEYS, weekCfg } from '../lib/weeks'
-import { CalendarLayersCard, DashboardWidgetsCard, SprintSettingsCard, TeamHealthCard } from '../components/ViewSettings'
+import { CalendarLayersCard, DashboardWidgetsCard, SprintSettingsCard, TaskViewsCard, TeamHealthCard } from '../components/ViewSettings'
 import { ColumnsCard, FieldsCard, FlagsCard, NotifyCard, Switch, TaskCard } from '../components/TaskSettings'
 
 /** Settings; in the back office one module at a time (section), on its own page everything. */
@@ -86,6 +86,7 @@ export default function Settings({ embedded, section }: { embedded?: boolean; se
         {show('tasks') && <TaskCard admin={admin} />}
         {show('tasks') && <FieldsCard admin={admin} />}
         {show('tasks') && <ColumnsCard admin={admin} />}
+        {show('tasks') && <TaskViewsCard admin={admin} />}
         {show('tasks') && <FlagsCard admin={admin} />}
         {show('planning') && <DashboardWidgetsCard admin={admin} />}
         {show('planning') && <TeamHealthCard admin={admin} />}

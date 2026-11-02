@@ -18,7 +18,7 @@
  *   viewer — read only (leadership)
  */
 
-var MADAR_VERSION = '2.9.0'; // shown on the login page and by diagnose()
+var MADAR_VERSION = '2.10.0'; // shown on the login page and by diagnose()
 
 var SCHEMA = {
   Projects: ['id', 'code', 'name', 'description', 'category', 'owner', 'client', 'liaison', 'liaison_contact', 'status', 'priority', 'phase', 'start_date', 'end_date', 'progress', 'health_override', 'objective', 'paused_at', 'pause_reason', 'delivery_day', 'last_delivery', 'archived', 'archived_at', 'links', 'team', 'kind', 'batch'],
@@ -2407,7 +2407,15 @@ function mzImport_(body, user) {
       t.key = String((withLink || same[0]).mz_key).replace(/^.*_sl/i, '');
     }
   });
+  // «update» mode: only tasks Madar already has; anything else in the answer is left out
+  var skipped = 0;
+  if (body.updateOnly) {
+    var known = {};
+    (rawAll_().Mizito || []).forEach(function (x) { if (x.mz_key) known[String(x.mz_key).replace(/^.*_sl/i, '')] = 1; });
+    items = items.filter(function (t) { var ok = !!known[String(t.key)]; if (!ok) skipped++; return ok; });
+  }
   var r = mzIngest_({ items: items, version: 'import' }, { name: account });
+  r.skipped = skipped;
   if (body.last) {
     var patch = { done_at: mzNow_(), via: 'import', run: { tasks: Number(body.total) || items.length } };
     // how far this person's import has got (the next range starts the day after)

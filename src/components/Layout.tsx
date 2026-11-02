@@ -7,6 +7,7 @@ import {
   Sparkles, CheckCircle2, AlertCircle, Bell, PanelLeftClose, PanelLeftOpen, Languages, Star, AtSign, Flag, Clock, CircleAlert, Ban, CalendarDays, Keyboard, CalendarRange, UserRound, LogOut, PackageCheck, Repeat,
   LayoutDashboard, Target, Gauge, Zap, GanttChart, FileBarChart,
   Inbox,
+  ChevronDown,
 } from 'lucide-react'
 import { useStore, clearSnaps } from '../lib/store'
 import { useI18n, L } from '../lib/i18n'
@@ -98,7 +99,6 @@ export function Layout({ children }: { children: ReactNode }) {
       links: [
         { to: '/my', label: L('میز کار', 'My desk'), icon: Sparkles, badge: myCount },
         ...(can.cartable(access) ? [{ to: '/cartable', label: L('کارتابل', 'Cartable'), icon: Inbox, badge: cartCount }] : []),
-        { to: '/overview', label: L('نمای کلی', 'Overview'), icon: LayoutDashboard },
         { to: '/calendar', label: L('تقویم', 'Calendar'), icon: CalendarDays },
         { to: '/meetings', label: L('جلسات', 'Meetings'), icon: CalendarRange },
       ],
@@ -122,12 +122,14 @@ export function Layout({ children }: { children: ReactNode }) {
         { to: '/resources', label: L('توزیع منابع', 'Resources'), icon: Gauge },
       ],
     },
-    ...(leader
-      ? [{
-          label: L('پایش', 'Watching'),
-          links: [{ to: '/risks', label: L('ریسک‌ها و تصمیم‌ها', 'Risks & decisions'), icon: ShieldAlert }],
-        }]
-      : []),
+    {
+      label: L('پایش', 'Monitoring'),
+      links: [
+        // the department at a glance: teams' health, late and blocked work, Mizito, people's load
+        { to: '/overview', label: L('پایش دپارتمان', 'Department monitor'), icon: LayoutDashboard },
+        ...(leader ? [{ to: '/risks', label: L('ریسک‌ها و تصمیم‌ها', 'Risks & decisions'), icon: ShieldAlert }] : []),
+      ],
+    },
     ...(can.backoffice(access)
       ? [{
           label: L('مدیریت', 'Admin'),
@@ -136,6 +138,23 @@ export function Layout({ children }: { children: ReactNode }) {
       : []),
   ]
 
+  // module groups open and close (remembered); the group of the page you are on is always open
+  const [shut, setShut] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('madar.nav.shut') || '[]')
+    } catch {
+      return []
+    }
+  })
+  const toggleGroup = (label: string) =>
+    setShut((v) => {
+      const n = v.includes(label) ? v.filter((x) => x !== label) : [...v, label]
+      try {
+        localStorage.setItem('madar.nav.shut', JSON.stringify(n))
+      } catch {}
+      return n
+    })
+  const holds = (g: (typeof groups)[number]) => g.links.some((l) => loc.pathname === l.to || loc.pathname.startsWith(l.to + '/') || (!!l.hub && hubOf(loc.pathname) === l.hub))
   const pinned = db.Projects.filter((p) => pins.includes(p.id))
   // Laptops under 1280px get the compact icon rail automatically; the user can still expand it.
   const [narrow, setNarrow] = useState(() => window.innerWidth < 1280)
@@ -164,8 +183,14 @@ export function Layout({ children }: { children: ReactNode }) {
       <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
         {groups.map((g) => (
           <div key={g.label}>
-            {wide && <div dir={dirOf(g.label)} className="mb-1.5 px-3 font-mono text-[0.625rem] uppercase tracking-[0.18em] text-band-sub/80">{g.label}</div>}
-            <div className="space-y-0.5">
+            {wide && (
+              <button onClick={() => toggleGroup(g.label)} className="mb-1.5 flex w-full items-center gap-1.5 px-3 font-mono text-[0.625rem] uppercase tracking-[0.18em] text-band-sub/80 hover:text-white" aria-expanded={!shut.includes(g.label) || holds(g)}>
+                <ChevronDown size={11} className={cx('transition', shut.includes(g.label) && !holds(g) && '-rotate-90 rtl:rotate-90')} />
+                <span dir={dirOf(g.label)}>{g.label}</span>
+                {shut.includes(g.label) && !holds(g) && g.links.some((l) => l.badge) && <span className="ms-auto h-1.5 w-1.5 rounded-full bg-[#c4314b]" />}
+              </button>
+            )}
+            <div className={cx('space-y-0.5', wide && shut.includes(g.label) && !holds(g) && 'hidden')}>
               {g.links.map((l) => (
                 <NavLink
                   key={l.to}

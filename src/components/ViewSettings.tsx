@@ -6,7 +6,7 @@ import { useStore } from '../lib/store'
 import { Card } from './ui'
 import { Switch } from './TaskSettings'
 import { L, tr } from '../lib/i18n'
-import { CAL_KEY, CAL_LAYERS, DASH_KEY, DASH_WIDGETS, readPicks, writePicks, type Choice } from '../lib/views'
+import { CAL_KEY, CAL_LAYERS, DASH_KEY, DASH_WIDGETS, TASK_VIEWS_KEY, TASK_VIEW_CHOICES, readPicks, writePicks, type Choice } from '../lib/views'
 import { TEAM_KEYS, teamCfg } from '../lib/teams'
 import { SPRINT_KEYS, sprintCfg } from '../lib/sprints'
 import { TRACKS } from '../lib/tracks'
@@ -67,6 +67,15 @@ export function DashboardWidgetsCard({ admin }: { admin: boolean }) {
     <Card eyebrow={<span className="flex items-center gap-1.5"><LayoutDashboard size={12} /> {L('نمای کلی', 'Overview')}</span>} title={L('بخش‌های داشبورد', 'Overview sections')}>
       <p className="mb-2 text-xs leading-6 text-sub">{L('هر بخش را روشن یا خاموش کنید و ترتیب نمایش را با فلش‌ها تغییر دهید.', 'Switch each section on or off and reorder them with the arrows.')}</p>
       <Picks admin={admin} cfgKey={DASH_KEY} all={DASH_WIDGETS} order />
+    </Card>
+  )
+}
+
+export function TaskViewsCard({ admin }: { admin: boolean }) {
+  return (
+    <Card eyebrow={L('صفحه‌ی تسک‌ها', 'Tasks page')} title={L('تب‌های صفحه‌ی تسک‌ها', 'Tabs on the Tasks page')}>
+      <p className="mb-2 text-xs leading-6 text-sub">{L('کدام تب‌ها (باز، معوق، در انتظار، انجام‌شده…) و به چه ترتیبی دیده شوند. اسم و تعداد وضعیت‌ها در کارت «وضعیت‌های تسک» است.', 'Which tabs show, in what order. Status names live in «Task statuses».')}</p>
+      <Picks admin={admin} cfgKey={TASK_VIEWS_KEY} all={TASK_VIEW_CHOICES} order />
     </Card>
   )
 }

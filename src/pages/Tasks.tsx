@@ -1,7 +1,9 @@
 import { assigneesOf, isAssignee, joinNames, leadAssignee } from '../lib/assignees'
+import { TASK_VIEWS_KEY, TASK_VIEW_CHOICES, readPicks } from '../lib/views'
+import { Pager, usePaged } from '../components/Paged'
 import { CartableMany } from '../components/CartableParts'
 import { dirOf } from '../lib/dir'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { canPersonal } from '../lib/taskcfg'
 import { useSearchParams } from 'react-router-dom'
 import { Plus, ArrowUpDown, MessageSquare, Link2, Settings2, UserX, Check, XCircle, Rows3, Target, X } from 'lucide-react'
@@ -38,10 +40,16 @@ const VIEW_LABEL: Record<View, [string, string]> = {
 const VIEW_TONE: Partial<Record<View, string>> = { blocked: 'text-bad', late: 'text-bad', flagged: 'text-warn', intake: 'text-sky-600', stale: 'text-sub' }
 
 /** rows drawn at once in the list (the rest with «نمایش بیشتر») */
-const PAGE = 120
+const PAGE = 50
 
 export default function Tasks() {
-  const { db, me, canEdit, upsert, access, toast, upsertMany } = useStore()
+  const { db, me, canEdit, upsert, access, toast, upsertMany, setting } = useStore()
+  // the tabs, as set in the back office (tasks → the Tasks page's tabs); «open» is always there
+  const tabs = (() => {
+    const on = readPicks(setting(TASK_VIEWS_KEY), TASK_VIEW_CHOICES).filter((p) => p.on).map((p) => p.id as View)
+    const list = on.length ? on : VIEWS
+    return list.includes('open') ? list : (['open', ...list] as View[])
+  })()
   const { lang } = useI18n()
   const { open } = useEditor()
   const pname = useProjectName()
@@ -127,18 +135,9 @@ export default function Tasks() {
     return keys.map((k) => ({ key: k, label: label(k), rows: map.get(k)! }))
   }, [list, group, db, pname])
 
-  // a long list is drawn in pages: the first rows at once, the rest on request
-  const [limit, setLimit] = useState(PAGE)
-  useEffect(() => setLimit(PAGE), [project, assignee, status, prio, due, q, sort, track, whose, area, kr, sv, group])
-  const shownGroups = useMemo(() => {
-    let left = limit
-    return groups.map((g) => {
-      const rows = g.rows.slice(0, Math.max(0, left))
-      left -= rows.length
-      return { ...g, shown: rows }
-    })
-  }, [groups, limit])
-  const hidden = list.length - Math.min(list.length, limit)
+  // the list in pages of 50
+  const paged = usePaged(groups, PAGE, [project, assignee, status, prio, due, q, sort, track, whose, area, kr, sv, group])
+  const shownGroups = paged.groups
   const togglePick = (id: string) =>
     setPicked((s) => {
       const n = new Set(s)
@@ -184,7 +183,7 @@ export default function Tasks() {
       />
       <Overlap>
         <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1 no-print">
-          {VIEWS.map((v) => (
+          {tabs.map((v) => (
             <button
               key={v}
               onClick={() => set('v', v === 'open' ? '' : v)}
@@ -394,13 +393,7 @@ export default function Tasks() {
                     ])}
                   </tbody>
                 </table>
-                {hidden > 0 && (
-                  <div className="border-t border-line p-3 text-center">
-                    <button className="btn-outline btn-sm" onClick={() => setLimit((n) => n + PAGE * 2)}>
-                      {L(`نمایش ${fa(Math.min(hidden, PAGE * 2))} تسک دیگر (${fa(hidden)} باقی‌مانده)`, `Show ${Math.min(hidden, PAGE * 2)} more (${hidden} left)`)}
-                    </button>
-                  </div>
-                )}
+                <Pager {...paged} />
               </div>
             )}
           </Card>

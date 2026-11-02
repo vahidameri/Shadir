@@ -128,7 +128,17 @@ export function CartableButton({ source, className }: { source: Source; classNam
 
 /** One item in a cartable. */
 export function CartableRow({ c, onEdit }: { c: CartableItem; onEdit?: () => void }) {
-  const { db, me, upsert, remove, toast } = useStore()
+  const { db, me, upsert, upsertMany, remove, toast } = useStore()
+  // passing an item on to someone else's cartable: it arrives there at once, and here it is closed as forwarded
+  const forward = async (to: string) => {
+    const at = nowStamp()
+    await upsertMany('Cartable', [
+      { ...c, status: 'done', response: L(`ارجاع به ${to}`, `Forwarded to ${to}`), done_at: at },
+      { ...c, id: uid('CB'), owner: to, from: me, status: 'sent', sent_at: at, done_at: '', response: '', period: periodOf(c.box), sort: Date.now(), created_at: at },
+    ])
+    toast(L(`به کارتابل ${to} ارجاع شد`, `Forwarded to ${to}`))
+  }
+  const others = cartableOwners(db).filter((n) => n !== c.owner)
   const { open } = useEditor()
   const [answer, setAnswer] = useState<'' | 'done' | 'returned'>('')
   const [text, setText] = useState('')
@@ -189,6 +199,11 @@ export function CartableRow({ c, onEdit }: { c: CartableItem; onEdit?: () => voi
             <>
               <button className="btn-primary btn-sm" onClick={() => setAnswer('done')}><Check size={14} /> {L('انجام شد', 'Done')}</button>
               {owner && !mine && <button className="btn-outline btn-sm" onClick={() => setAnswer('returned')}><CornerUpLeft size={14} /> {L('برگشت', 'Back')}</button>}
+              {owner && others.map((n) => (
+                <button key={n} className="btn-outline btn-sm" onClick={() => void forward(n)} title={L(`ارجاع به کارتابل ${n}`, `Forward to ${n}`)}>
+                  <Send size={13} className="rtl:-scale-x-100" /> {L(`ارجاع به ${n.split(' ')[0]}`, `To ${n.split(' ')[0]}`)}
+                </button>
+              ))}
             </>
           )}
           {c.status !== 'sent' && c.status !== 'draft' && (owner || mine) && (

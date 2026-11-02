@@ -4,13 +4,15 @@ import { useStore } from '../lib/store'
 import { HubNav } from '../components/HubNav'
 import { useEditor } from '../components/Editor'
 import { Band, Card, Empty, FilterSelect, Overlap, Segmented, Toolbar, Avatar, StatStrip, cx } from '../components/ui'
-import { FollowUpRow } from '../components/shared'
+import { FollowUpRow, TaskRow } from '../components/shared'
+import { closed } from '../lib/columns'
+import { isAssignee } from '../lib/assignees'
 import { addDays, fa, todayISO } from '../lib/jalali'
 import { L } from '../lib/i18n'
 import type { FollowUp } from '../lib/types'
 
 export default function FollowUps() {
-  const { db, canEdit } = useStore()
+  const { db, canEdit, me } = useStore()
   const { open } = useEditor()
   const [project, setProject] = useState('')
   const [person, setPerson] = useState('')
@@ -65,6 +67,7 @@ export default function FollowUps() {
         />
       </Band>
       <Overlap>
+        <ChaseTasks me={me} />
         <div className="card mb-4 p-3">
           <Toolbar className="!mb-0">
             <Segmented value={group} onChange={setGroup} options={[{ value: 'time', label: L('بر اساس زمان', 'By time') }, { value: 'person', label: L('بر اساس فرد', 'By person') }]} />
@@ -107,5 +110,34 @@ export default function FollowUps() {
         )}
       </Overlap>
     </>
+  )
+}
+
+/**
+ * Tasks whose follow-up is mine: open tasks with a reminder date, or that I asked for / watch / reported
+ * while someone else does them. Soonest reminder (then deadline) first.
+ */
+function ChaseTasks({ me }: { me: string }) {
+  const { db } = useStore()
+  const [all, setAll] = useState(false)
+  const today = todayISO()
+  const listed = (v: string | undefined) => String(v || '').split(',').map((x) => x.trim()).includes(me)
+  const rows = db.Tasks.filter((t) => {
+    if (closed(t) || isAssignee(t, me)) return false
+    return !!t.follow_date || t.requested_by === me || t.reporter === me || listed(t.watchers)
+  }).sort((a, b) => (a.follow_date || a.due_date || '9999').localeCompare(b.follow_date || b.due_date || '9999'))
+  if (!rows.length) return null
+  const due = rows.filter((t) => (t.follow_date && t.follow_date <= today) || (t.due_date && t.due_date <= today)).length
+  const shown = all ? rows : rows.slice(0, 8)
+  return (
+    <Card
+      className="mb-4"
+      eyebrow={L('تسک‌هایی که پیگیری‌شان با من است', 'Tasks I follow up')}
+      title={L(`${fa(rows.length)} تسک${due ? ` · ${fa(due)} مورد امروز یا گذشته` : ''}`, `${rows.length} tasks${due ? ` · ${due} due` : ''}`)}
+      action={rows.length > 8 ? <button className="btn-ghost btn-sm" onClick={() => setAll(!all)}>{all ? L('کمتر', 'Less') : L(`همه (${fa(rows.length)})`, `All (${rows.length})`)}</button> : undefined}
+    >
+      <p className="mb-2 text-xs text-sub">{L('تسک‌های باز دیگران که «تاریخ یادآوری» دارند، یا شما درخواست‌کننده، گزارش‌دهنده یا ناظرشان هستید.', 'Others’ open tasks with a reminder date, or that you asked for, reported or watch.')}</p>
+      <div className="divide-y divide-line">{shown.map((t) => <TaskRow key={t.id} t={t} />)}</div>
+    </Card>
   )
 }

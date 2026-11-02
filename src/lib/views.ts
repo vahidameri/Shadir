@@ -16,6 +16,21 @@ export const CAL_LAYERS: Choice<CalLayer>[] = [
 ]
 
 export const DASH_KEY = 'dash.widgets'
+/** The tabs on the Tasks page (which, in what order): back office → tasks. */
+export const TASK_VIEWS_KEY = 'task.views'
+export const TASK_VIEW_CHOICES: Choice<'open' | 'mine' | 'flagged' | 'blocked' | 'late' | 'week' | 'stale' | 'waiting' | 'intake' | 'closed' | 'all'>[] = [
+  { id: 'open', label: ['باز', 'Open'] },
+  { id: 'mine', label: ['مال من', 'Mine'] },
+  { id: 'flagged', label: ['پرچم‌دار', 'Flagged'] },
+  { id: 'blocked', label: ['مسدود', 'Blocked'] },
+  { id: 'late', label: ['معوق', 'Overdue'] },
+  { id: 'week', label: ['۷ روز آینده', 'Next 7 days'] },
+  { id: 'stale', label: ['راکد', 'Quiet'] },
+  { id: 'waiting', label: ['در انتظار (پیگیری)', 'Waiting (follow-up)'] },
+  { id: 'intake', label: ['ورودی', 'Intake'] },
+  { id: 'closed', label: ['بسته‌شده (انجام‌شده)', 'Closed (done)'] },
+  { id: 'all', label: ['همه', 'All'] },
+]
 export type DashWidget = 'kpis' | 'okr' | 'sprint' | 'teams' | 'status' | 'team_load' | 'mizito' | 'people' | 'upcoming' | 'blocked'
 export const DASH_WIDGETS: Choice<DashWidget>[] = [
   { id: 'kpis', label: ['شاخص‌های کلیدی', 'Key numbers'] },

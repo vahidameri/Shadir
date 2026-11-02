@@ -2,7 +2,7 @@
 // priority (P0 first, then SLA, then deadline). Re-mentions thread into the same row.
 import { CartableMany } from '../components/CartableParts'
 import { FlagMark, FlagPicker } from '../components/TaskTracking'
-import { MoreButton, usePaged } from '../components/Paged'
+import { Pager, usePaged } from '../components/Paged'
 import { dirOf } from '../lib/dir'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -73,7 +73,12 @@ export default function MizitoPage() {
     const exec = isExecTier(mzSignals(db, m).tier)
     return badge === 'key' ? key : badge === 'exec' ? exec : badge === 'any' ? key || exec : true
   }
-  const base = db.Mizito.filter((m) => (!who || m.mentioned.split(',').map((x) => x.trim()).includes(who)) && (!cat || m.category === cat) && (!act || m.action === act) && hasBadge(m) && (!q || [m.title, m.description, m.asked_by, m.assigned_to, m.outcome].some((v) => String(v || '').includes(q))))
+  // every filter but the kind: the kind tabs count over it
+  const beforeKind = db.Mizito.filter((m) => (!who || m.mentioned.split(',').map((x) => x.trim()).includes(who)) && (!cat || m.category === cat) && hasBadge(m) && (!q || [m.title, m.description, m.asked_by, m.assigned_to, m.outcome].some((v) => String(v || '').includes(q))))
+  const ofKind = (m: MizitoItem, k: string) => (k === '-' ? !m.action : m.action === k)
+  const base = act ? beforeKind.filter((m) => ofKind(m, act)) : beforeKind
+  const inThisView = beforeKind.filter((m) => inMzView(db, m, view, sig.get(m.id)))
+  const kindCount = (k: string) => (k ? inThisView.filter((m) => ofKind(m, k)).length : inThisView.length)
   const counts = Object.fromEntries(MZ_VIEWS.map((v) => [v, base.filter((m) => inMzView(db, m, v, sig.get(m.id))).length])) as Record<MzView, number>
   const list = base
     .filter((m) => inMzView(db, m, view, sig.get(m.id)))
@@ -101,7 +106,7 @@ export default function MizitoPage() {
     return [...map.entries()].sort((a, b) => (group === 'p' ? a[0].localeCompare(b[0]) : b[1].length - a[1].length)).map(([k, rows]) => ({ key: k, label: label(k), rows }))
   }, [list, group, sig, c])
 
-  const paged = usePaged(groups, 80, [view, group, sort, q, who, badge])
+  const paged = usePaged(groups, 50, [view, group, sort, q, who, badge, cat, act])
   if (!(access === 'super' || access === 'exec')) return <Empty text={L('این بخش فقط برای CPTO و مدیر برنامه است', 'For the CPTO and the PgM only')} />
   const open = base.filter((m) => inMzView(db, m, 'queue', sig.get(m.id)))
   const closedWeek = db.Mizito.filter((m) => m.closed_at && daysFromToday(m.closed_at.slice(0, 10)) >= -7).length
@@ -186,7 +191,6 @@ export default function MizitoPage() {
           <SearchInput value={q} onChange={setQ} />
           <Segmented value={(who || '') as string} onChange={(v) => set('who', v)} options={[{ value: '', label: L('همه', 'Everyone') }, ...leaders.map((n) => ({ value: n, label: n === me ? L(`${n} (من)`, `${n} (me)`) : n }))]} />
           <FilterSelect value={cat} onChange={(v) => set('cat', v)} placeholder={L('همه‌ی دسته‌ها', 'All categories')} options={c.categories.map((x) => ({ value: x.id, label: optLabel(x) }))} />
-          <FilterSelect value={act} onChange={(v) => set('act', v)} placeholder={L('همه‌ی نوع‌ها', 'All kinds')} options={c.actions.map((x) => ({ value: x.id, label: optLabel(x) }))} />
           <FilterSelect
             value={badge}
             onChange={(v) => set('b', v)}
@@ -225,6 +229,14 @@ export default function MizitoPage() {
           </span>
         </div>
 
+        {/* one tab per kind (set on each row, or for a selection): what you sort goes to its tab */}
+        <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1">
+          {[{ id: '', label: L('همه‌ی نوع‌ها', 'All kinds') }, ...c.actions.map((x) => ({ id: x.id, label: optLabel(x) })), { id: '-', label: L('بدون نوع', 'No kind') }].map((k) => (
+            <button key={k.id || 'all'} onClick={() => set('act', k.id)} className={cx('inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs transition', act === k.id ? 'border-brand bg-brand text-white' : 'border-line bg-surface hover:border-line-strong')}>
+              {k.label} <span className={cx('num', act === k.id ? 'text-white/80' : 'text-sub')}>{fa(kindCount(k.id))}</span>
+            </button>
+          ))}
+        </div>
         {picked.size > 0 && (
           <div className="sticky top-2 z-20 mb-3 flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-surface px-3 py-2 shadow-float">
             <span className="text-sm font-medium">{L(`${fa(picked.size)} مورد انتخاب شد`, `${picked.size} selected`)}</span>
@@ -370,7 +382,7 @@ export default function MizitoPage() {
                   })}
                 </div>
               ))}
-              <MoreButton hidden={paged.hidden} step={paged.step} onMore={paged.more} />
+              <Pager {...paged} />
             </div>
           )}
         </Card>

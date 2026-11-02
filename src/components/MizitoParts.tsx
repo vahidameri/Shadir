@@ -9,14 +9,14 @@ import { AtSign, Ban, Bot, Check, CheckCheck, Clock, Crown, Star, Copy, External
 import { useStore } from '../lib/store'
 import { useEditor } from './Editor'
 import { SaveClose } from './SaveClose'
-import { Avatar, Card, MenuItem, Popover, Sheet, cx } from './ui'
+import { Avatar, Card, MenuItem, Popover, Segmented, Sheet, cx } from './ui'
 import { DatePicker } from './DatePicker'
 import { PersonPicker } from './pickers'
 import { L, locale } from '../lib/i18n'
 import { fa, fmtDate, fmtDayMonth, timeAgo, todayISO } from '../lib/jalali'
 import { uid } from '../lib/api'
 import { historyOf } from '../lib/history'
-import { mzClaudePrompt, mzTitleKey, nextRange, parseMzImport } from '../lib/mzImport'
+import { jNum, mzClaudePrompt, mzTitleKey, mzUpdatePrompt, nextRange, parseMzImport } from '../lib/mzImport'
 import { historyText } from './TaskTracking'
 import {
   MZ_CUTOFF, MZ_KEYS, P_COLOR, P_HINT, agentRun, isExecTier, markSeen, recentlyChanged, allPeople, askersOf, commentsOf, firstMzStatus, isMizitoLink, mentionsOf, mzCat, mzCfg, mzClosed, mzFlags, mzKeyOf, mzSignals, nowStampMz, optLabel, reminderText, statusById, tierOf,
@@ -751,6 +751,16 @@ export function MizitoImport({ admin }: { admin: boolean }) {
   const [busy, setBusy] = useState('')
   const [progress, setProgress] = useState('')
   const [showPrompt, setShowPrompt] = useState(false)
+  // range = read new messages of a range of days; update = bring changes on tasks Madar already has
+  const [mode, setMode] = useState<'range' | 'update'>('range')
+  const [upPage, setUpPage] = useState(0)
+  const UP = 25
+  const toUpdate = useMemo(
+    () => db.Mizito.filter((m) => !mzClosed(m) && String(m.mentioned || '').split(',').map((x) => x.trim()).includes(account)).sort((a, b) => String(a.synced_at || a.last_mention_at || '').localeCompare(String(b.synced_at || b.last_mention_at || ''))),
+    [db.Mizito, account],
+  )
+  const upPages = Math.max(1, Math.ceil(toUpdate.length / UP))
+  const upChunk = toUpdate.slice(upPage * UP, upPage * UP + UP)
   const cutoff = setting(MZ_KEYS.cutoff) || MZ_CUTOFF
   // where this person's import got to (kept by the server); the next range starts the day after
   const lastTo = agentRun(setting(MZ_KEYS.agent + account)).range_to || ''
@@ -758,7 +768,10 @@ export function MizitoImport({ admin }: { admin: boolean }) {
   const suggested = useMemo(() => nextRange(lastTo, cutoff, todayISO(), span), [lastTo, cutoff, span])
   const [range, setRange] = useState(suggested)
   useEffect(() => setRange(suggested), [suggested.from, suggested.to]) // eslint-disable-line react-hooks/exhaustive-deps
-  const prompt = mzClaudePrompt(account || me, range.from, range.to, fmtDate(range.from, 'long'), fmtDate(range.to, 'long'))
+  const prompt =
+    mode === 'update'
+      ? mzUpdatePrompt(account || me, upChunk.map((m) => ({ title: m.title, link: m.link, since: jNum(String(m.last_mention_at || m.received_at || '').slice(0, 10)) })))
+      : mzClaudePrompt(account || me, range.from, range.to, fmtDate(range.from, 'long'), fmtDate(range.to, 'long'))
   const people = useMemo(() => allPeople(db), [db])
   const parsed = useMemo(() => (raw.trim() ? parseMzImport(raw, account, db.Mizito, people) : null), [raw, account, db.Mizito, people])
   // one or more files from Claude (one per range or part): each becomes a part of the paste
@@ -811,12 +824,12 @@ export function MizitoImport({ admin }: { admin: boolean }) {
         const items = all.slice(i, i + size)
         setProgress(L(`${fa(Math.min(i + size, all.length))} از ${fa(all.length)}`, `${Math.min(i + size, all.length)} of ${all.length}`))
         // how far the import got: the range the answer itself covers, when it says (else the one chosen)
-        const r = await send({ account: who, items, batch: batchId(who, items), last: i + size >= all.length, total: all.length, range: parsed.range || range })
+        const r = await send(mode === 'update' ? { account: who, items, batch: batchId(who + '|u', items), updateOnly: true, last: i + size >= all.length, total: all.length } : { account: who, items, batch: batchId(who, items), last: i + size >= all.length, total: all.length, range: parsed.range || range })
         if (!r) return toast(L('در حالت نمایشی ایمپورت نمی‌شود', 'No import in demo mode'), 'err')
         made += r.made || 0
         updated += r.updated || 0
       }
-      toast(L(`بازه‌ی ${fmtDate(range.from)} تا ${fmtDate(range.to)}: ${fa(made)} تسک تازه، ${fa(updated)} به‌روز`, `Imported: ${made} new, ${updated} updated`))
+      toast(mode === 'update' ? L(`${fa(updated)} تسک به‌روز شد`, `${updated} tasks updated`) : L(`بازه‌ی ${fmtDate(range.from)} تا ${fmtDate(range.to)}: ${fa(made)} تسک تازه، ${fa(updated)} به‌روز`, `Imported: ${made} new, ${updated} updated`))
       setRaw('')
       await refresh()
     })
@@ -854,7 +867,28 @@ export function MizitoImport({ admin }: { admin: boolean }) {
         </select>
         <span className="text-xs text-sub">{lastTo ? L(`تا ${fmtDate(lastTo, 'long')} ایمپورت شده`, `Imported up to ${lastTo}`) : L('هنوز بازه‌ای ایمپورت نشده', 'Nothing imported yet')}</span>
       </div>
-      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl bg-muted/50 p-3 text-sm">
+      <div className="mb-3">
+        <Segmented
+          value={mode}
+          onChange={(v) => { setMode(v); setRaw('') }}
+          options={[
+            { value: 'range', label: L('خواندن بازه (تسک‌های تازه)', 'Read a range (new tasks)') },
+            { value: 'update', label: L(`به‌روزرسانی تسک‌های موجود (${fa(toUpdate.length)})`, `Update existing (${toUpdate.length})`) },
+          ]}
+        />
+      </div>
+      {mode === 'update' && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl bg-muted/50 p-3 text-sm">
+          <span className="text-xs leading-6 text-sub">{L('تسک‌های باز شما در مدار، اول آن‌هایی که دیرتر به‌روز شده‌اند. Claude هر کدام را با لینکش باز می‌کند و وضعیت، کامنت‌ها و منشن‌های تازه را می‌آورد؛ تسک تازه اضافه نمی‌شود.', 'Your open tasks, least recently updated first. Claude opens each and brings its state and new comments/mentions; nothing new is added.')}</span>
+          <span className="flex-1" />
+          <button className="btn-ghost btn-sm" disabled={upPage === 0} onClick={() => setUpPage(upPage - 1)}>{L('دسته‌ی قبل', 'Previous')}</button>
+          <span className="num text-xs">{L(`دسته‌ی ${fa(upPage + 1)} از ${fa(upPages)} (${fa(upChunk.length)} تسک)`, `Batch ${upPage + 1} of ${upPages}`)}</span>
+          <button className="btn-ghost btn-sm" disabled={upPage >= upPages - 1} onClick={() => setUpPage(upPage + 1)}>{L('دسته‌ی بعد', 'Next')}</button>
+          <button className="btn-primary btn-sm" disabled={!upChunk.length} onClick={() => navigator.clipboard?.writeText(prompt).then(() => toast(L('متن برای Claude کپی شد', 'Prompt copied')))}><Copy size={13} /> {L('کپی متن برای Claude', 'Copy the prompt')}</button>
+          <button className="btn-ghost btn-sm text-sub" onClick={() => setShowPrompt(!showPrompt)}>{showPrompt ? L('بستن', 'Hide') : L('دیدن متن', 'Show')}</button>
+        </div>
+      )}
+      <div className={cx('mb-3 flex flex-wrap items-center gap-2 rounded-2xl bg-muted/50 p-3 text-sm', mode === 'update' && 'hidden')}>
         <span className="font-medium">{L('بازه:', 'Range:')}</span>
         <select value={span} onChange={(e) => setSpan(Number(e.target.value))} className="input h-8 w-auto text-xs" aria-label={L('طول بازه', 'Range length')}>
           <option value={3}>{L('۳ روز', '3 days')}</option>
