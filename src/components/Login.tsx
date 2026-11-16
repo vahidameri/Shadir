@@ -146,7 +146,7 @@ export function Login({ onEnter }: { onEnter: () => void }) {
             <h1 className="text-2xl font-semibold tracking-tight">{L('ورود به مدار', 'Sign in to Madar')}</h1>
             <p className="mt-1.5 text-sm text-[#6b7180]">{L('خوش آمدید', 'Welcome back')}</p>
 
-            {g.otp ? (
+            {g.otp || g.apiUrl === '/api' ? (
               <div className="mt-7 space-y-3">
                 {forgot ? (
                   <form onSubmit={(e) => (e.preventDefault(), forgot === 'ask' ? sendCode() : verifyCode(code))} className="space-y-3">
@@ -200,11 +200,11 @@ export function Login({ onEnter }: { onEnter: () => void }) {
                       {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </label>
-                  <div className="flex justify-end">
+                  {g.otp && <div className="flex justify-end">
                     <button type="button" className="text-xs text-[#6b7180] transition hover:text-[#16181d]" onClick={() => (setForgot('ask'), setErr(''))}>
                       {L('رمز را فراموش کرده‌اید؟', 'Forgot password?')}
                     </button>
-                  </div>
+                  </div>}
                   <button className="shine-btn flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-sm font-bold text-[#111]" disabled={working || !username.trim() || !password}>
                     {working ? <Loader size={16} className="animate-spin" /> : <ArrowRight size={16} className="rtl:-scale-x-100" />}
                     {L('ورود', 'Sign in')}

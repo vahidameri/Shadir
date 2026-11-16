@@ -1,0 +1,43 @@
+name: vahid-madar
+services:
+  web:
+    build: .
+    init: true
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4181:8080"
+    environment:
+      PGHOST: db
+      PGUSER: app
+      PGDATABASE: app
+    secrets:
+      - db_password
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_DB: app
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets:
+      - db_password
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "app", "-d", "app"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  db-data:
+secrets:
+  db_password:
+    file: ./.secrets/db-password.txt

@@ -5,3 +5,7 @@ dist
 .DS_Store
 *.tsbuildinfo
 dist-single
+.secrets/
+deploy/graphify-out/*
+!deploy/graphify-out/graph.json
+!deploy/graphify-out/GRAPH_REPORT.md

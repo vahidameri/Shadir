@@ -126,10 +126,11 @@ export const useGoogle = () => useContext(C)!
 
 export function GoogleProvider({ children }: { children: ReactNode }) {
   const isHosted = hosted()
-  const [session, setSession] = useState<GSession | null>(isHosted ? null : load)
+  const localApi = import.meta.env.VITE_API_URL === '/api' ? '/api' : ''
+  const [session, setSession] = useState<GSession | null>(isHosted ? null : localApi ? loadOtp : load)
   const [busy, setBusy] = useState(isHosted)
   const [error, setError] = useState('')
-  const [apiUrl, setApiUrl] = useState('')
+  const [apiUrl, setApiUrl] = useState(localApi)
   const [otp, setOtp] = useState(false)
   const [appUrl, setAppUrl] = useState('')
   const [offer, setOffer] = useState<{ token: string; email: string } | null>(null)
