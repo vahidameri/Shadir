@@ -451,6 +451,17 @@
       "source_location": "L10"
     },
     {
+      "id": "keep_docker_running",
+      "label": "keep-docker-running.ps1",
+      "_origin": "ast",
+      "community": 8,
+      "community_name": "keep-docker-running.ps1",
+      "file_type": "code",
+      "norm_label": "keep-docker-running.ps1",
+      "source_file": "deploy/keep-docker-running.ps1",
+      "source_location": "L1"
+    },
+    {
       "id": "ref_node_crypto",
       "label": "ref_node_crypto",
       "_origin": "semantic",
@@ -1299,5 +1310,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "1904686cb84e9067d1454274eecdd80846839516"
+  "built_at_commit": "38ec383a6f9511a17f3b761a86df374e37243169"
 }

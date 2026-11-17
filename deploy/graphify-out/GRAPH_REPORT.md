@@ -1,16 +1,16 @@
 # Graph Report - deploy  (2026-11-17)
 
 ## Corpus Check
-- 7 files · ~3,756 words
+- 8 files · ~3,881 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 53 nodes · 59 edges · 8 communities (4 shown, 4 thin omitted)
+- 54 nodes · 59 edges · 9 communities (4 shown, 5 thin omitted)
 - Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 3 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `1904686c`
+- Built from commit: `38ec383a`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -40,7 +40,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (8 total, 4 thin omitted)
+## Communities (9 total, 5 thin omitted)
 
 ### Community 0 - "server.mjs"
 Cohesion: 0.12
@@ -60,14 +60,14 @@ Nodes (4): convert(), main(), schema(), value()
 
 ## Knowledge Gaps
 - **12 isolated node(s):** `pool`, `code`, `cache`, `cacheService`, `mime` (+7 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 32 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **4 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 33 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **5 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `appContext()` connect `appContext` to `server.mjs`?**
-  _High betweenness centrality (0.036) - this node is a cross-community bridge._
+  _High betweenness centrality (0.034) - this node is a cross-community bridge._
 - **Are the 2 inferred relationships involving `appContext()` (e.g. with `blob()` and `unavailable()`) actually correct?**
   _`appContext()` has 2 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `pool`, `code`, `cache` to the rest of the system?**
@@ -75,4 +75,4 @@ _Questions this graph is uniquely positioned to answer:_
 - **Should `server.mjs` be split into smaller, more focused modules?**
   _Cohesion score 0.11764705882352941 - nodes in this community are weakly interconnected._
 - **Why does `sheet()` connect `sheet` to `server.mjs`?**
-  _High betweenness centrality (0.035) - this node is a cross-community bridge._
+  _High betweenness centrality (0.034) - this node is a cross-community bridge._
