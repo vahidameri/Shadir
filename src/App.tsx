@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { can } from './lib/access'
 import Admin from './pages/Admin'
@@ -75,24 +76,31 @@ function Gate({ children }: { children: React.ReactNode }) {
   const { loading, lastSync, mode, authed, error } = useStore()
   const g = useGoogle()
   const [entered, setEntered] = usePref<boolean>('madar.entered', false)
+  const onEnter = useCallback(() => setEntered(true), [setEntered])
   // an email-link / code session goes straight in
   const inside = entered || g.session?.kind === 'otp'
-  if (!inside || (mode === 'live' && !authed && (!g.hosted || (g.otp && !g.busy)))) return <Login onEnter={() => setEntered(true)} />
+  if (!inside || (mode === 'live' && !authed && (!g.hosted || (g.otp && !g.busy)))) return <Login onEnter={onEnter} />
   if (g.hosted && (!g.session || !g.apiUrl || (error && !lastSync))) return <HostedSplash error={g.error || (g.session && !g.apiUrl ? 'API_URL' : '') || (!lastSync ? error : '')} retry={() => g.signIn('')} />
   if (mode === 'live' && loading && !lastSync && g.hosted) return <HostedSplash error="" retry={() => g.signIn('')} />
-  if (mode === 'live' && loading && !lastSync)
-    return (
-      <div className="mx-auto max-w-[112rem] space-y-4 pt-8">
-        <Skeleton className="h-10 w-1/3" />
-        <Skeleton className="h-5 w-1/2" />
-        <div className="grid gap-4 pt-6 md:grid-cols-3">
-          {[0, 1, 2, 3, 4, 5].map((i) => (
-            <Skeleton key={i} className="h-40" />
-          ))}
-        </div>
-      </div>
-    )
-  return <>{children}</>
+  return (
+    <AutomationProvider>
+      <EditorProvider>
+        <ComposerProvider>
+          <Layout>
+            {mode === 'live' && loading && !lastSync ? (
+              <div className="mx-auto max-w-[112rem] space-y-4 pt-8">
+                <Skeleton className="h-10 w-1/3" />
+                <Skeleton className="h-5 w-1/2" />
+                <div className="grid gap-4 pt-6 md:grid-cols-3">
+                  {[0, 1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-40" />)}
+                </div>
+              </div>
+            ) : children}
+          </Layout>
+        </ComposerProvider>
+      </EditorProvider>
+    </AutomationProvider>
+  )
 }
 
 export default function App() {
@@ -101,10 +109,6 @@ export default function App() {
     <StoreProvider>
       <I18nProvider>
       <HashRouter>
-        <AutomationProvider>
-        <EditorProvider>
-        <ComposerProvider>
-          <Layout>
             <Gate>
               <Routes>
                 <Route path="/" element={<Navigate to="/my" replace />} />
@@ -135,10 +139,6 @@ export default function App() {
                 <Route path="*" element={<Home />} />
               </Routes>
             </Gate>
-          </Layout>
-        </ComposerProvider>
-        </EditorProvider>
-        </AutomationProvider>
       </HashRouter>
       </I18nProvider>
     </StoreProvider>

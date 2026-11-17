@@ -45,6 +45,10 @@ declare global {
     google?: {
       script?: { run: ScriptRun; url?: { getLocation: (cb: (l: { parameter?: Record<string, string> }) => void) => void } }
       accounts: {
+        id: {
+          initialize: (o: { client_id: string; nonce: string; callback: (r: { credential?: string }) => void }) => void
+          renderButton: (container: HTMLElement, o: { type: 'standard'; text: 'continue_with'; width: number; locale: string }) => void
+        }
         oauth2: {
           initTokenClient: (o: { client_id: string; scope: string; callback: (r: TokenResponse) => void; error_callback?: (e: { type: string }) => void }) => TokenClient
           revoke: (token: string, cb?: () => void) => void
@@ -64,14 +68,15 @@ function load(): GSession | null {
 }
 
 let gisPromise: Promise<void> | null = null
-function loadGis() {
-  if (window.google?.accounts?.oauth2) return Promise.resolve()
+export function loadGis() {
+  if (window.google?.accounts?.oauth2 || window.google?.accounts?.id) return Promise.resolve()
   gisPromise ??= new Promise<void>((resolve, reject) => {
     const s = document.createElement('script')
     s.src = 'https://accounts.google.com/gsi/client'
     s.async = true
     s.onload = () => resolve()
     s.onerror = () => {
+      s.remove()
       gisPromise = null
       reject(new Error('Google sign-in could not load'))
     }
@@ -113,6 +118,7 @@ interface Ctx {
   googleEmail: string
   continueWithGoogle: () => Promise<void>
   passwordLogin: (username: string, password: string) => Promise<void>
+  googleLogin: (credential: string, nonce: string) => Promise<void>
   /** forgot password: a sign-in link + code to the person's email */
   sendCode: (id: string) => Promise<void>
   verifyCode: (id: string, code: string) => Promise<void>
@@ -268,6 +274,17 @@ export function GoogleProvider({ children }: { children: ReactNode }) {
     adopt({ ...r, email: r.email || username.toLowerCase() })
   }, [apiUrl]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const googleLogin = useCallback(async (credential: string, nonce: string) => {
+    const res = await fetch('/api', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'googleLogin', credential, nonce }),
+    })
+    const r = await res.json() as { ok: boolean; session: string; email: string; exp: number; error?: string }
+    if (!res.ok || !r.ok) throw new Error(r.error || 'Google sign-in failed')
+    adopt(r)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const sendCode = useCallback(async (id: string) => {
     await otpCall(apiUrl, { action: 'otpSend', email: id })
   }, [apiUrl])
@@ -305,5 +322,5 @@ export function GoogleProvider({ children }: { children: ReactNode }) {
     setSession(null)
   }, [session, apiUrl])
 
-  return <C.Provider value={{ hosted: isHosted, apiUrl, session, otp, appUrl, googleEmail: offer?.email || '', continueWithGoogle, passwordLogin, sendCode, verifyCode, signIn, signOut, busy, error }}>{children}</C.Provider>
+  return <C.Provider value={{ hosted: isHosted, apiUrl, session, otp, appUrl, googleEmail: offer?.email || '', continueWithGoogle, passwordLogin, googleLogin, sendCode, verifyCode, signIn, signOut, busy, error }}>{children}</C.Provider>
 }

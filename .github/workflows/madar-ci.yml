@@ -17,6 +17,8 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      MADAR_GOOGLE_CLIENT_ID: '12345678-ci.apps.googleusercontent.com'
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -36,6 +38,12 @@ jobs:
           curl --fail --silent --show-error http://127.0.0.1:4181/healthz | jq -e '.ok == true'
           curl --fail --silent --show-error http://127.0.0.1:4181/ | grep -F '<div id="root">'
           curl --fail --silent --show-error 'http://127.0.0.1:4181/api?action=all' | jq -e '.ok == false'
+          curl --fail --silent --show-error -H 'Sec-Fetch-Site: same-origin' 'http://127.0.0.1:4181/api?action=googleLoginConfig' |
+            jq -e --arg client "$MADAR_GOOGLE_CLIENT_ID" '.ok == true and .clientId == $client and (.nonce | type == "string")' > /dev/null
+          status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+            -H 'Content-Type: application/json' -H 'Sec-Fetch-Site: same-origin' \
+            --data '{"action":"googleLogin","credential":"fake.token.value","nonce":"invalid"}' http://127.0.0.1:4181/api)
+          test "$status" = 401
           jq -nc --arg password "$admin_password" '{action:"pwLogin",username:"admin",password:$password}' |
             curl --fail --silent --show-error -H 'Content-Type: application/json' --data-binary @- http://127.0.0.1:4181/api |
             jq -e '.ok == true and (.session | type == "string")' > /dev/null

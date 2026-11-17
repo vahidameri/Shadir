@@ -512,12 +512,21 @@ select:focus-visible {
 }
 .light-field {
   display: flex; align-items: center; gap: 0.75rem; height: 3rem; padding: 0 1rem; border-radius: 1rem;
-  background: #f4f5f8; border: 1px solid #e6e8ee;
-  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  --field-bg: #f4f5f8;
+  color-scheme: light;
+  background: var(--field-bg); border: 1px solid #e6e8ee;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
-.light-field:focus-within { border-color: #ff9500; background: #fff; box-shadow: 0 0 0 4px rgb(255 149 0 / 0.18); }
+.light-field:focus-within { --field-bg: #fff; border-color: #ff9500; box-shadow: 0 0 0 4px rgb(255 149 0 / 0.18); }
 .light-field input { flex: 1; min-width: 0; background: transparent; outline: none; font-size: 0.875rem; color: #16181d; }
 .light-field input::placeholder { color: #9aa0ad; }
+.light-field input:autofill {
+  box-shadow: 0 0 0 100px var(--field-bg) inset;
+  -webkit-text-fill-color: #16181d;
+}
+@media (max-width: 639px) {
+  .light-field input { font-size: 1rem; }
+}
 .light-select { background: #f4f5f8; border: 1px solid #e6e8ee; color: #16181d; outline: none; }
 .light-btn { background: #fff; border: 1px solid #e1e4ea; box-shadow: 0 1px 2px rgb(16 24 40 / 0.05); transition: background 0.2s, border-color 0.2s, transform 0.15s; }
 .light-btn:hover { background: #f7f8fa; border-color: #cfd4dd; }

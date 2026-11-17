@@ -10,6 +10,7 @@ services:
       PGHOST: db
       PGUSER: app
       PGDATABASE: app
+      MADAR_GOOGLE_CLIENT_ID: ${MADAR_GOOGLE_CLIENT_ID:-}
     secrets:
       - db_password
     depends_on:
