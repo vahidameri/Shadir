@@ -26,7 +26,22 @@ The check creates one temporary project record, restarts this stack, verifies th
 
 ## Google dependencies and data
 
-The app starts with an empty project dataset. Google Sheets data can be imported when the owner provides each source. Local username/password login is enabled. The Google deployment continues to use its existing handlers and Google integrations. In this Docker deployment, Google sign-in, email and email-based recovery, Drive uploads, Calendar synchronization and external sheet imports require separate integration work.
+The app starts with an empty project dataset. Google Sheets data can be imported when the owner provides each source. Local username/password login is enabled. The Apps Script deployment keeps its own Google integrations. This Docker deployment can use Google for sign-in. Email and email-based recovery, Drive uploads, Calendar synchronization and external sheet imports require separate setup.
+
+### Enable Google sign-in on the Docker site
+
+1. In the Google Cloud project for Madar, open **Google Auth Platform → Clients** and use a **Web application** OAuth client. Register `https://taskamun.ir` as an authorized JavaScript origin. The popup flow needs no redirect URI and no client secret. Configure the consent audience for the Madar users.
+2. Set `MADAR_GOOGLE_CLIENT_ID` to that client's public ID in the deployment's `.env`. New checkouts already pass it to the web container in Compose. On the existing ASUS installation, the scheduled updater only replaces the web image; add the environment mapping to the installed Compose configuration or merge it into a local `compose.override.yaml` before recreating **only** the web container:
+   ```yaml
+   services:
+     web:
+       environment:
+         MADAR_GOOGLE_CLIENT_ID: ${MADAR_GOOGLE_CLIENT_ID:-}
+   ```
+   Back up any existing configuration first. Run `docker compose config --quiet` and use the existing web-only update procedure; neither the PostgreSQL service nor its data has to be replaced.
+3. Verify the official Google button on the same site with an active team test account, and verify that username/password sign-in still works. A Google account can sign in only if its verified Gmail or Workspace address matches exactly one active team member. On first sign-in the Google account is linked to the existing member; no member is created automatically. For a sanctioned account replacement, an operator must verify the identity and remove that member's `GOOGLE_SUB.<member-id>` property before relinking. An empty client ID leaves password login available.
+
+Madar uses the ID token to sign users in on this site and does not request Calendar or Drive permissions.
 
 Upstream source revision: `e34716ee7e7dad23ec448040bfa84cb17255e9fb`.
 

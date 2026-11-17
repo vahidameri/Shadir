@@ -12,6 +12,7 @@
     "build:apps-script": "vite build --config vite.single.config.ts && node -e \"require('fs').copyFileSync('dist-single/index.html','apps-script/Index.html')\""
   },
   "dependencies": {
+    "google-auth-library": "^11.3.4",
     "lucide-react": "^1.52.0",
     "pg": "8.23.1",
     "react": "^19.3.0",

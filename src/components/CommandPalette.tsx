@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { dirOf } from '../lib/dir'
 import { JOB_TITLE } from '../lib/labels'
 import { createPortal } from 'react-dom'
@@ -31,14 +31,23 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const navigate = useNavigate()
   const [q, setQ] = useState('')
   const [idx, setIdx] = useState(0)
+  const dialogRef = useRef<HTMLDialogElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (open) {
-      setQ('')
-      setIdx(0)
-      setTimeout(() => inputRef.current?.focus(), 10)
+  useLayoutEffect(() => {
+    const dialog = dialogRef.current
+    if (!open || !dialog) return
+    setQ('')
+    setIdx(0)
+    const previousFocus = document.activeElement
+    dialog.showModal()
+    inputRef.current?.focus()
+    return () => {
+      dialog.close()
+      if (previousFocus instanceof HTMLElement && previousFocus.isConnected) {
+        previousFocus.focus({ preventScroll: true })
+      }
     }
   }, [open])
 
@@ -101,23 +110,39 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
 
   let lastGroup = ''
   return createPortal(
-    <div className="fixed inset-0 z-[75] flex items-start justify-center px-4 pt-[12vh] no-print">
-      <div className="absolute inset-0 bg-[#0a0d12]/50 backdrop-blur-sm fade-in" onClick={onClose} />
+    <dialog
+      ref={dialogRef}
+      aria-label={L('جستجو و فرمان‌ها', 'Search and commands')}
+      onCancel={(e) => { e.preventDefault(); onClose() }}
+      onKeyDown={(e) => {
+        e.stopPropagation()
+        if (e.key !== 'Tab' || e.ctrlKey || e.metaKey || e.altKey) return
+        const first = inputRef.current
+        const last = listRef.current?.lastElementChild?.querySelector('button') ?? first
+        if (document.activeElement === (e.shiftKey ? first : last)) {
+          e.preventDefault()
+          const next = e.shiftKey ? last : first
+          next?.focus()
+        }
+      }}
+      className="fixed inset-0 m-0 flex h-full max-h-none w-full max-w-none items-start justify-center bg-transparent px-4 pt-[12vh] text-ink no-print backdrop:bg-transparent"
+    >
+      <div className="absolute inset-0 bg-[#0a0d12]/50 backdrop-blur-sm fade-in" onClick={onClose} aria-hidden />
       <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-line bg-surface shadow-pop pop-in">
         <div className="flex items-center gap-3 border-b border-line px-5">
           <Search size={18} className="text-sub" />
           <input
             ref={inputRef}
+            aria-label={L('جستجو', 'Search')}
             value={q}
             onChange={(e) => {
               setQ(e.target.value)
               setIdx(0)
             }}
             onKeyDown={(e) => {
-              if (e.key === 'Escape') onClose()
               if (e.key === 'ArrowDown') {
                 e.preventDefault()
-                setIdx((i) => Math.min(items.length - 1, i + 1))
+                setIdx((i) => Math.max(0, Math.min(items.length - 1, i + 1)))
               }
               if (e.key === 'ArrowUp') {
                 e.preventDefault()
@@ -160,7 +185,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           </span>
         </div>
       </div>
-    </div>,
+    </dialog>,
     document.body,
   )
 }

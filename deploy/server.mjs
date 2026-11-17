@@ -3,6 +3,7 @@ import { readFileSync, statSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { resolve, sep, extname } from 'node:path'
 import pg from 'pg'
+import { createGoogleSignIn, googleCookie, openGoogleSession } from './google-login.mjs'
 import { Script } from 'node:vm'
 import { gzipSync, gunzipSync } from 'node:zlib'
 
@@ -232,6 +233,10 @@ const json = (res, status, value) => {
   res.end(JSON.stringify(value))
 }
 const loginThrottle = new Map()
+const googleClientId = process.env.MADAR_GOOGLE_CLIENT_ID?.trim() || ''
+const googleSignIn = /^[\w-]+\.apps\.googleusercontent\.com$/.test(googleClientId) ? createGoogleSignIn(googleClientId) : null
+const browserCookie = (req) => req.headers.cookie?.split(';').map(part => part.trim())
+  .find(part => part.startsWith(googleCookie + '='))?.slice(googleCookie.length + 1)
 const disabledActions = new Set(['otpSend', 'otpVerify', 'otpLink', 'upload', 'syncMeeting',
   'mailTask', 'mailMinutes', 'mailCartable', 'readSheet'])
 
@@ -247,6 +252,13 @@ createServer(async (req, res) => {
     if (url.pathname === '/api') {
       if (req.method !== 'GET' && req.method !== 'POST') return json(res, 405, { ok: false })
       if (req.headers['sec-fetch-site'] === 'cross-site') return json(res, 403, { ok: false })
+      if (req.method === 'GET' && url.searchParams.get('action') === 'googleLoginConfig') {
+        if (req.headers['sec-fetch-site'] !== 'same-origin') return json(res, 403, { ok: false })
+        if (!googleSignIn) return json(res, 200, { ok: true, clientId: '' })
+        const { browser, nonce } = googleSignIn.challenge(browserCookie(req))
+        res.setHeader('Set-Cookie', googleCookie + '=' + browser + '; Path=/; Max-Age=7200; Secure; HttpOnly; SameSite=Strict')
+        return json(res, 200, { ok: true, clientId: googleClientId, nonce })
+      }
       let params = Object.fromEntries(url.searchParams)
       if (req.method === 'POST') {
         const chunks = []
@@ -271,6 +283,18 @@ createServer(async (req, res) => {
         return json(res, 400, { ok: false, error: 'درخواست نامعتبر است.' })
       }
       if (Object.hasOwn(params, 'email_') || params.access_token) return json(res, 403, { ok: false, error: 'روش ورود نامعتبر است.' })
+      if (params.action === 'googleLogin') {
+        if (req.method !== 'POST' || req.headers['sec-fetch-site'] !== 'same-origin' ||
+            req.headers['content-type']?.split(';')[0].trim().toLowerCase() !== 'application/json') {
+          return json(res, 403, { ok: false, error: 'درخواست ورود نامعتبر است.' })
+        }
+        if (!googleSignIn) return json(res, 503, { ok: false, error: 'ورود با گوگل هنوز فعال نیست.' })
+        const identity = await googleSignIn.identity(params.credential, browserCookie(req), params.nonce)
+        if (!identity) return json(res, 401, { ok: false, error: 'ورود با گوگل تأیید نشد. دوباره تلاش کنید.' })
+        const output = await atomic((app, props) => openGoogleSession(app, props, identity), value => value.ok)
+        if (!output.ok) return json(res, 403, { ok: false, error: 'این حساب گوگل برای ورود به مدار مجاز نیست.' })
+        return json(res, 200, output)
+      }
       if (disabledActions.has(params.action)) return json(res, 501, { ok: false, error: 'این قابلیت Google در استقرار ASUS پیکربندی نشده است.' })
       if (params.action === 'pwLogin') {
         if (typeof params.username !== 'string' || params.username.length > 160 ||

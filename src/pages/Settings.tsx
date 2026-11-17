@@ -97,7 +97,7 @@ export default function Settings({ embedded, section }: { embedded?: boolean; se
         <Card eyebrow="Google" title={L('ورود با گوگل و تقویم', 'Google sign-in & calendar')}>
           <div className="space-y-4">
             {admin && <TeamPasswordField />}
-            {admin && <GoogleLinkField />}
+            {admin && g.apiUrl !== '/api' && <GoogleLinkField />}
             <div className="rounded-2xl bg-muted/70 p-4 text-xs leading-6 text-sub">
               {L('وضعیت', 'Status')}:{' '}
               <b className="text-ink">
@@ -110,7 +110,7 @@ export default function Settings({ embedded, section }: { embedded?: boolean; se
               <br />
               {L(`پروژه‌ها ${fa(db.Projects.length)} · تسک‌ها ${fa(db.Tasks.length)} · جلسات ${fa(db.Meetings.length)} · فایل‌ها ${fa(db.Files.length)}`, `Projects ${db.Projects.length} · Tasks ${db.Tasks.length} · Meetings ${db.Meetings.length} · Files ${db.Files.length}`)}
             </div>
-            {g.hosted ? (
+            {g.apiUrl === '/api' ? null : g.hosted ? (
               <p className="rounded-2xl bg-good/10 px-4 py-3 text-xs text-good">{L('متصل از طریق Google Apps Script', 'Connected via Google Apps Script')}</p>
             ) : (
               <>

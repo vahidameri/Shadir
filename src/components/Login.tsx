@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { JOB_TITLE } from '../lib/labels'
 import { ArrowRight, Eye, EyeOff, KeyRound, Loader, User } from 'lucide-react'
 import { useStore } from '../lib/store'
-import { useGoogle } from '../lib/google'
+import { loadGis, useGoogle } from '../lib/google'
 import { useI18n, L, lbl } from '../lib/i18n'
 import { NoyanTag, ShadIntro, ShadMark } from './Brand'
 import { VERSION } from '../lib/brand'
@@ -83,6 +83,70 @@ export function Login({ onEnter }: { onEnter: () => void }) {
     }
   }
   const [working, setWorking] = useState(false)
+  const googleMount = useRef<HTMLDivElement>(null)
+  const [googleVisible, setGoogleVisible] = useState(false)
+  const [googleAttempt, setGoogleAttempt] = useState(0)
+  const googleLogin = g.googleLogin
+  useEffect(() => {
+    const mount = googleMount.current
+    if (g.apiUrl !== '/api' || !mount) return
+    const el = mount
+    const ctl = new AbortController()
+    let resize: ResizeObserver | undefined
+    let configured = false
+    let exchanging = false
+    async function setup() {
+      const res = await fetch('/api?action=googleLoginConfig', { signal: ctl.signal })
+      if (!res.ok) return
+      const { clientId, nonce } = await res.json()
+      if (ctl.signal.aborted || typeof clientId !== 'string' || !clientId || typeof nonce !== 'string') return
+      configured = true
+      await loadGis()
+      if (ctl.signal.aborted) return
+      const id = window.google?.accounts?.id
+      if (!id) throw new Error('Google Identity Services is unavailable')
+      id.initialize({
+        client_id: clientId, nonce,
+        callback: async ({ credential }) => {
+          if (!credential || ctl.signal.aborted || exchanging || el.inert) return
+          exchanging = true
+          setWorking(true)
+          setErr('')
+          try {
+            await googleLogin(credential, nonce)
+            onEnter()
+          } catch (e) {
+            setErr(e instanceof Error ? e.message : L('ورود با گوگل انجام نشد.', 'Google sign-in failed.'))
+            setGoogleAttempt(n => n + 1)
+          } finally {
+            setWorking(false)
+          }
+        },
+      })
+      let lastWidth = 0
+      const render = () => {
+        const width = Math.min(400, el.clientWidth)
+        if (!width || width === lastWidth) return
+        lastWidth = width
+        el.replaceChildren()
+        id.renderButton(el, { type: 'standard', text: 'continue_with', width, locale: lang })
+        setGoogleVisible(true)
+      }
+      resize = new ResizeObserver(render)
+      resize.observe(el)
+      render()
+    }
+    void setup().catch(() => {
+      if (configured && !ctl.signal.aborted) {
+        setErr(L('ورود با گوگل در دسترس نیست؛ می‌توانید با رمز وارد شوید.', 'Google sign-in is unavailable; you can sign in with your password.'))
+      }
+    })
+    return () => {
+      ctl.abort()
+      resize?.disconnect()
+      el.replaceChildren()
+    }
+  }, [g.apiUrl, googleLogin, lang, onEnter, googleAttempt])
   const pwLogin = async () => {
     setErr('')
     setWorking(true)
@@ -127,7 +191,7 @@ export function Login({ onEnter }: { onEnter: () => void }) {
           </div>
         </header>
 
-        <main className="mx-auto grid w-full max-w-6xl flex-1 items-center gap-6 px-5 pb-8 sm:gap-10 sm:px-6 lg:grid-cols-[1.1fr_1fr] lg:gap-16 lg:px-10">
+        <main className="mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 items-center gap-6 px-5 pb-8 sm:gap-10 sm:px-6 lg:grid-cols-[1.1fr_1fr] lg:gap-16 lg:px-10">
           {/* hero: the Shad mark builds itself inside its orbits (madar = orbit) */}
           <section className="flex flex-col items-center text-center">
             <div className="hero-mark relative mx-auto h-44 w-44 sm:h-64 sm:w-64 lg:h-80 lg:w-80">
@@ -142,7 +206,7 @@ export function Login({ onEnter }: { onEnter: () => void }) {
           </section>
 
           {/* the form, on glass */}
-          <section className="login-card light-card mx-auto w-full max-w-md rounded-[2rem] p-7 text-[#16181d] sm:p-9">
+          <section className="login-card light-card mx-auto w-full min-w-0 max-w-md rounded-[2rem] p-7 text-[#16181d] sm:p-9">
             <h1 className="text-2xl font-semibold tracking-tight">{L('ورود به مدار', 'Sign in to Madar')}</h1>
             <p className="mt-1.5 text-sm text-[#6b7180]">{L('خوش آمدید', 'Welcome back')}</p>
 
@@ -191,15 +255,15 @@ export function Login({ onEnter }: { onEnter: () => void }) {
                 <form onSubmit={(e) => (e.preventDefault(), pwLogin())} className="space-y-3">
                   <label className="light-field">
                     <User size={16} className="shrink-0 text-[#9aa0ad]" />
-                    <input dir="ltr" autoFocus={!username} autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder={L('نام کاربری', 'Username')} value={username} onChange={(e) => setUsername(e.target.value)} />
+                    <input dir="ltr" name="username" aria-label={L('نام کاربری', 'Username')} autoFocus={!username} autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder={L('نام کاربری', 'Username')} value={username} onChange={(e) => setUsername(e.target.value)} />
                   </label>
-                  <label className="light-field">
-                    <KeyRound size={16} className="shrink-0 text-[#9aa0ad]" />
-                    <input dir="ltr" type={showPw ? 'text' : 'password'} autoFocus={!!username} autoComplete="current-password" placeholder={L('رمز عبور', 'Password')} value={password} onChange={(e) => setPassword(e.target.value)} />
-                    <button type="button" tabIndex={-1} onClick={() => setShowPw((x) => !x)} className="shrink-0 text-[#9aa0ad] transition hover:text-[#16181d]" aria-label={L('نمایش رمز', 'Show password')}>
+                  <div className="light-field">
+                    <KeyRound size={16} className="shrink-0 text-[#9aa0ad]" aria-hidden />
+                    <input dir="ltr" name="password" aria-label={L('رمز عبور', 'Password')} type={showPw ? 'text' : 'password'} autoFocus={!!username} autoComplete="current-password" placeholder={L('رمز عبور', 'Password')} value={password} onChange={(e) => setPassword(e.target.value)} />
+                    <button type="button" onClick={() => setShowPw((x) => !x)} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[#6b7180] transition hover:text-[#16181d]" aria-label={showPw ? L('پنهان کردن رمز', 'Hide password') : L('نمایش رمز', 'Show password')}>
                       {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
-                  </label>
+                  </div>
                   {g.otp && <div className="flex justify-end">
                     <button type="button" className="text-xs text-[#6b7180] transition hover:text-[#16181d]" onClick={() => (setForgot('ask'), setErr(''))}>
                       {L('رمز را فراموش کرده‌اید؟', 'Forgot password?')}
@@ -210,6 +274,11 @@ export function Login({ onEnter }: { onEnter: () => void }) {
                     {L('ورود', 'Sign in')}
                   </button>
                 </form>
+                )}
+                {g.apiUrl === '/api' && (
+                  <div className={googleVisible ? 'pt-1' : '!mt-0'} aria-busy={working}>
+                    <div ref={googleMount} inert={working} className="flex w-full min-w-0 justify-center" />
+                  </div>
                 )}
                 {!forgot && (g.googleEmail || g.appUrl) && (
                   <>
@@ -249,7 +318,7 @@ export function Login({ onEnter }: { onEnter: () => void }) {
                 {g.hosted && g.session ? L(`ادامه با ${g.session.email}`, `Continue as ${g.session.email}`) : L('ورود با حساب گوگل', 'Continue with Google')}
               </button>
             )}
-            {error && <p className="mt-3 rounded-xl bg-[#fde8eb] px-3 py-2 text-xs leading-5 text-[#c0283d]">{error}</p>}
+            {error && <p role="alert" className="mt-3 rounded-xl bg-[#fde8eb] px-3 py-2 text-xs leading-5 text-[#c0283d]">{error}</p>}
 
             {mode === 'demo' && (
               <div className="mt-7 border-t border-[#e6e8ee] pt-6">
