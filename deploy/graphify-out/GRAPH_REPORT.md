@@ -1,16 +1,16 @@
 # Graph Report - deploy  (2026-11-17)
 
 ## Corpus Check
-- 6 files · ~3,205 words
+- 7 files · ~3,756 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 49 nodes · 55 edges · 9 communities (4 shown, 5 thin omitted)
+- 53 nodes · 59 edges · 8 communities (4 shown, 4 thin omitted)
 - Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 3 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `1e9ba84f`
+- Built from commit: `1904686c`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -19,14 +19,14 @@
 - appContext
 - Madar on ASUS
 - sheet
-- main
-- convert
+- stage-sheets-import.py
+- update-from-ci.ps1
 
 ## God Nodes (most connected - your core abstractions)
 1. `main()` - 6 edges
 2. `appContext()` - 5 edges
-3. `convert()` - 4 edges
-4. `Madar on ASUS` - 4 edges
+3. `Madar on ASUS` - 5 edges
+4. `convert()` - 4 edges
 5. `sheet()` - 3 edges
 6. `schema()` - 3 edges
 7. `unavailable()` - 2 edges
@@ -35,13 +35,12 @@
 10. `atomic()` - 2 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `main()` --calls--> `schema()`  [EXTRACTED]
-  deploy/stage-sheets-import.py → deploy/stage-sheets-import.py  _Bridges community 8 → community 7_
+- None detected - all connections are within the same source files.
 
 ## Import Cycles
 - None detected.
 
-## Communities (9 total, 5 thin omitted)
+## Communities (8 total, 4 thin omitted)
 
 ### Community 0 - "server.mjs"
 Cohesion: 0.12
@@ -52,28 +51,28 @@ Cohesion: 0.33
 Nodes (5): appContext(), context, atomic(), blob(), unavailable()
 
 ### Community 2 - "Madar on ASUS"
-Cohesion: 0.40
-Nodes (4): Google dependencies and data, Madar on ASUS, Start and connect, Verify
+Cohesion: 0.33
+Nodes (5): CI and production deploys, Google dependencies and data, Madar on ASUS, Start and connect, Verify
 
-### Community 8 - "convert"
-Cohesion: 0.50
-Nodes (3): convert(), schema(), value()
+### Community 6 - "stage-sheets-import.py"
+Cohesion: 0.26
+Nodes (4): convert(), main(), schema(), value()
 
 ## Knowledge Gaps
-- **11 isolated node(s):** `pool`, `code`, `cache`, `cacheService`, `mime` (+6 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 31 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **5 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **12 isolated node(s):** `pool`, `code`, `cache`, `cacheService`, `mime` (+7 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 32 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **4 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `appContext()` connect `appContext` to `server.mjs`?**
-  _High betweenness centrality (0.042) - this node is a cross-community bridge._
+  _High betweenness centrality (0.036) - this node is a cross-community bridge._
 - **Are the 2 inferred relationships involving `appContext()` (e.g. with `blob()` and `unavailable()`) actually correct?**
   _`appContext()` has 2 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `pool`, `code`, `cache` to the rest of the system?**
-  _11 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _12 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `server.mjs` be split into smaller, more focused modules?**
   _Cohesion score 0.11764705882352941 - nodes in this community are weakly interconnected._
 - **Why does `sheet()` connect `sheet` to `server.mjs`?**
-  _High betweenness centrality (0.042) - this node is a cross-community bridge._
+  _High betweenness centrality (0.035) - this node is a cross-community bridge._

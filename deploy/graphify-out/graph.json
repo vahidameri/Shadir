@@ -100,36 +100,36 @@
       "source_location": "L46"
     },
     {
-      "id": "stage_sheets_import_main",
-      "label": "main()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "main",
-      "file_type": "code",
-      "norm_label": "main()",
-      "source_file": "deploy/stage-sheets-import.py",
-      "source_location": "L68"
-    },
-    {
       "id": "stage_sheets_import_convert",
       "label": "convert()",
       "_callable": true,
       "_origin": "ast",
-      "community": 8,
-      "community_name": "convert",
+      "community": 6,
+      "community_name": "stage-sheets-import.py",
       "file_type": "code",
       "norm_label": "convert()",
       "source_file": "deploy/stage-sheets-import.py",
       "source_location": "L34"
     },
     {
+      "id": "stage_sheets_import_main",
+      "label": "main()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 6,
+      "community_name": "stage-sheets-import.py",
+      "file_type": "code",
+      "norm_label": "main()",
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L68"
+    },
+    {
       "id": "stage_sheets_import_schema",
       "label": "schema()",
       "_callable": true,
       "_origin": "ast",
-      "community": 8,
-      "community_name": "convert",
+      "community": 6,
+      "community_name": "stage-sheets-import.py",
       "file_type": "code",
       "norm_label": "schema()",
       "source_file": "deploy/stage-sheets-import.py",
@@ -140,8 +140,8 @@
       "label": "value()",
       "_callable": true,
       "_origin": "ast",
-      "community": 8,
-      "community_name": "convert",
+      "community": 6,
+      "community_name": "stage-sheets-import.py",
       "file_type": "code",
       "norm_label": "value()",
       "source_file": "deploy/stage-sheets-import.py",
@@ -281,6 +281,18 @@
       "source_location": "L1"
     },
     {
+      "id": "readme_ci_and_production_deploys",
+      "label": "CI and production deploys",
+      "_origin": "ast",
+      "community": 2,
+      "community_name": "Madar on ASUS",
+      "file_type": "document",
+      "node_kind": "heading",
+      "norm_label": "ci and production deploys",
+      "source_file": "deploy/README.md",
+      "source_location": "L33"
+    },
+    {
       "id": "readme_google_dependencies_and_data",
       "label": "Google dependencies and data",
       "_origin": "ast",
@@ -406,6 +418,39 @@
       "source_location": "L1"
     },
     {
+      "id": "update_from_ci",
+      "label": "update-from-ci.ps1",
+      "_origin": "ast",
+      "community": 7,
+      "community_name": "update-from-ci.ps1",
+      "file_type": "code",
+      "norm_label": "update-from-ci.ps1",
+      "source_file": "deploy/update-from-ci.ps1",
+      "source_location": "L1"
+    },
+    {
+      "id": "update_from_ci_invoke_docker",
+      "label": "Invoke-Docker()",
+      "_origin": "ast",
+      "community": 7,
+      "community_name": "update-from-ci.ps1",
+      "file_type": "code",
+      "norm_label": "invoke-docker()",
+      "source_file": "deploy/update-from-ci.ps1",
+      "source_location": "L5"
+    },
+    {
+      "id": "update_from_ci_update_web",
+      "label": "Update-Web()",
+      "_origin": "ast",
+      "community": 7,
+      "community_name": "update-from-ci.ps1",
+      "file_type": "code",
+      "norm_label": "update-web()",
+      "source_file": "deploy/update-from-ci.ps1",
+      "source_location": "L10"
+    },
+    {
       "id": "ref_node_crypto",
       "label": "ref_node_crypto",
       "_origin": "semantic",
@@ -490,8 +535,33 @@
       "type": "external"
     },
     {
+      "id": "argparse",
+      "label": "argparse",
+      "_origin": "semantic",
+      "community": 6,
+      "community_name": "stage-sheets-import.py",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "argparse",
+      "source_file": "",
+      "type": "external"
+    },
+    {
+      "id": "csv",
+      "label": "csv",
+      "_origin": "semantic",
+      "community": 6,
+      "community_name": "stage-sheets-import.py",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "csv",
+      "source_file": "",
+      "type": "external"
+    },
+    {
       "id": "datetime",
       "label": "datetime",
+      "_origin": "semantic",
       "community": 6,
       "community_name": "stage-sheets-import.py",
       "external": true,
@@ -501,8 +571,21 @@
       "type": "external"
     },
     {
+      "id": "json",
+      "label": "json",
+      "_origin": "semantic",
+      "community": 6,
+      "community_name": "stage-sheets-import.py",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "json",
+      "source_file": "",
+      "type": "external"
+    },
+    {
       "id": "openpyxl",
       "label": "openpyxl",
+      "_origin": "semantic",
       "community": 6,
       "community_name": "stage-sheets-import.py",
       "external": true,
@@ -514,6 +597,7 @@
     {
       "id": "pathlib",
       "label": "pathlib",
+      "_origin": "semantic",
       "community": 6,
       "community_name": "stage-sheets-import.py",
       "external": true,
@@ -523,43 +607,11 @@
       "type": "external"
     },
     {
-      "id": "argparse",
-      "label": "argparse",
-      "community": 7,
-      "community_name": "main",
-      "external": true,
-      "file_type": "concept",
-      "norm_label": "argparse",
-      "source_file": "",
-      "type": "external"
-    },
-    {
-      "id": "csv",
-      "label": "csv",
-      "community": 7,
-      "community_name": "main",
-      "external": true,
-      "file_type": "concept",
-      "norm_label": "csv",
-      "source_file": "",
-      "type": "external"
-    },
-    {
-      "id": "json",
-      "label": "json",
-      "community": 7,
-      "community_name": "main",
-      "external": true,
-      "file_type": "concept",
-      "norm_label": "json",
-      "source_file": "",
-      "type": "external"
-    },
-    {
       "id": "re",
       "label": "re",
-      "community": 8,
-      "community_name": "convert",
+      "_origin": "semantic",
+      "community": 6,
+      "community_name": "stage-sheets-import.py",
       "external": true,
       "file_type": "concept",
       "norm_label": "re",
@@ -869,6 +921,17 @@
       "weight": 1.0
     },
     {
+      "source": "update_from_ci_update_web",
+      "target": "update_from_ci_invoke_docker",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "deploy/update-from-ci.ps1",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
       "source": "readme",
       "target": "readme_madar_on_asus",
       "relation": "contains",
@@ -899,6 +962,17 @@
       "confidence_score": 1.0,
       "source_file": "deploy/README.md",
       "source_location": "L27",
+      "weight": 1.0
+    },
+    {
+      "source": "readme_madar_on_asus",
+      "target": "readme_ci_and_production_deploys",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "deploy/README.md",
+      "source_location": "L33",
       "weight": 1.0
     },
     {
@@ -1144,6 +1218,28 @@
       "weight": 1.0
     },
     {
+      "source": "update_from_ci",
+      "target": "update_from_ci_update_web",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "deploy/update-from-ci.ps1",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "update_from_ci",
+      "target": "update_from_ci_invoke_docker",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "deploy/update-from-ci.ps1",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
       "source": "server_appcontext_context",
       "target": "server_appcontext_context_pwhash",
       "relation": "method",
@@ -1203,5 +1299,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "1e9ba84fd1da4959a5c9a67a7e2c8a44ba3b201e"
+  "built_at_commit": "1904686cb84e9067d1454274eecdd80846839516"
 }

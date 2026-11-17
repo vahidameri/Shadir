@@ -1,0 +1,47 @@
+name: Madar CI
+
+on:
+  pull_request:
+    branches: [codex/asus-postgres]
+  push:
+    branches: [codex/asus-postgres]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: madar-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Build and start isolated Madar stack
+        run: |
+          mkdir -m 700 .secrets
+          openssl rand -hex 32 | tr -d '\n' > .secrets/db-password.txt
+          docker compose config --quiet
+          docker compose build web
+          docker compose up --wait --wait-timeout 90 db
+      - name: Verify frontend, database and API access
+        run: |
+          admin_password=$(openssl rand -hex 32)
+          printf '%s' "$admin_password" | docker compose run --rm --no-deps -T web node deploy/server.mjs bootstrap
+          docker compose up --no-deps --no-build --wait --wait-timeout 60 web
+          curl --fail --silent --show-error http://127.0.0.1:4181/healthz | jq -e '.ok == true'
+          curl --fail --silent --show-error http://127.0.0.1:4181/ | grep -F '<div id="root">'
+          curl --fail --silent --show-error 'http://127.0.0.1:4181/api?action=all' | jq -e '.ok == false'
+          jq -nc --arg password "$admin_password" '{action:"pwLogin",username:"admin",password:$password}' |
+            curl --fail --silent --show-error -H 'Content-Type: application/json' --data-binary @- http://127.0.0.1:4181/api |
+            jq -e '.ok == true and (.session | type == "string")' > /dev/null
+      - name: Show service status on failure
+        if: failure()
+        run: docker compose ps -a
+      - name: Stop ephemeral test stack
+        if: always()
+        run: docker compose down --volumes

@@ -29,3 +29,11 @@ The check creates one temporary project record, restarts this stack, verifies th
 The app starts with an empty project dataset. Google Sheets data can be imported when the owner provides each source. Local username/password login is enabled. The Google deployment continues to use its existing handlers and Google integrations. In this Docker deployment, Google sign-in, email and email-based recovery, Drive uploads, Calendar synchronization and external sheet imports require separate integration work.
 
 Upstream source revision: `e34716ee7e7dad23ec448040bfa84cb17255e9fb`.
+
+## CI and production deploys
+
+Open pull requests against `codex/asus-postgres`. On pull requests and pushes to that branch, **Madar CI** builds the Docker image, starts a temporary PostgreSQL database, and checks the frontend, health endpoint, and login. GitHub Pages has a separate workflow.
+
+The `Madar Deploy from CI` Windows task runs `deploy/update-from-ci.ps1` on ASUS every three minutes while the Docker Desktop user session is active. It checks the most recent push run of Madar CI and downloads/builds that exact commit only when the run passes. It replaces the web container, checks local health, and reverts to the previous web image on failure. PostgreSQL and the Cloudflare connector remain in place. A failed release can be retried by removing its SHA from `.secrets/madar-ci-failed-sha` on ASUS after correcting the cause. To pause deployments, disable the Windows task.
+
+The ASUS script is installed on the server and changes to the script itself require a separate server update. Schema or Compose changes require a separate deployment step.
