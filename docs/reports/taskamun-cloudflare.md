@@ -1,10 +1,10 @@
 # Madar on taskamun.ir
 
-2026-11-17. Published application route configured in Cloudflare on the dedicated `madar` tunnel. The dashboard confirmed a CNAME for `taskamun.ir` pointing to the tunnel, and the route maps to `http://127.0.0.1:4181` on ASUS.
+2026-11-17. The Cloudflare `madar` tunnel publishes `taskamun.ir` to `http://127.0.0.1:4181` on ASUS. Cloudflare confirmed creation of the CNAME for the route.
 
-- The origin `/healthz` returned HTTP 200 over the existing ASUS SSH connection.
-- Installed the official Windows cloudflared package. The server reported version 2026.11.0 at `C:\Program Files (x86)\cloudflared\cloudflared.exe`. Service registration is pending.
-- On ASUS, run the Windows service installation command shown in Cloudflare under the `madar` tunnel's **Add a replica** page from an elevated PowerShell. Use the absolute path above if the executable is absent from PATH. Keep the connector token out of the repository and shared messages.
-- The authoritative `.ir` nameserver and public resolvers still returned NXDOMAIN at the time of checking. Once the connector is healthy and delegation is visible, verify public HTTPS on `/healthz` and confirm the Madar login page loads.
+- Registered the official cloudflared 2026.11.0 Windows service on ASUS. Windows reports Running and the Cloudflare dashboard reports Healthy. ASUS reached the Cloudflare edge on TCP 7844, and the local Madar `/healthz` returned HTTP 200.
+- The service token file grants access only to Windows Administrators and SYSTEM. The temporary local transfer file was removed.
+- Cloudflare requests `aria.ns.cloudflare.com` and `rustam.ns.cloudflare.com`. At verification, Cloudflare was waiting for registrar propagation and both `a.nic.ir` and `b.nic.ir` returned NXDOMAIN. The public HTTPS request could not resolve the hostname.
+- After delegation becomes visible, verify public HTTPS on `/healthz` and confirm that the Madar login page loads on the root URL.
 
-The application and database configuration were untouched. Atlas was outside this change.
+The application and database configuration were outside this change, as was Atlas.
