@@ -1,16 +1,16 @@
-# Graph Report - deploy  (2026-11-16)
+# Graph Report - deploy  (2026-11-17)
 
 ## Corpus Check
-- 4 files · ~2,423 words
+- 6 files · ~3,205 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 36 nodes · 35 edges · 6 communities (3 shown, 3 thin omitted)
-- Extraction: 91% EXTRACTED · 9% INFERRED · 0% AMBIGUOUS · INFERRED: 3 edges (avg confidence: 0.85)
+- 49 nodes · 55 edges · 9 communities (4 shown, 5 thin omitted)
+- Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 3 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `e34716ee`
+- Built from commit: `1e9ba84f`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -19,26 +19,29 @@
 - appContext
 - Madar on ASUS
 - sheet
+- main
+- convert
 
 ## God Nodes (most connected - your core abstractions)
-1. `appContext()` - 5 edges
-2. `Madar on ASUS` - 4 edges
-3. `sheet()` - 3 edges
-4. `unavailable()` - 2 edges
-5. `blob()` - 2 edges
-6. `context` - 2 edges
-7. `atomic()` - 2 edges
-8. `pool` - 1 edges
-9. `code` - 1 edges
-10. `cache` - 1 edges
+1. `main()` - 6 edges
+2. `appContext()` - 5 edges
+3. `convert()` - 4 edges
+4. `Madar on ASUS` - 4 edges
+5. `sheet()` - 3 edges
+6. `schema()` - 3 edges
+7. `unavailable()` - 2 edges
+8. `blob()` - 2 edges
+9. `context` - 2 edges
+10. `atomic()` - 2 edges
 
 ## Surprising Connections (you probably didn't know these)
-- None detected - all connections are within the same source files.
+- `main()` --calls--> `schema()`  [EXTRACTED]
+  deploy/stage-sheets-import.py → deploy/stage-sheets-import.py  _Bridges community 8 → community 7_
 
 ## Import Cycles
 - None detected.
 
-## Communities (6 total, 3 thin omitted)
+## Communities (9 total, 5 thin omitted)
 
 ### Community 0 - "server.mjs"
 Cohesion: 0.12
@@ -52,16 +55,20 @@ Nodes (5): appContext(), context, atomic(), blob(), unavailable()
 Cohesion: 0.40
 Nodes (4): Google dependencies and data, Madar on ASUS, Start and connect, Verify
 
+### Community 8 - "convert"
+Cohesion: 0.50
+Nodes (3): convert(), schema(), value()
+
 ## Knowledge Gaps
 - **11 isolated node(s):** `pool`, `code`, `cache`, `cacheService`, `mime` (+6 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 27 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **3 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 31 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **5 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `appContext()` connect `appContext` to `server.mjs`?**
-  _High betweenness centrality (0.080) - this node is a cross-community bridge._
+  _High betweenness centrality (0.042) - this node is a cross-community bridge._
 - **Are the 2 inferred relationships involving `appContext()` (e.g. with `blob()` and `unavailable()`) actually correct?**
   _`appContext()` has 2 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `pool`, `code`, `cache` to the rest of the system?**
@@ -69,4 +76,4 @@ _Questions this graph is uniquely positioned to answer:_
 - **Should `server.mjs` be split into smaller, more focused modules?**
   _Cohesion score 0.11764705882352941 - nodes in this community are weakly interconnected._
 - **Why does `sheet()` connect `sheet` to `server.mjs`?**
-  _High betweenness centrality (0.079) - this node is a cross-community bridge._
+  _High betweenness centrality (0.042) - this node is a cross-community bridge._

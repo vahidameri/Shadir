@@ -100,6 +100,54 @@
       "source_location": "L46"
     },
     {
+      "id": "stage_sheets_import_main",
+      "label": "main()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 7,
+      "community_name": "main",
+      "file_type": "code",
+      "norm_label": "main()",
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L68"
+    },
+    {
+      "id": "stage_sheets_import_convert",
+      "label": "convert()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 8,
+      "community_name": "convert",
+      "file_type": "code",
+      "norm_label": "convert()",
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L34"
+    },
+    {
+      "id": "stage_sheets_import_schema",
+      "label": "schema()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 8,
+      "community_name": "convert",
+      "file_type": "code",
+      "norm_label": "schema()",
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L25"
+    },
+    {
+      "id": "stage_sheets_import_value",
+      "label": "value()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 8,
+      "community_name": "convert",
+      "file_type": "code",
+      "norm_label": "value()",
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L11"
+    },
+    {
       "id": "server",
       "label": "server.mjs",
       "_origin": "ast",
@@ -336,8 +384,31 @@
       "source_location": "L1"
     },
     {
+      "id": "stage_sheets_import",
+      "label": "stage-sheets-import.py",
+      "_origin": "ast",
+      "community": 6,
+      "community_name": "stage-sheets-import.py",
+      "file_type": "code",
+      "norm_label": "stage-sheets-import.py",
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "stage_sheets_import_rationale_1",
+      "label": "Stage a read-only Google Sheets workbook export for the Madar PostgreSQL import.",
+      "_origin": "ast",
+      "community": 6,
+      "community_name": "stage-sheets-import.py",
+      "file_type": "rationale",
+      "norm_label": "stage a read-only google sheets workbook export for the madar postgresql import.",
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L1"
+    },
+    {
       "id": "ref_node_crypto",
       "label": "ref_node_crypto",
+      "_origin": "semantic",
       "community": 0,
       "community_name": "server.mjs",
       "external": true,
@@ -349,6 +420,7 @@
     {
       "id": "ref_node_fs",
       "label": "ref_node_fs",
+      "_origin": "semantic",
       "community": 0,
       "community_name": "server.mjs",
       "external": true,
@@ -360,6 +432,7 @@
     {
       "id": "ref_node_http",
       "label": "ref_node_http",
+      "_origin": "semantic",
       "community": 0,
       "community_name": "server.mjs",
       "external": true,
@@ -371,6 +444,7 @@
     {
       "id": "ref_node_path",
       "label": "ref_node_path",
+      "_origin": "semantic",
       "community": 0,
       "community_name": "server.mjs",
       "external": true,
@@ -382,6 +456,7 @@
     {
       "id": "ref_node_vm",
       "label": "ref_node_vm",
+      "_origin": "semantic",
       "community": 0,
       "community_name": "server.mjs",
       "external": true,
@@ -393,6 +468,7 @@
     {
       "id": "ref_node_zlib",
       "label": "ref_node_zlib",
+      "_origin": "semantic",
       "community": 0,
       "community_name": "server.mjs",
       "external": true,
@@ -404,11 +480,89 @@
     {
       "id": "ref_pg",
       "label": "ref_pg",
+      "_origin": "semantic",
       "community": 0,
       "community_name": "server.mjs",
       "external": true,
       "file_type": "concept",
       "norm_label": "ref_pg",
+      "source_file": "",
+      "type": "external"
+    },
+    {
+      "id": "datetime",
+      "label": "datetime",
+      "community": 6,
+      "community_name": "stage-sheets-import.py",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "datetime",
+      "source_file": "",
+      "type": "external"
+    },
+    {
+      "id": "openpyxl",
+      "label": "openpyxl",
+      "community": 6,
+      "community_name": "stage-sheets-import.py",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "openpyxl",
+      "source_file": "",
+      "type": "external"
+    },
+    {
+      "id": "pathlib",
+      "label": "pathlib",
+      "community": 6,
+      "community_name": "stage-sheets-import.py",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "pathlib",
+      "source_file": "",
+      "type": "external"
+    },
+    {
+      "id": "argparse",
+      "label": "argparse",
+      "community": 7,
+      "community_name": "main",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "argparse",
+      "source_file": "",
+      "type": "external"
+    },
+    {
+      "id": "csv",
+      "label": "csv",
+      "community": 7,
+      "community_name": "main",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "csv",
+      "source_file": "",
+      "type": "external"
+    },
+    {
+      "id": "json",
+      "label": "json",
+      "community": 7,
+      "community_name": "main",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "json",
+      "source_file": "",
+      "type": "external"
+    },
+    {
+      "id": "re",
+      "label": "re",
+      "community": 8,
+      "community_name": "convert",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "re",
       "source_file": "",
       "type": "external"
     }
@@ -424,6 +578,102 @@
       "context": "call",
       "source_file": "deploy/server.mjs",
       "source_location": "L184",
+      "weight": 1.0
+    },
+    {
+      "source": "stage_sheets_import_convert",
+      "target": "stage_sheets_import_value",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L39",
+      "weight": 1.0
+    },
+    {
+      "source": "stage_sheets_import_convert",
+      "target": "re",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L45",
+      "weight": 1.0
+    },
+    {
+      "source": "stage_sheets_import_main",
+      "target": "argparse",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L69",
+      "weight": 1.0
+    },
+    {
+      "source": "stage_sheets_import_main",
+      "target": "stage_sheets_import_convert",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L75",
+      "weight": 1.0
+    },
+    {
+      "source": "stage_sheets_import_main",
+      "target": "stage_sheets_import_schema",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L75",
+      "weight": 1.0
+    },
+    {
+      "source": "stage_sheets_import_main",
+      "target": "csv",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L78",
+      "weight": 1.0
+    },
+    {
+      "source": "stage_sheets_import_main",
+      "target": "json",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L80",
+      "weight": 1.0
+    },
+    {
+      "source": "stage_sheets_import_schema",
+      "target": "re",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L28",
       "weight": 1.0
     },
     {
@@ -448,6 +698,54 @@
       "context": "call",
       "source_file": "deploy/server.mjs",
       "source_location": "L230",
+      "weight": 1.0
+    },
+    {
+      "source": "stage_sheets_import",
+      "target": "argparse",
+      "relation": "imports",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "import",
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "stage_sheets_import",
+      "target": "csv",
+      "relation": "imports",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "import",
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "stage_sheets_import",
+      "target": "json",
+      "relation": "imports",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "import",
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "stage_sheets_import",
+      "target": "re",
+      "relation": "imports",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "import",
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L7",
       "weight": 1.0
     },
     {
@@ -532,6 +830,42 @@
       "context": "import",
       "source_file": "deploy/server.mjs",
       "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "stage_sheets_import",
+      "target": "datetime",
+      "relation": "imports_from",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "import",
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "stage_sheets_import",
+      "target": "pathlib",
+      "relation": "imports_from",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "import",
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "stage_sheets_import",
+      "target": "openpyxl",
+      "relation": "imports_from",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "import",
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L9",
       "weight": 1.0
     },
     {
@@ -766,6 +1100,50 @@
       "weight": 1.0
     },
     {
+      "source": "stage_sheets_import",
+      "target": "stage_sheets_import_value",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "stage_sheets_import",
+      "target": "stage_sheets_import_schema",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L25",
+      "weight": 1.0
+    },
+    {
+      "source": "stage_sheets_import",
+      "target": "stage_sheets_import_convert",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L34",
+      "weight": 1.0
+    },
+    {
+      "source": "stage_sheets_import",
+      "target": "stage_sheets_import_main",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L68",
+      "weight": 1.0
+    },
+    {
       "source": "server_appcontext_context",
       "target": "server_appcontext_context_pwhash",
       "relation": "method",
@@ -774,6 +1152,17 @@
       "confidence_score": 1.0,
       "source_file": "deploy/server.mjs",
       "source_location": "L143",
+      "weight": 1.0
+    },
+    {
+      "source": "stage_sheets_import_rationale_1",
+      "target": "stage_sheets_import",
+      "relation": "rationale_for",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "deploy/stage-sheets-import.py",
+      "source_location": "L1",
       "weight": 1.0
     },
     {
@@ -814,5 +1203,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "e34716ee7e7dad23ec448040bfa84cb17255e9fb"
+  "built_at_commit": "1e9ba84fd1da4959a5c9a67a7e2c8a44ba3b201e"
 }
