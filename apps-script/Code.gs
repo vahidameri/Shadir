@@ -100,7 +100,7 @@ function doGet(e) {
   // No action → serve the app itself (Index.html). Everything runs on Google: no other hosting.
   if (!e.parameter.action) {
     return HtmlService.createHtmlOutputFromFile('Index')
-      .setTitle('Madar')
+      .setTitle('Taskamun')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
   }

@@ -1,27 +1,23 @@
-// Back office → Import: bring tasks, follow-ups, Mizito mentions, people or an old log in from the
-// sheets used before Madar. Source: a Google Sheet link, pasted cells or a CSV file. Columns and values
+// Back office → Import: bring tasks, follow-ups, Mizito mentions, people or an old log in from
+// pasted cells or a CSV file. Columns and values
 // are guessed and can be corrected; duplicates are skipped; Mizito rows of the same task become one
 // item with a thread. Every import is a batch that can be taken back.
 import { dirOf } from '../lib/dir'
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, ClipboardPaste, FileUp, Link2, RotateCcw, Sheet as SheetIcon, Upload } from 'lucide-react'
+import { CheckCircle2, ClipboardPaste, FileUp, RotateCcw, Upload } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { Card, Empty, Segmented, cx } from './ui'
 import { L, tr } from '../lib/i18n'
 import { fa } from '../lib/jalali'
 import { TARGETS, build, cellText, detectHeader, distinctValues, enumOptions, guessColumns, guessValue, parseText, type Plan, type Target } from '../lib/importer'
 
-type Source = 'sheet' | 'paste' | 'file'
+type Source = 'paste' | 'file'
 const MAP_KEY = (t: Target) => `import.map.${t}`
 
 export function ImportPage() {
-  const { db, mode, me, action, bulk, undoBatch, setting, setSetting, toast, access } = useStore()
+  const { db, me, bulk, undoBatch, setting, setSetting, toast, access } = useStore()
   const [target, setTarget] = useState<Target>('Tasks')
-  const [source, setSource] = useState<Source>(mode === 'live' ? 'sheet' : 'paste')
-  const [url, setUrl] = useState('')
-  const [tabs, setTabs] = useState<string[]>([])
-  const [tab, setTab] = useState('')
-  const [title, setTitle] = useState('')
+  const [source, setSource] = useState<Source>('paste')
   const [text, setText] = useState('')
   const [rows, setRows] = useState<string[][]>([])
   const [header, setHeader] = useState(0)
@@ -59,24 +55,6 @@ export function ImportPage() {
   const plan: Plan = { target, rows, header, cols, values, addPeople, me }
   const built = useMemo(() => (rows.length && cols[fields.find((f) => f.required)!.key] !== undefined ? build(db, plan) : null), [db, rows, header, cols, values, addPeople, target, me]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadSheet = async (t = tab) => {
-    if (!url.trim()) return
-    setBusy(true)
-    try {
-      const res = (await action('readSheet', { url: url.trim(), tab: t })) as { tabs: string[]; title: string; rows: string[][] } | undefined
-      if (!res) {
-        toast(L('خواندن از گوگل‌شیت فقط در نسخه‌ی نصب‌شده کار می‌کند؛ در نسخه‌ی نمایشی از «چسباندن» استفاده کنید.', 'Reading a Google Sheet works in the installed app only; use paste in the demo.'), 'err')
-        return
-      }
-      setTabs(res.tabs)
-      setTitle(res.title)
-      if (t) setRows(res.rows)
-    } catch (e) {
-      toast(String(e instanceof Error ? e.message : e), 'err')
-    } finally {
-      setBusy(false)
-    }
-  }
   const readFile = (f?: File) => {
     if (!f) return
     const r = new FileReader()
@@ -151,48 +129,23 @@ export function ImportPage() {
           value={source}
           onChange={setSource}
           options={[
-            { value: 'sheet', label: L('لینک گوگل‌شیت', 'Google Sheet link') },
             { value: 'paste', label: L('چسباندن سلول‌ها', 'Paste cells') },
             { value: 'file', label: L('فایل CSV', 'CSV file') },
           ]}
         />
         <div className="mt-4">
-          {source === 'sheet' && (
-            <div className="space-y-3">
-              <div className="flex flex-wrap gap-2">
-                <label className="flex min-w-[16rem] flex-1 items-center gap-2 rounded-xl border border-line px-3">
-                  <Link2 size={14} className="text-sub" />
-                  <input dir="ltr" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://docs.google.com/spreadsheets/d/…" className="h-10 w-full bg-transparent text-xs outline-none" />
-                </label>
-                <button className="btn-outline btn-sm h-10" disabled={!url.trim() || busy} onClick={() => loadSheet('')}>
-                  <SheetIcon size={14} /> {L('خواندن تب‌ها', 'Read tabs')}
-                </button>
-              </div>
-              {tabs.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2 text-sm">
-                  <span className="text-sub">{title} ·</span>
-                  {tabs.map((t) => (
-                    <button key={t} onClick={() => (setTab(t), loadSheet(t))} className={cx('h-8 rounded-full border px-3 text-xs', tab === t ? 'border-ink bg-ink text-surface' : 'border-line')}>
-                      {t}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <p className="text-[0.6875rem] leading-5 text-sub">{L('حساب گوگلی که مدار را نصب کرده باید به این شیت دسترسی داشته باشد. لینک‌های داخل سلول‌ها (مثل «Link» به میزیتو) هم خوانده می‌شوند.', 'The Google account that installed Madar must have access to the sheet. Links inside cells (like “Link” to Mizito) are read too.')}</p>
-            </div>
-          )}
           {source === 'paste' && (
             <div className="space-y-2">
               <textarea value={text} onChange={(e) => setText(e.target.value)} rows={8} dir="auto" className="input w-full py-2 font-mono text-xs" placeholder={L('در شیت قدیمی، محدوده را (با ردیف عنوان ستون‌ها) انتخاب کنید، Ctrl+C و اینجا Ctrl+V', 'Select the range in the old sheet (with the header row), copy and paste here')} />
               <button className="btn-outline btn-sm" disabled={!text.trim()} onClick={() => setRows(parseText(text))}>
                 <ClipboardPaste size={14} /> {L('خواندن', 'Read')}
               </button>
-              <p className="text-[0.6875rem] text-sub">{L('توجه: با چسباندن، لینک‌های پشت متن (مثل «Link») منتقل نمی‌شوند؛ برای لینک‌ها از «لینک گوگل‌شیت» استفاده کنید.', 'Note: pasting drops links hidden behind text; use the Google Sheet link for those.')}</p>
+              <p className="text-[0.6875rem] text-sub">{L('توجه: با چسباندن، لینک‌های پشت متن (مثل «Link») منتقل نمی‌شوند؛ برای انتقال لینک‌ها، نشانی کامل را در سلول قرار دهید.', 'Note: pasting drops links hidden behind text; put the full URL in the cell to import it.')}</p>
             </div>
           )}
           {source === 'file' && (
             <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-line-strong p-6 text-sm text-sub hover:text-ink">
-              <FileUp size={16} /> {L('انتخاب فایل CSV (از گوگل‌شیت: File ← Download ← CSV)', 'Choose a CSV (Google Sheets: File → Download → CSV)')}
+              <FileUp size={16} /> {L('انتخاب فایل CSV', 'Choose a CSV file')}
               <input type="file" accept=".csv,.tsv,.txt" className="hidden" onChange={(e) => readFile(e.target.files?.[0])} />
             </label>
           )}

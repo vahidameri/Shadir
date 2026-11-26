@@ -1,6 +1,6 @@
-# Madar on ASUS
+# Taskamun on ASUS
 
-The Docker deployment contains the Vite frontend, a Node.js adapter for the existing Apps Script handlers, and a dedicated PostgreSQL 16 service. The adapter runs the existing application routes and permission checks. PostgreSQL stores logical sheets and app properties in two tables. The single web replica processes each request against a database transaction and saves changed sheets as JSONB. PostgreSQL listens on the project's Compose network. Its named volume survives a container restart or replacement.
+The Docker deployment contains the Vite frontend, a Node.js adapter for the existing Apps Script handlers, and a dedicated PostgreSQL 16 service. The adapter runs the existing application routes and permission checks. The adapter provides a local spreadsheet-shaped interface over PostgreSQL for the shared handlers. PostgreSQL stores app records as JSONB and stores app properties in a separate table. The web service processes each request in a database transaction. PostgreSQL listens on the project's Compose network. Its named volume survives a container restart or replacement.
 
 ## Start and connect
 
@@ -24,9 +24,11 @@ With both stacks running, from this deployment directory on ASUS:
 
 The check creates one temporary project record, restarts this stack, verifies the record still exists, deletes it and revokes the test session. It also checks unauthenticated requests and isolation against the other stack.
 
-## Google dependencies and data
+## Data and integrations
 
-The app starts with an empty project dataset. Google Sheets data can be imported when the owner provides each source. Local username/password login is enabled. The Apps Script deployment keeps its own Google integrations. This Docker deployment can use Google for sign-in. Email and email-based recovery, Drive uploads, Calendar synchronization and external sheet imports require separate setup.
+PostgreSQL is the data store for the Docker site. The historical Google Sheets import was a one-time migration. New imports use pasted cells or CSV files. The Docker runtime uses the same-origin `/api` endpoint even when a browser has an old Apps Script URL saved.
+
+Password login is enabled. Google sign-in is optional. Email and email-based recovery, Drive uploads, and Calendar synchronization require separate setup.
 
 ### Enable Google sign-in on the Docker site
 

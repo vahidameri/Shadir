@@ -18,7 +18,7 @@ import { useEditor } from './Editor'
 import { cx, Avatar, HealthDot, Popover, MenuItem } from './ui'
 import { fa, fmtDayMonth } from '../lib/jalali'
 import { useGoogle } from '../lib/google'
-import { APP_NAME, VERSION } from '../lib/brand'
+import { APP_NAME, SHAD_WORDMARK, VERSION } from '../lib/brand'
 import { hubOf, type Hub } from './HubNav'
 import { can } from '../lib/access'
 import { ACCESS, JOB_TITLE } from '../lib/labels'
@@ -175,7 +175,7 @@ export function Layout({ children }: { children: ReactNode }) {
           {wide && (
             <div className="leading-tight">
               <div className="text-sm font-semibold tracking-tight">{APP_NAME()}</div>
-              <div className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-band-sub">Shad · Madar</div>
+              <div className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-band-sub">{SHAD_WORDMARK}</div>
             </div>
           )}
         </Link>
@@ -264,7 +264,7 @@ export function Layout({ children }: { children: ReactNode }) {
             <>
               <div className="px-2.5 py-2">
                 <div className="text-sm font-medium">{me}</div>
-                <div className="text-xs text-sub">{mode === 'demo' ? L('حالت نمایشی با داده‌ی نمونه', 'Demo mode with sample data') : L('متصل به Google Sheets', 'Connected to Google Sheets')}</div>
+                <div className="text-xs text-sub">{mode === 'demo' ? L('حالت نمایشی با داده‌ی نمونه', 'Demo mode with sample data') : apiUrl === '/api' ? L('متصل به پایگاه دادهٔ PostgreSQL', 'Connected to PostgreSQL') : L('متصل به سرور', 'Connected to server')}</div>
               </div>
               <div className="my-1 h-px bg-line" />
               {myMember && (
@@ -399,7 +399,10 @@ export function Layout({ children }: { children: ReactNode }) {
         {/* page and server must be the same release; a half-done update shows here for the program manager */}
         {mode === 'live' && lastSync && can.backoffice(access) && serverVersion !== VERSION && (
           <div className="bg-warn px-4 py-2 text-center text-xs text-white no-print">
-            {L(
+            {apiUrl === '/api' ? L(
+              `نسخهٔ صفحه (${VERSION}) با نسخهٔ سرور (${serverVersion || 'قدیمی‌تر'}) یکسان نیست. صفحه را تازه کنید.`,
+              `The page version (${VERSION}) differs from the server version (${serverVersion || 'older'}). Refresh the page.`,
+            ) : L(
               `نسخه‌ی صفحه ${VERSION} است ولی سرور (Code.gs) ${serverVersion || 'قدیمی‌تر'} — Code.gs را جایگزین کنید و در Manage deployments برای Madar Team «New version» بزنید.`,
               `This page is ${VERSION} but the server (Code.gs) is ${serverVersion || 'older'} — replace Code.gs and create a New version of Madar Team in Manage deployments.`,
             )}
@@ -411,7 +414,7 @@ export function Layout({ children }: { children: ReactNode }) {
             <Link to="/settings" className="font-semibold underline">{L('ذخیره‌ی لینک', 'Save the link')}</Link>
           </div>
         )}
-        {error && mode === 'live' && <div className="bg-bad px-4 py-2 text-center text-xs text-white no-print">{L('اتصال به Google Sheet برقرار نشد', 'Could not reach Google Sheet')}: {error}</div>}
+        {error && mode === 'live' && <div className="bg-bad px-4 py-2 text-center text-xs text-white no-print">{L('ارتباط با سرور برقرار نشد', 'Could not reach the server')}: {error}</div>}
 
         <main ref={mainRef} className="flex-1 overflow-y-auto">
           <div className="@container px-4 pb-16 sm:px-6 lg:px-8 print-full" key={loc.pathname}>

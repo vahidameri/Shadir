@@ -1,7 +1,7 @@
-# Graph Report - deploy  (2026-11-17)
+# Graph Report - deploy  (2026-11-26)
 
 ## Corpus Check
-- 10 files · ~5,190 words
+- 10 files · ~5,207 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,14 +10,14 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `32aa529b`
+- Built from commit: `fcecbf78`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - server.mjs
 - appContext
-- Madar on ASUS
+- Taskamun on ASUS
 - sheet
 - stage-sheets-import.py
 - update-from-ci.ps1
@@ -26,7 +26,7 @@
 ## God Nodes (most connected - your core abstractions)
 1. `main()` - 6 edges
 2. `appContext()` - 5 edges
-3. `Madar on ASUS` - 5 edges
+3. `Taskamun on ASUS` - 5 edges
 4. `convert()` - 4 edges
 5. `createGoogleSignIn()` - 3 edges
 6. `openGoogleSession()` - 3 edges
@@ -51,9 +51,9 @@ Nodes (8): cache, cacheService, code, disabledActions, dist, loginThrottle, mime
 Cohesion: 0.33
 Nodes (5): appContext(), context, atomic(), blob(), unavailable()
 
-### Community 2 - "Madar on ASUS"
+### Community 2 - "Taskamun on ASUS"
 Cohesion: 0.29
-Nodes (6): CI and production deploys, Enable Google sign-in on the Docker site, Google dependencies and data, Madar on ASUS, Start and connect, Verify
+Nodes (6): CI and production deploys, Data and integrations, Enable Google sign-in on the Docker site, Start and connect, Taskamun on ASUS, Verify
 
 ### Community 6 - "stage-sheets-import.py"
 Cohesion: 0.26
