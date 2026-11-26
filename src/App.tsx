@@ -33,6 +33,7 @@ import { Skeleton } from './components/ui'
 import { Login } from './components/Login'
 import { MadarLoader } from './components/Brand'
 import { usePref } from './lib/prefs'
+import { APP_NAME_EN, APP_NAME_FA, SHAD_WORDMARK } from './lib/brand'
 
 /** Department-wide pages are for the PgM and the CPTO; everyone lands on their own desk. */
 function Only({ rule, children }: { rule: 'portfolio' | 'backoffice' | 'contracts' | 'mizito' | 'cartable'; children: React.ReactNode }) {
@@ -54,11 +55,11 @@ function HostedSplash({ error, retry }: { error: string; retry: () => void }) {
     <div className="band fixed inset-0 z-[90] grid place-items-center px-6 text-center">
       <div className="relative z-10 max-w-md rise">
         {msg ? (
-          <div className="display text-4xl text-white">{fa ? 'مدار' : 'Madar'}</div>
+          <div className="display text-4xl text-white">{fa ? APP_NAME_FA : APP_NAME_EN}</div>
         ) : (
           <MadarLoader className="mx-auto h-36 w-36" />
         )}
-        <div className={msg ? 'mt-2 font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-band-sub' : 'madar-word mt-8 font-mono text-[0.6875rem] uppercase tracking-[0.35em] text-band-sub'}>Shad · Madar</div>
+        <div className={msg ? 'mt-2 font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-band-sub' : 'madar-word mt-8 font-mono text-[0.6875rem] uppercase tracking-[0.35em] text-band-sub'}>{SHAD_WORDMARK}</div>
         {msg ? (
           <>
             <p className="mt-8 whitespace-pre-line [overflow-wrap:anywhere] text-sm leading-7 text-[#ff8a9a]" dir="auto">{msg}</p>

@@ -31,11 +31,13 @@ export async function otpCall<T = Record<string, unknown>>(apiUrl: string, body:
 const CFG_KEY = 'madar.config'
 
 export function loadConfig(): Config {
+  const env = import.meta.env
+  if (env.VITE_API_URL === '/api') return { apiUrl: '/api', token: '' }
+
   try {
     const raw = localStorage.getItem(CFG_KEY)
     if (raw) return JSON.parse(raw)
   } catch {}
-  const env = import.meta.env
   return { apiUrl: env.VITE_API_URL || '', token: '', googleClientId: env.VITE_GOOGLE_CLIENT_ID || '' }
 }
 
@@ -65,6 +67,9 @@ async function readJson(res: Response) {
     // show what actually answered, so the misconfiguration is obvious
     const title = (text.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1] || '').trim()
     const where = res.url.replace(/[?#].*$/, '')
+    if (import.meta.env.VITE_API_URL === '/api') {
+      throw new Error(`سرور تسکامون به‌جای داده یک صفحه برگرداند (${res.status}${title ? ` · ${title}` : ''}). صفحه را تازه کنید و دوباره امتحان کنید.`)
+    }
     throw new Error(`آدرس داده به‌جای داده یک صفحه برگرداند (${res.status}${title ? ` · ${title}` : ''}). انتشار «Madar Team» باید Web app با Execute as: Me و Who has access: Anyone باشد و API_URL همان آدرس باشد.\n${where}`)
   }
   return JSON.parse(text)
@@ -90,7 +95,7 @@ export async function fetchAll(c: Config, since = '', held: Record<string, strin
   } catch (e) {
     // the partial answer failed: once more, the plain way (everything), before giving up
     if (held && !(e instanceof Error && /دسترسی|رمز|نشست|sign|token|auth/i.test(e.message))) return fetchAll(c, '', null)
-    if (ctl.signal.aborted) throw new Error('سرور مدار پاسخ نداد؛ دوباره امتحان کنید')
+    if (ctl.signal.aborted) throw new Error('سرور تسکامون پاسخ نداد؛ دوباره امتحان کنید')
     throw e
   } finally {
     clearTimeout(timer)

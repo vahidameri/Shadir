@@ -5,7 +5,7 @@ import { useStore } from '../lib/store'
 import { loadGis, useGoogle } from '../lib/google'
 import { useI18n, L, lbl } from '../lib/i18n'
 import { NoyanTag, ShadIntro, ShadMark } from './Brand'
-import { VERSION } from '../lib/brand'
+import { APP_NAME, SHAD_WORDMARK, VERSION } from '../lib/brand'
 import { cx } from './ui'
 
 function GoogleG() {
@@ -180,7 +180,7 @@ export function Login({ onEnter }: { onEnter: () => void }) {
         <header className="flex items-center justify-between px-6 py-5 sm:px-10">
           <div className="flex items-center gap-3">
             <ShadMark className="h-8 w-8" />
-            <span className="font-mono text-[0.6875rem] uppercase tracking-[0.25em] text-white/50">Shad · Madar</span>
+            <span className="font-mono text-[0.6875rem] uppercase tracking-[0.25em] text-white/50">{SHAD_WORDMARK}</span>
           </div>
           <div className="glass flex rounded-full p-0.5">
             {(['fa', 'en'] as const).map((l) => (
@@ -201,13 +201,13 @@ export function Login({ onEnter }: { onEnter: () => void }) {
               <span className="orb orb-inner"><i /></span>
               <ShadIntro className="absolute inset-0 m-auto h-[42%] w-[42%]" />
             </div>
-            <h2 className="display hero-title mt-5 text-5xl leading-none sm:text-7xl lg:text-8xl">{L('مدار', 'Madar')}</h2>
-            <p className="hero-sub mt-3 text-sm text-white/60 sm:text-lg">{L('مدار دپارتمان محصول و فناوری شاد', 'Shad product & technology, in one orbit')}</p>
+            <h2 className="display hero-title mt-5 text-5xl leading-none sm:text-7xl lg:text-8xl">{APP_NAME()}</h2>
+            <p className="hero-sub mt-3 text-sm text-white/60 sm:text-lg">{L('دپارتمان محصول و فناوری شاد', 'Shad Product and Technology Department')}</p>
           </section>
 
           {/* the form, on glass */}
           <section className="login-card light-card mx-auto w-full min-w-0 max-w-md rounded-[2rem] p-7 text-[#16181d] sm:p-9">
-            <h1 className="text-2xl font-semibold tracking-tight">{L('ورود به مدار', 'Sign in to Madar')}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">{L(`ورود به ${APP_NAME()}`, `Sign in to ${APP_NAME()}`)}</h1>
             <p className="mt-1.5 text-sm text-[#6b7180]">{L('خوش آمدید', 'Welcome back')}</p>
 
             {g.otp || g.apiUrl === '/api' ? (
